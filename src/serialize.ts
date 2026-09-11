@@ -123,9 +123,14 @@ function writeNode(node: Node, indent: string, lines: string[]): void {
 	}
 
 	if (isContainer(node)) {
-		lines.push(`${inner}children:`);
+		// a bare `children:` reads back as null, so an empty container needs []
+		if (node.children.length === 0) {
+			lines.push(`${inner}children: []`);
+		} else {
+			lines.push(`${inner}children:`);
 
-		for (const child of node.children) writeNode(child, `${inner}  `, lines);
+			for (const child of node.children) writeNode(child, `${inner}  `, lines);
+		}
 	}
 }
 
@@ -137,9 +142,14 @@ export function serializeConfig(config: DashboardConfig): string {
 	lines.push(`  type: ${root.type}`);
 
 	for (const [k, v] of fields(root)) lines.push(`  ${k}: ${v}`);
-	lines.push("  children:");
 
-	for (const child of root.children) writeNode(child, "    ", lines);
+	if (root.children.length === 0) {
+		lines.push("  children: []");
+	} else {
+		lines.push("  children:");
+
+		for (const child of root.children) writeNode(child, "    ", lines);
+	}
 
 	return lines.join("\n") + "\n";
 }

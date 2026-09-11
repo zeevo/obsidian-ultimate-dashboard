@@ -350,9 +350,13 @@ check("flat form wraps panels as children", flat.root.children.length === 1);
 
 rejects("layout:\n  type: line\n  property: weight", "panel as root rejected");
 
-rejects("layout:\n  type: row", "container without children rejected");
+rejects("layout:\n  type: row", "container with no children key rejected");
 
-rejects("layout:\n  type: row\n  children: []", "empty children rejected");
+check("an empty container is allowed", (() => {
+		const c = parseConfig("layout:\n  type: row\n  children: []");
+
+		return isContainer(c.root) && c.root.children.length === 0;
+	})());
 
 rejects("layout:\n  type: line\n  property: w\n  children: [{ type: heatmap, property: lift }]", "panel with children rejected");
 
@@ -519,6 +523,32 @@ layout:
 	try { parseConfig(serializeConfig(bare)); } catch { rejected = true; }
 
 	check("an unconfigured panel is caught by the parser", rejected);
+
+	// dropping a divider makes an empty container, which must survive a save
+	const withDivider = base();
+
+	withDivider.root.children.push({ type: "row", children: [] });
+	const dividerText = serializeConfig(withDivider);
+
+	check("an empty divider serialises as an explicit list", dividerText.includes("children: []"),
+		dividerText.split("\n").filter((l) => l.includes("children")).join(" | "));
+
+	let dividerOk = true;
+	let dividerMsg = "";
+
+	try { parseConfig(dividerText); } catch (e) { dividerOk = false; dividerMsg = (e as Error).message; }
+
+	check("an empty divider re-parses", dividerOk, dividerMsg);
+
+	// and nested empties too, since dividers can hold dividers
+	const deepEmpty = base();
+
+	deepEmpty.root.children.push({ type: "row", children: [{ type: "column", children: [] }] });
+	let deepOk = true;
+
+	try { parseConfig(serializeConfig(deepEmpty)); } catch { deepOk = false; }
+
+	check("a nested empty divider re-parses", deepOk);
 
 	// removing a panel
 	const pruned = base();

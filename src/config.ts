@@ -309,8 +309,10 @@ function parseNode(raw: unknown, where: string, parent: Parent, depth: number): 
 	if (CONTAINERS.includes(type as ContainerKind)) {
 		const kind = type as ContainerKind;
 
-		if (!Array.isArray(p.children) || p.children.length === 0) {
-			throw new ConfigError(`${where}: \`${kind}\` needs a non-empty \`children\` list`);
+		// An empty list is allowed: the visual editor creates a divider before you
+		// fill it. A missing key is still an error, since that is a typo.
+		if (!Array.isArray(p.children)) {
+			throw new ConfigError(`${where}: \`${kind}\` needs a \`children\` list`);
 		}
 
 		if (kind !== "grid" && (p.columns !== undefined || p.minWidth !== undefined)) {
