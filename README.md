@@ -22,10 +22,9 @@ it; drag one already on the canvas to move it anywhere, including into a
 divider. Dropping a type that needs settings, like a heatmap with no property
 yet, opens its configuration straight away.
 
-Each card carries up and down arrows to reorder it within its parent, a pencil
-to reconfigure, and a bin to remove. The arrows are the dependable route:
-dragging means hitting a gap, and inside a Columns divider those gaps are
-narrow.
+Each card carries a pencil to reconfigure and a bin to remove. Dropping is
+handled per container rather than per gap: the whole container is a target, and
+a line shows which side of a card the panel will land on.
 
 The palette's **dividers** are containers: *Columns* lays its children out side
 by side, *Rows* stacks them. Drop panels inside one to segment the dashboard,

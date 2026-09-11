@@ -180,21 +180,6 @@ export class VisualEditor {
 
 	private controls(head: HTMLElement, node: Node, path: number[]): void {
 		const actions = head.createDiv({ cls: "udash-node-actions" });
-		const parent = this.parentOf(path);
-		const index = path[path.length - 1];
-
-		// Buttons are the reliable way to reorder: dragging depends on hitting a
-		// gap, and inside a Columns divider those gaps are narrow.
-		this.moveButton(actions, "chevron-up", "Move up", parent !== null && index > 0, () =>
-			this.swap(path, -1),
-		);
-		this.moveButton(
-			actions,
-			"chevron-down",
-			"Move down",
-			parent !== null && index < parent.children.length - 1,
-			() => this.swap(path, 1),
-		);
 
 		if (!isContainer(node)) {
 			const edit = actions.createEl("button", { cls: "udash-icon-button" });
@@ -218,41 +203,6 @@ export class VisualEditor {
 			this.removeAt(path);
 			this.commit();
 		});
-	}
-
-	private moveButton(
-		actions: HTMLElement,
-		icon: string,
-		tip: string,
-		enabled: boolean,
-		run: () => void,
-	): void {
-		const button = actions.createEl("button", { cls: "udash-icon-button" });
-
-		setIcon(button, icon);
-		setTooltip(button, tip);
-		button.disabled = !enabled;
-		button.draggable = false;
-		button.addEventListener("click", (e) => {
-			e.stopPropagation();
-
-			if (enabled) run();
-		});
-	}
-
-	/** Moves a node one place within its parent. */
-	private swap(path: number[], delta: number): void {
-		const parent = this.parentOf(path);
-
-		if (!parent) return;
-		const from = path[path.length - 1];
-		const to = from + delta;
-
-		if (to < 0 || to >= parent.children.length) return;
-		const [node] = parent.children.splice(from, 1);
-
-		parent.children.splice(to, 0, node);
-		this.commit();
 	}
 
 	private setDragging(on: boolean): void {

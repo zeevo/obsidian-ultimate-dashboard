@@ -613,10 +613,6 @@
 	color: var(--text-normal);
 }
 
-.udash-editor .udash-icon-button:disabled {
-	opacity: 0.25;
-	cursor: default;
-}
 
 /* A card is itself a drop target: the edge you are nearest shows where it lands. */
 /* Only a fade. `pointer-events: none` here also stops the card receiving
