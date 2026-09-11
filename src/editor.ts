@@ -102,6 +102,8 @@ export class VisualEditor {
 		chip.addEventListener("dragstart", (e) => {
 			this.dragging = { kind: "new", type };
 			e.dataTransfer?.setData("text/plain", type);
+
+			if (e.dataTransfer) e.dataTransfer.effectAllowed = "copyMove";
 			this.setDragging(true);
 		});
 		chip.addEventListener("dragend", () => this.endDrag());
@@ -112,7 +114,11 @@ export class VisualEditor {
 	private renderContainer(el: HTMLElement, node: ContainerNode, path: number[]): void {
 		const box = el.createDiv({ cls: `udash-node udash-node-${node.type}` });
 
-		if (path.length > 0) this.makeDraggable(box, path);
+		if (path.length > 0) {
+			this.makeDraggable(box, path);
+			this.makeDropTarget(box, path);
+		}
+
 		const head = box.createDiv({ cls: "udash-node-head" });
 
 		head.createSpan({ cls: "udash-node-kind", text: label(node.type) });
@@ -146,6 +152,7 @@ export class VisualEditor {
 		const box = el.createDiv({ cls: `udash-node udash-node-leaf udash-node-${node.type}` });
 
 		this.makeDraggable(box, path);
+		this.makeDropTarget(box, path);
 
 		const head = box.createDiv({ cls: "udash-node-head" });
 
@@ -154,15 +161,59 @@ export class VisualEditor {
 		this.controls(head, node, path);
 	}
 
+	/** Lets a card accept a drop, inserting before or after itself. */
+	private makeDropTarget(box: HTMLElement, path: number[]): void {
+		const parent = this.parentOf(path);
+
+		if (!parent) return;
+		const index = path[path.length - 1];
+
+		const after = (e: DragEvent) => {
+			const r = box.getBoundingClientRect();
+			const horizontal = r.width > r.height * 2;
+
+			return horizontal ? e.clientX > r.left + r.width / 2 : e.clientY > r.top + r.height / 2;
+		};
+
+		box.addEventListener("dragover", (e) => {
+			if (!this.dragging) return;
+			e.preventDefault();
+			e.stopPropagation();
+
+			if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+			box.toggleClass("is-over-after", after(e));
+			box.toggleClass("is-over-before", !after(e));
+		});
+		box.addEventListener("dragleave", () => {
+			box.removeClass("is-over-after");
+			box.removeClass("is-over-before");
+		});
+		box.addEventListener("drop", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			const target = { parent, index: after(e) ? index + 1 : index };
+
+			box.removeClass("is-over-after");
+			box.removeClass("is-over-before");
+			this.drop(target);
+		});
+	}
+
 	private makeDraggable(box: HTMLElement, path: number[]): void {
 		box.draggable = true;
 		box.addEventListener("dragstart", (e) => {
 			this.dragging = { kind: "move", path };
 			e.dataTransfer?.setData("text/plain", pathOf(path));
+
+			if (e.dataTransfer) e.dataTransfer.effectAllowed = "copyMove";
 			e.stopPropagation();
 			this.setDragging(true);
+			box.addClass("is-dragging-self");
 		});
-		box.addEventListener("dragend", () => this.endDrag());
+		box.addEventListener("dragend", () => {
+			box.removeClass("is-dragging-self");
+			this.endDrag();
+		});
 	}
 
 	private controls(head: HTMLElement, node: Node, path: number[]): void {
@@ -257,6 +308,8 @@ export class VisualEditor {
 			if (!this.dragging) return;
 			e.preventDefault();
 			e.stopPropagation();
+
+			if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
 			zone.addClass("is-over");
 		});
 		zone.addEventListener("dragleave", () => zone.removeClass("is-over"));

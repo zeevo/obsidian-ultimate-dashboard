@@ -612,3 +612,16 @@
 	opacity: 0.25;
 	cursor: default;
 }
+
+/* A card is itself a drop target: the edge you are nearest shows where it lands. */
+.udash-editor .udash-node.is-over-before {
+	box-shadow: inset 0 3px 0 0 var(--interactive-accent);
+}
+
+.udash-editor .udash-node.is-over-after {
+	box-shadow: inset 0 -3px 0 0 var(--interactive-accent);
+}
+
+.udash-editor .udash-node.is-dragging-self {
+	opacity: 0.4;
+}
