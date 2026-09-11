@@ -2,18 +2,10 @@ import { parseYaml } from "obsidian";
 
 export type Agg = "latest" | "mean" | "count" | "sum" | "delta";
 
-/** How many grid columns a node occupies. `full` always spans the whole row. */
-export type Span = number | "full";
-
-/** `auto` fits as many `minWidth` columns as the page allows. */
-export type Columns = number | "auto";
-
 /** Shared by every node, container or leaf. */
 interface NodeBase {
-	/** Growth factor inside a row or column. */
+	/** Growth factor within its container. */
 	flex?: number;
-	/** Columns to occupy inside a grid. */
-	span?: Span;
 }
 
 /** A date window, shared by any panel that plots over time. */
@@ -99,17 +91,13 @@ export type CalendarPanel = UpcomingPanel | MonthPanel;
 
 export type Panel = StatsPanel | HeatmapPanel | LinePanel | UpcomingPanel | MonthPanel;
 
-export type ContainerKind = "row" | "column" | "grid";
+export type ContainerKind = "row" | "column";
 
 export interface ContainerNode extends NodeBase {
 	type: ContainerKind;
 	children: Node[];
 	/** Space between children, in pixels. Inherited from the parent if unset. */
 	gap?: number;
-	/** Grid only: fixed column count, or `auto`. */
-	columns?: Columns;
-	/** Grid only: column width the `auto` grid fits against. */
-	minWidth?: number;
 	/** Row only: whether children wrap onto further lines. Defaults to true. */
 	wrap?: boolean;
 }
@@ -126,7 +114,7 @@ export class ConfigError extends Error {}
 
 const AGGS: Agg[] = ["latest", "mean", "count", "sum", "delta"];
 
-const CONTAINERS: ContainerKind[] = ["row", "column", "grid"];
+const CONTAINERS: ContainerKind[] = ["row", "column"];
 
 const LEAVES = ["stats", "heatmap", "line", "upcoming", "calendar"];
 
@@ -227,70 +215,21 @@ function parseTile(raw: unknown, i: number, where: string): Tile {
 /** What kind of container a node sits directly inside. */
 interface Parent {
 	kind: ContainerKind;
-	/** Column count of the enclosing grid, when it is fixed. */
-	columns?: Columns;
 }
 
-function parseColumns(v: unknown, where: string): Columns | undefined {
-	if (v === undefined || v === null) return undefined;
-
-	if (v === "auto") return "auto";
-
-	if (typeof v !== "number" || !Number.isInteger(v) || v < 1 || v > 12) {
-		throw new ConfigError(`${where}: \`columns\` must be "auto" or a whole number from 1 to 12`);
+function parseSizing(p: Record<string, unknown>, where: string): NodeBase {
+	if (p.span !== undefined) {
+		throw new ConfigError(
+			`${where}: \`span\` is gone. Size children with \`flex\` inside a row or column.`,
+		);
 	}
 
-	return v;
-}
+	if (p.flex === undefined || p.flex === null) return {};
+	const f = optNum(p.flex, `${where} flex`)!;
 
-function parseSizing(p: Record<string, unknown>, where: string, parent: Parent): NodeBase {
-	const out: NodeBase = {};
+	if (f <= 0) throw new ConfigError(`${where}: \`flex\` must be greater than zero`);
 
-	if (p.flex !== undefined && p.flex !== null) {
-		if (parent.kind === "grid") {
-			throw new ConfigError(
-				`${where}: \`flex\` only applies inside a row or column. Use \`span\` inside a grid.`,
-			);
-		}
-
-		const f = optNum(p.flex, `${where} flex`)!;
-
-		if (f <= 0) throw new ConfigError(`${where}: \`flex\` must be greater than zero`);
-		out.flex = f;
-	}
-
-	if (p.span !== undefined && p.span !== null) {
-		if (parent.kind !== "grid") {
-			throw new ConfigError(
-				`${where}: \`span\` only applies inside a grid. Use \`flex\` inside a row or column.`,
-			);
-		}
-
-		if (p.span === "full") {
-			out.span = "full";
-		} else {
-			const n = p.span;
-
-			if (typeof n !== "number" || !Number.isInteger(n) || n < 1) {
-				throw new ConfigError(`${where}: \`span\` must be a positive whole number or "full"`);
-			}
-
-			if (parent.columns === "auto" || parent.columns === undefined) {
-				throw new ConfigError(
-					`${where}: a numeric \`span\` needs the enclosing grid to set a fixed \`columns\`, ` +
-						`because an auto grid has no fixed column count. Use \`span: full\` instead.`,
-				);
-			}
-
-			if (n > parent.columns) {
-				throw new ConfigError(`${where}: \`span: ${n}\` exceeds the grid's \`columns: ${parent.columns}\``);
-			}
-
-			out.span = n;
-		}
-	}
-
-	return out;
+	return { flex: f };
 }
 
 function parseNode(raw: unknown, where: string, parent: Parent, depth: number): Node {
@@ -304,7 +243,7 @@ function parseNode(raw: unknown, where: string, parent: Parent, depth: number): 
 
 	const p = raw as Record<string, unknown>;
 	const type = str(p.type, `${where} type`);
-	const sizing = parseSizing(p, where, parent);
+	const sizing = parseSizing(p, where);
 
 	if (CONTAINERS.includes(type as ContainerKind)) {
 		const kind = type as ContainerKind;
@@ -315,23 +254,22 @@ function parseNode(raw: unknown, where: string, parent: Parent, depth: number): 
 			throw new ConfigError(`${where}: \`${kind}\` needs a \`children\` list`);
 		}
 
-		if (kind !== "grid" && (p.columns !== undefined || p.minWidth !== undefined)) {
-			throw new ConfigError(`${where}: \`columns\` and \`minWidth\` only apply to a grid`);
+		if (p.columns !== undefined || p.minWidth !== undefined) {
+			throw new ConfigError(
+				`${where}: \`columns\` and \`minWidth\` are gone. Build columns with a row of children.`,
+			);
 		}
 
 		if (kind !== "row" && p.wrap !== undefined) {
 			throw new ConfigError(`${where}: \`wrap\` only applies to a row`);
 		}
 
-		const columns = kind === "grid" ? (parseColumns(p.columns, where) ?? "auto") : undefined;
-		const childParent: Parent = { kind, columns };
+		const childParent: Parent = { kind };
 
 		return {
 			type: kind,
 			...sizing,
 			gap: optNum(p.gap, `${where} gap`),
-			columns,
-			minWidth: optNum(p.minWidth, `${where} minWidth`),
 			wrap: typeof p.wrap === "boolean" ? p.wrap : undefined,
 			children: p.children.map((c, i) =>
 				parseNode(c, `${where} > ${kind}[${i}]`, childParent, depth + 1),
@@ -342,7 +280,7 @@ function parseNode(raw: unknown, where: string, parent: Parent, depth: number): 
 	if (p.children !== undefined) {
 		throw new ConfigError(
 			`${where}: \`${type}\` is a panel and cannot have \`children\`. ` +
-				`Wrap panels in a row, column or grid instead.`,
+				`Wrap panels in a row or column instead.`,
 		);
 	}
 
@@ -351,10 +289,7 @@ function parseNode(raw: unknown, where: string, parent: Parent, depth: number): 
 			throw new ConfigError(`${where}: stats needs a non-empty \`tiles\` list`);
 		}
 
-		// a tile row reads best across the full width of its grid
-		const span = sizing.span ?? (parent.kind === "grid" ? "full" : undefined);
-
-		return { type: "stats", ...sizing, span, tiles: p.tiles.map((t, i) => parseTile(t, i, where)) };
+		return { type: "stats", ...sizing, tiles: p.tiles.map((t, i) => parseTile(t, i, where)) };
 	}
 
 	if (type === "heatmap") {
@@ -477,7 +412,7 @@ export function parseConfig(source: string): DashboardConfig {
 
 		if (!isContainer(root)) {
 			throw new ConfigError(
-				`layout: the root must be a row, column or grid, not a "${root.type}" panel`,
+				`layout: the root must be a row or column, not a "${root.type}" panel`,
 			);
 		}
 
@@ -489,15 +424,12 @@ export function parseConfig(source: string): DashboardConfig {
 		throw new ConfigError("`panels` must be a non-empty list, or use `layout`");
 	}
 
-	const columns = parseColumns(c.columns, "top level") ?? "auto";
-	const parent: Parent = { kind: "grid", columns };
+	const parent: Parent = { kind: "column" };
 
 	return {
 		folder,
 		root: {
-			type: "grid",
-			columns,
-			minWidth: optNum(c.minWidth, "minWidth") ?? 520,
+			type: "column",
 			gap: optNum(c.gap, "gap") ?? 20,
 			children: c.panels.map((p, i) => parseNode(p, `panel[${i}]`, parent, 1)),
 		},

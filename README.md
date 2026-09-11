@@ -31,8 +31,7 @@ by side, *Rows* stacks them. Drop panels inside one to segment the dashboard,
 and nest them for more involved layouts.
 
 Every container, the outermost one included, has a pencil. Its **Layout**
-setting switches between rows, columns and a grid, so nothing about the shape is
-fixed: a new dashboard is a plain stack, and you build any arrangement by adding
+setting switches between rows and columns, so nothing about the shape is fixed: a new dashboard is a plain stack, and you build any arrangement by adding
 dividers rather than configuring a preset. Only the outermost container cannot
 be moved or deleted.
 
@@ -97,11 +96,13 @@ Notes are picked up when they live in `folder` and are named `YYYY-MM-DD`.
 
 Panels are leaves of a layout tree. Three container types hold `children`:
 
-| Container | Behaviour | Sizes children with |
-|-----------|-----------|---------------------|
-| `column` | stacks vertically | `flex` |
-| `row` | side by side, wrapping by default | `flex` |
-| `grid` | CSS grid | `span` |
+| Container | Behaviour |
+|-----------|-----------|
+| `column` | stacks its children vertically |
+| `row` | lays them side by side, wrapping by default |
+
+There is no grid type: two columns is a `row` with two children, and anything
+more elaborate is those two nesting.
 
 ```yaml
 layout:
@@ -116,12 +117,11 @@ layout:
         - { type: line, property: weight, rolling: 7, flex: 2 }
         - { type: heatmap, property: lift, flex: 1 }
 
-    - type: grid
-      columns: 3
+    - type: row
       children:
         - { type: heatmap, property: cardio, intensity: miles }
         - { type: heatmap, property: vitamins }
-        - { type: heatmap, property: read, span: 1 }
+        - { type: heatmap, property: read }
 ```
 
 Containers nest to 8 levels. The root must be a container, and a panel cannot
@@ -131,22 +131,22 @@ take `children`: wrap panels in a `row`, `column` or `grid` instead.
 
 | Key | Applies to | Meaning |
 |-----|-----------|---------|
-| `gap` | all | Space between children, in px. Inherited when unset |
-| `columns` | grid | `auto`, or a whole number from 1 to 12 |
-| `minWidth` | grid | Column width the `auto` grid fits against |
+| `gap` | both | Space between children, in px. Inherited when unset |
 | `wrap` | row | `false` to keep children on one line |
 
 **Child sizing**
+
+| Key | Meaning |
+|-----|---------|
+| `flex` | Growth factor, like CSS `flex-grow`. Two children at `flex: 1` split the row evenly |
 
 | Key | Valid inside | Meaning |
 |-----|-------------|---------|
 | `flex` | row, column | Growth factor, like CSS `flex-grow` |
 | `span` | grid | Columns to occupy, or `full` |
 
-Using the wrong one is an error naming the node, for instance
-`layout > row[0]: \`span\` only applies inside a grid`. A numeric `span` needs
-its grid to set a fixed `columns`, since an auto grid has no fixed column count;
-`span: full` works in either. A `stats` panel inside a grid defaults to `full`.
+`span`, `columns` and `minWidth` were removed along with the grid type; the
+parser rejects them with a message pointing at the replacement.
 
 Below 700px every row becomes a column and every grid a single track, so a
 deeply nested dashboard stays readable in a split pane or on a phone.
@@ -281,10 +281,9 @@ needs a timezone database.
 
 ### Flat form
 
-The older flat form still works and is treated as a single grid:
+The older flat form still works and is treated as a single column:
 
 ```yaml
-columns: 2
 gap: 20
 panels:
   - { type: stats, tiles: [...] }

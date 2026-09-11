@@ -44,8 +44,6 @@ function fields(node: Node): [string, string][] {
 
 	if (isContainer(node)) {
 		put("gap", node.gap);
-		put("columns", node.columns);
-		put("minWidth", node.minWidth);
 		put("wrap", node.wrap);
 	} else if (node.type === "stats") {
 		// tiles are written separately, as a nested list
@@ -87,7 +85,6 @@ function fields(node: Node): [string, string][] {
 	}
 
 	put("flex", node.flex);
-	put("span", node.span);
 
 	return out;
 }

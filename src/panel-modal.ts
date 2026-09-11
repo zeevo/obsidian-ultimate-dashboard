@@ -77,7 +77,6 @@ export class PanelModal extends Modal {
 				.addDropdown((dd) => {
 					dd.addOption("column", "Rows, stacked");
 					dd.addOption("row", "Columns, side by side");
-					dd.addOption("grid", "Grid");
 					dd.setValue(node.type);
 					dd.onChange((v) => {
 						retype(node, toKind(v));
@@ -88,15 +87,6 @@ export class PanelModal extends Modal {
 				});
 
 			this.number("Gap (px)", () => node.gap, (v) => (node.gap = v));
-
-			if (node.type === "grid") {
-				this.number(
-					"Columns",
-					() => (node.columns === "auto" ? undefined : node.columns),
-					(v) => (node.columns = v ?? "auto"),
-				);
-				this.number("Min column width (px)", () => node.minWidth, (v) => (node.minWidth = v));
-			}
 		}
 
 		new Setting(contentEl).addButton((b) =>
@@ -242,14 +232,13 @@ const LABELS = new Map<Node["type"], string>([
 	["calendar", "Month"],
 	["row", "Columns"],
 	["column", "Rows"],
-	["grid", "Grid"],
 ]);
 
 export function label(type: Node["type"]): string {
 	return LABELS.get(type) ?? type;
 }
 
-const KINDS: ContainerKind[] = ["row", "column", "grid"];
+const KINDS: ContainerKind[] = ["row", "column"];
 
 function toKind(v: string): ContainerKind {
 	return KINDS.find((k) => k === v) ?? "column";
@@ -264,12 +253,6 @@ function retype(node: Node, kind: ContainerKind): void {
 	if (!isContainer(node)) return;
 	node.type = kind;
 
-	if (kind !== "grid") {
-		delete node.columns;
-		delete node.minWidth;
-	} else if (node.columns === undefined) {
-		node.columns = "auto";
-	}
-
+	// `wrap` is a row option; leaving it on a column is rejected on save
 	if (kind !== "row") delete node.wrap;
 }

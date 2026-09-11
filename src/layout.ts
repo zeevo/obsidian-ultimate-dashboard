@@ -4,16 +4,9 @@ import { fillCalendar, fillMonth, monthWindow, renderHeatmap, renderLine, render
 
 const DEFAULT_GAP = 20;
 
-const DEFAULT_MIN_WIDTH = 520;
 
 /** Applies a node's own sizing within whatever container encloses it. */
 function applySizing(el: HTMLElement, node: Node): void {
-	if (node.span === "full") {
-		el.style.gridColumn = "1 / -1";
-	} else if (node.span !== undefined) {
-		el.style.gridColumn = `span ${node.span}`;
-	}
-
 	if (node.flex !== undefined) {
 		// grow by the factor, never overflow on shrink
 		el.style.flex = `${node.flex} 1 0`;
@@ -25,21 +18,12 @@ function applyContainer(el: HTMLElement, node: ContainerNode, inheritedGap: numb
 	const gap = node.gap ?? inheritedGap;
 	el.style.gap = `${gap}px`;
 
-	if (node.type === "grid") {
-		el.style.display = "grid";
-		el.style.alignItems = "start";
-		el.style.gridTemplateColumns =
-			node.columns === undefined || node.columns === "auto"
-				? `repeat(auto-fit, minmax(${node.minWidth ?? DEFAULT_MIN_WIDTH}px, 1fr))`
-				: `repeat(${node.columns}, minmax(0, 1fr))`;
-	} else {
-		el.style.display = "flex";
-		el.style.flexDirection = node.type === "row" ? "row" : "column";
+	el.style.display = "flex";
+	el.style.flexDirection = node.type === "row" ? "row" : "column";
 
-		if (node.type === "row") {
-			el.style.flexWrap = node.wrap === false ? "nowrap" : "wrap";
-			el.style.alignItems = "flex-start";
-		}
+	if (node.type === "row") {
+		el.style.flexWrap = node.wrap === false ? "nowrap" : "wrap";
+		el.style.alignItems = "flex-start";
 	}
 
 	return gap;

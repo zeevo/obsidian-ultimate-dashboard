@@ -100,7 +100,7 @@ panels:
 
 check("valid config parses", good.root.children.length === 2 && good.folder === "Daily");
 
-check("minWidth defaults to 520", good.root.minWidth === 520);
+check("gap defaults to 20", good.root.gap === 20);
 
 const rejects = (src: string, name: string) => {
 	try { parseConfig(src); check(name, false, "no error thrown"); }
@@ -313,11 +313,10 @@ layout:
       children:
         - { type: line, property: weight, flex: 2 }
         - { type: heatmap, property: lift }
-    - type: grid
-      columns: 3
+    - type: row
       children:
         - { type: stats, tiles: [{ label: A, property: weight }] }
-        - { type: heatmap, property: read, span: 2 }
+        - { type: heatmap, property: read, flex: 2 }
         - { type: heatmap, property: vitamins }
 `);
 
@@ -329,22 +328,22 @@ check("two branches", tree.root.children.length === 2);
 
 const row = tree.root.children[0] as ContainerNode;
 
-const grid = tree.root.children[1] as ContainerNode;
+const inner = tree.root.children[1] as ContainerNode;
 
 check("row nests two panels", isContainer(row) && row.type === "row" && row.children.length === 3 - 1);
 
 check("flex parsed inside a row", (row.children[0] as { flex?: number }).flex === 2);
 
-check("grid columns parsed", grid.columns === 3);
+check("nested row parsed", inner.type === "row" && inner.children.length === 3);
 
-check("span parsed inside a grid", (grid.children[1] as { span?: unknown }).span === 2);
+check("flex parsed on a nested child", (inner.children[1] as { flex?: number }).flex === 2);
 
-check("stats defaults to full inside a grid", (grid.children[0] as { span?: unknown }).span === "full");
+check("stats carries no implicit sizing", (inner.children[0] as { flex?: number }).flex === undefined);
 
 // legacy flat form must keep working
-const flat = parseConfig("columns: 2\npanels:\n  - { type: heatmap, property: lift }");
+const flat = parseConfig("panels:\n  - { type: heatmap, property: lift }");
 
-check("flat panels still parse", isContainer(flat.root) && flat.root.type === "grid" && flat.root.columns === 2);
+check("flat panels still parse", isContainer(flat.root) && flat.root.type === "column");
 
 check("flat form wraps panels as children", flat.root.children.length === 1);
 
@@ -360,15 +359,12 @@ check("an empty container is allowed", (() => {
 
 rejects("layout:\n  type: line\n  property: w\n  children: [{ type: heatmap, property: lift }]", "panel with children rejected");
 
-rejects("layout:\n  type: row\n  children: [{ type: heatmap, property: lift, span: 2 }]", "span inside a row rejected");
+rejects("layout:\n  type: row\n  children: [{ type: heatmap, property: lift, span: 2 }]", "span is rejected outright");
 
-rejects("layout:\n  type: grid\n  columns: 2\n  children: [{ type: heatmap, property: lift, flex: 2 }]", "flex inside a grid rejected");
 
-rejects("layout:\n  type: grid\n  children: [{ type: heatmap, property: lift, span: 2 }]", "numeric span in an auto grid rejected");
 
-rejects("layout:\n  type: grid\n  columns: 2\n  children: [{ type: heatmap, property: lift, span: 3 }]", "span wider than grid rejected");
 
-rejects("layout:\n  type: row\n  columns: 2\n  children: [{ type: heatmap, property: lift }]", "columns on a row rejected");
+rejects("layout:\n  type: row\n  columns: 2\n  children: [{ type: heatmap, property: lift }]", "columns is rejected outright");
 
 rejects("layout: { type: column, children: [] }\npanels: []", "layout plus panels rejected");
 
@@ -385,12 +381,10 @@ console.log("\nserialisation round trip");
 		// every leaf type, with the options each one carries
 		`folder: Daily
 layout:
-  type: grid
-  columns: 2
+  type: column
   gap: 22
   children:
     - type: stats
-      span: 1
       tiles:
         - { label: Weight, property: weight, agg: latest, unit: lb }
         - { label: Lifts, property: lift, agg: count, days: 7, target: 3 }
@@ -424,11 +418,9 @@ layout:
       children:
         - { type: line, property: weight, flex: 2 }
         - { type: heatmap, property: lift, flex: 1 }
-    - type: grid
-      columns: 3
-      minWidth: 300
+    - type: row
       children:
-        - { type: heatmap, property: read, span: 2 }
+        - { type: heatmap, property: read, flex: 2 }
         - { type: heatmap, property: vitamins, from: "2025-01-01", to: "2025-12-31" }`,
 	];
 
@@ -678,43 +670,37 @@ layout:
 	const retyped = parseConfig(`
 folder: Daily
 layout:
-  type: grid
-  columns: 3
-  minWidth: 300
+  type: row
+  wrap: false
   children:
     - { type: heatmap, property: lift }
 `);
 
-	const rootNode = retyped.root;
-
-	// grid -> row, as the Layout dropdown does
-	rootNode.type = "row";
-	delete rootNode.columns;
-	delete rootNode.minWidth;
+	retyped.root.type = "column";
+	delete retyped.root.wrap;
 
 	let retypeOk = true;
 	let retypeErr = "";
 
 	try { parseConfig(serializeConfig(retyped)); } catch (e) { retypeOk = false; retypeErr = (e as Error).message; }
 
-	check("a grid can become a row", retypeOk, retypeErr);
+	check("a row can become a column", retypeOk, retypeErr);
 
-	// leaving `columns` behind is exactly what the parser rejects
 	const stale = parseConfig(`
 folder: Daily
 layout:
-  type: grid
-  columns: 3
+  type: row
+  wrap: false
   children:
     - { type: heatmap, property: lift }
 `);
 
-	stale.root.type = "row";
+	stale.root.type = "column";
 	let staleRejected = false;
 
 	try { parseConfig(serializeConfig(stale)); } catch { staleRejected = true; }
 
-	check("a stale columns option would be rejected", staleRejected);
+	check("a stale wrap option would be rejected", staleRejected);
 
 	// the shipped default starts as a plain stack now
 	const fresh = parseConfig(DEFAULT_CONFIG);
@@ -842,11 +828,12 @@ console.log("\ntree rendering");
 	check("row inherits gap", rowEl.style["gap"] === "24px");
 	check("flex child sized", rowEl.children[0].style["flex"] === "2 1 0");
 
-	const gridEl = rootEl.children[1];
-	check("grid renders as grid", gridEl.style["display"] === "grid");
-	check("grid uses fixed columns", gridEl.style["gridTemplateColumns"] === "repeat(3, minmax(0, 1fr))");
-	check("span child sized", gridEl.children[1].style["gridColumn"] === "span 2");
-	check("stats spans full row", gridEl.children[0].style["gridColumn"] === "1 / -1");
+	const nestedEl = rootEl.children[1];
+
+	check("a nested row renders as a flex row",
+		nestedEl.style["display"] === "flex" && nestedEl.style["flexDirection"] === "row");
+	check("flex child inside it is sized", nestedEl.children[1].style["flex"] === "2 1 0");
+	check("an unsized child gets no inline flex", !nestedEl.children[0].style["flex"]);
 
 	const panels = host.all.filter((e) => e.classes.has("udash-panel"));
 	check("every leaf rendered a panel", panels.length === 5, `${panels.length}`);

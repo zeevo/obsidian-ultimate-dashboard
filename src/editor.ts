@@ -24,7 +24,7 @@ const DIVIDERS: { type: "row" | "column"; hint: string }[] = [
 
 /** A fresh node of the given type, with only what the parser demands. */
 function blank(type: Node["type"]): Node {
-	if (type === "stats") return { type: "stats", tiles: [], span: "full" };
+	if (type === "stats") return { type: "stats", tiles: [] };
 
 	if (type === "line") return { type: "line", property: "" };
 
@@ -33,8 +33,6 @@ function blank(type: Node["type"]): Node {
 	if (type === "upcoming") return { type: "upcoming" };
 
 	if (type === "calendar") return { type: "calendar" };
-
-	if (type === "grid") return { type: "grid", columns: 2, children: [] };
 
 	// SAFETY: the remaining cases are the container kinds, which take children.
 	return { type, children: [] } as ContainerNode;
@@ -124,10 +122,6 @@ export class VisualEditor {
 		const head = box.createDiv({ cls: "udash-node-head" });
 
 		head.createSpan({ cls: "udash-node-kind", text: label(node.type) });
-
-		if (node.type === "grid") {
-			head.createSpan({ cls: "udash-node-meta", text: `${node.columns ?? "auto"} columns` });
-		}
 
 		// the root cannot be moved or deleted, but it is still configurable
 		this.controls(head, node, path, path.length === 0);
