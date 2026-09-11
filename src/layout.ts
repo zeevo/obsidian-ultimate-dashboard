@@ -1,0 +1,102 @@
+import { CalendarPanel, ContainerNode, Node, isContainer } from "./config";
+import { DayRecord } from "./data";
+import { fillCalendar, fillMonth, monthWindow, renderHeatmap, renderLine, renderMonth, renderStats, renderUpcoming } from "./render";
+
+const DEFAULT_GAP = 20;
+
+const DEFAULT_MIN_WIDTH = 520;
+
+/** Applies a node's own sizing within whatever container encloses it. */
+function applySizing(el: HTMLElement, node: Node): void {
+	if (node.span === "full") {
+		el.style.gridColumn = "1 / -1";
+	} else if (node.span !== undefined) {
+		el.style.gridColumn = `span ${node.span}`;
+	}
+
+	if (node.flex !== undefined) {
+		// grow by the factor, never overflow on shrink
+		el.style.flex = `${node.flex} 1 0`;
+		el.style.minWidth = "0";
+	}
+}
+
+function applyContainer(el: HTMLElement, node: ContainerNode, inheritedGap: number): number {
+	const gap = node.gap ?? inheritedGap;
+	el.style.gap = `${gap}px`;
+
+	if (node.type === "grid") {
+		el.style.display = "grid";
+		el.style.alignItems = "start";
+		el.style.gridTemplateColumns =
+			node.columns === undefined || node.columns === "auto"
+				? `repeat(auto-fit, minmax(${node.minWidth ?? DEFAULT_MIN_WIDTH}px, 1fr))`
+				: `repeat(${node.columns}, minmax(0, 1fr))`;
+	} else {
+		el.style.display = "flex";
+		el.style.flexDirection = node.type === "row" ? "row" : "column";
+
+		if (node.type === "row") {
+			el.style.flexWrap = node.wrap === false ? "nowrap" : "wrap";
+			el.style.alignItems = "flex-start";
+		}
+	}
+
+	return gap;
+}
+
+/**
+ * Walks the layout tree, creating a div per node. Containers set their own
+ * display mode; leaves render a panel. Errors are contained to the node that
+ * caused them so one bad panel does not blank the dashboard.
+ */
+/** Supplies calendar events; omitted when no feeds are configured. */
+export type CalendarFiller = (el: HTMLElement, panel: CalendarPanel) => void;
+
+export function renderNode(
+	parent: HTMLElement,
+	node: Node,
+	days: DayRecord[],
+	inheritedGap: number,
+	onError: (el: HTMLElement, message: string) => void,
+	fillCalendarPanel?: CalendarFiller,
+): void {
+	const el = parent.createDiv({ cls: `lifedash-node lifedash-${node.type}` });
+	applySizing(el, node);
+
+	if (isContainer(node)) {
+		const gap = applyContainer(el, node, inheritedGap);
+
+		for (const child of node.children) {
+			renderNode(el, child, days, gap, onError, fillCalendarPanel);
+		}
+
+		return;
+	}
+
+	el.addClass("lifedash-panel");
+
+	try {
+		if (node.type === "stats") renderStats(el, days, node);
+		else if (node.type === "heatmap") renderHeatmap(el, days, node);
+		else if (node.type === "line") renderLine(el, days, node);
+		else if (node.type === "upcoming") {
+			const shell = renderUpcoming(el, node);
+
+			if (fillCalendarPanel) fillCalendarPanel(shell, node);
+			else fillCalendar(shell, [], ["No calendars configured. Add one in settings."], false);
+		} else {
+			const { first } = monthWindow(node);
+			const shell = renderMonth(el, node, first);
+
+			if (fillCalendarPanel) fillCalendarPanel(shell, node);
+			else fillMonth(shell, node, first, [], ["No calendars configured. Add one in settings."]);
+		}
+	} catch (e) {
+		// SAFETY: the catch binding is whatever a panel renderer threw; Error is
+		// the only thing they construct, and a non-Error still stringifies here.
+		onError(el, `${node.type} panel failed: ${(e as Error).message}`);
+	}
+}
+
+export { DEFAULT_GAP };
