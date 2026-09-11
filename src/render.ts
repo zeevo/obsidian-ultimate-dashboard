@@ -593,6 +593,4 @@ const DEFAULT_BLANK_HEIGHT = 120;
 export function renderBlank(el: HTMLElement, panel: BlankPanel): void {
 	const box = el.createDiv({ cls: "udash-blank" });
 	box.style.minHeight = `${panel.height ?? DEFAULT_BLANK_HEIGHT}px`;
-
-	if (panel.label) box.createSpan({ cls: "udash-blank-label", text: panel.label });
 }

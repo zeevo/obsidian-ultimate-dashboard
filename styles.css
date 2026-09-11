@@ -621,13 +621,5 @@
 /* ----------------------------------------------------------------- blank */
 
 .udash-blank {
-	display: flex;
-	align-items: center;
-	justify-content: center;
 	height: 100%;
-}
-
-.udash-blank-label {
-	font-size: 0.8em;
-	color: var(--text-faint);
 }

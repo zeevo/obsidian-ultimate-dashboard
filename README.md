@@ -403,18 +403,17 @@ belongs in each slot.
 | Key | Meaning |
 |-----|---------|
 | `height` | How tall it stands, in pixels. Defaults to 120 |
-| `label` | Optional caption, to tell placeholders apart |
 
 ```yaml
 - type: row
   children:
-    - { type: blank, label: chart goes here, flex: 2 }
-    - { type: blank, label: sidebar, flex: 1 }
+    - { type: line, property: weight, flex: 2 }
+    - { type: blank, flex: 1 }
 ```
 
 Nothing is drawn: it is an invisible spacer, so it also works for pushing a
 row's other children into place. Use `flex` to try column widths and `height` to
-try row heights. Give it a `label` if you want to see where it lands.
+try row heights.
 
 ## Development
 

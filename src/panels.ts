@@ -106,8 +106,6 @@ export interface NotePanel extends NodeBase {
 
 export interface BlankPanel extends NodeBase {
 	type: typeof PanelKind.Blank;
-	/** Optional caption, so placeholders in a draft layout stay distinguishable. */
-	label?: string;
 	/** How tall the placeholder stands, in pixels. */
 	height?: number;
 }
@@ -299,12 +297,9 @@ const blankPanel: PanelSpec<BlankPanel> = {
 	type: PanelKind.Blank,
 	label: "Blank",
 	hint: "A placeholder that holds space",
-	fields: [
-		{ key: "label", kind: FieldKind.Text, label: "Caption" },
-		{ key: "height", kind: FieldKind.Number, label: "Height (px)" },
-	],
+	fields: [{ key: "height", kind: FieldKind.Number, label: "Height (px)" }],
 	blank: () => ({ type: PanelKind.Blank }),
-	summary: (p) => p.label ?? "placeholder",
+	summary: () => "placeholder",
 };
 
 /** Every panel type, keyed by its discriminant. */

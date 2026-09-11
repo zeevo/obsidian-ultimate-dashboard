@@ -415,7 +415,6 @@ layout:
       path: 0 All/Health.md
       height: 240
     - type: blank
-      label: TBD
       height: 80`,
 		// nesting, flex sizing and an explicit range
 		`folder: Notes
@@ -1058,19 +1057,18 @@ console.log("\nblank panel");
 
 {
 	const host = new El();
-	renderBlank(host, { id: "t", type: "blank", label: "TBD", height: 80 });
+	renderBlank(host, { id: "t", type: "blank", height: 80 });
 
 	const box = host.byClass("udash-blank")[0];
 
 	check("a box is drawn", !!box);
 	check("it stands at the declared height", box?.style.minHeight === "80px", box?.style.minHeight);
-	check("the caption shows", host.all.some((e) => e.text === "TBD"));
+	check("it draws nothing inside", box?.children.length === 0);
 
 	const bare = new El();
 	renderBlank(bare, { id: "t", type: "blank" });
 
 	check("height defaults rather than collapsing", bare.byClass("udash-blank")[0]?.style.minHeight === "120px");
-	check("no caption means no label element", bare.byClass("udash-blank-label").length === 0);
 
 	// it holds space and nothing else, so it must never ask to be configured
 	check("a blank never needs setup", !needsSetup(newNode("blank")));
