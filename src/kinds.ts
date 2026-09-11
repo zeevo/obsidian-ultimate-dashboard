@@ -23,8 +23,6 @@ export const PanelKind = {
 
 export type PanelKind = (typeof PanelKind)[keyof typeof PanelKind];
 
-export type NodeKind = ContainerKind | PanelKind;
-
 export const CONTAINER_KINDS = Object.values(ContainerKind);
 
 export const PANEL_KINDS = Object.values(PanelKind);

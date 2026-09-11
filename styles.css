@@ -122,7 +122,6 @@
 	color: var(--text-normal);
 }
 
-.udash-grid-line,
 .udash-svg .udash-grid {
 	stroke: currentColor;
 	opacity: 0.12;
@@ -533,56 +532,6 @@
 .udash-editor .udash-node-row > .udash-node-body > .udash-node {
 	flex: 1;
 	min-width: 0;
-}
-
-.udash-editor .udash-dropzone {
-	min-height: 10px;
-	border-radius: 4px;
-	transition: background 80ms ease;
-}
-
-/* Inside a Columns divider the gaps are thin vertical strips, but the empty
-   body is not a gap: it has to fill the row or its label wraps a word per line. */
-.udash-editor .udash-node-row > .udash-node-body > .udash-dropzone:not(.udash-dropzone-empty) {
-	min-height: 40px;
-	min-width: 10px;
-	flex: 0 0 10px;
-}
-
-.udash-editor .udash-dropzone.is-over {
-	background: color-mix(in srgb, var(--interactive-accent) 45%, transparent);
-	min-height: 14px;
-}
-
-/* An empty container is entirely a drop target, so a divider you just added is
-   as easy to hit as the gap between two existing panels. */
-.udash-editor .udash-dropzone-empty {
-	flex: 1 1 auto;
-	width: 100%;
-	min-width: 0;
-	min-height: 54px;
-	text-align: center;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	font-size: 0.76em;
-	color: var(--text-muted);
-	border: 1px dashed var(--background-modifier-border);
-	border-radius: 6px;
-}
-
-/* While something is in flight, every gap grows into a target you can hit. */
-.udash-editor.is-dragging .udash-dropzone {
-	min-height: 26px;
-	border: 1px dashed color-mix(in srgb, var(--interactive-accent) 35%, transparent);
-}
-
-.udash-editor.is-dragging
-	.udash-node-row
-	> .udash-node-body
-	> .udash-dropzone:not(.udash-dropzone-empty) {
-	min-width: 26px;
-	flex: 0 0 26px;
 }
 
 .udash-editor-tabs {

@@ -1,5 +1,4 @@
 import { PanelKind } from "./kinds";
-import { DayRecord } from "./data";
 import { Field, FieldKind } from "./schema";
 
 /**
@@ -237,7 +236,3 @@ export function specFor(type: PanelKind): PanelSpec {
 	return PANELS[type];
 }
 
-/** Context a renderer needs beyond the panel itself. */
-export interface RenderContext {
-	days: DayRecord[];
-}

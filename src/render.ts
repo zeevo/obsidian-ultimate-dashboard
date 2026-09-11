@@ -78,16 +78,6 @@ export function renderStats(el: HTMLElement, days: DayRecord[], panel: StatsPane
 
 /* ---------------------------------------------------------------- heatmap */
 
-export function hasRange(r: { year?: number; months?: number; back?: number; from?: string; to?: string }): boolean {
-	return (
-		r.year !== undefined ||
-		r.months !== undefined ||
-		r.back !== undefined ||
-		r.from !== undefined ||
-		r.to !== undefined
-	);
-}
-
 /**
  * The date window a panel covers. `fallback` decides what an unset range means:
  * a heatmap needs a concrete year to draw, a line chart just plots everything.
