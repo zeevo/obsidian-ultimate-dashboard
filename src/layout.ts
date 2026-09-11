@@ -1,4 +1,6 @@
-import { CalendarPanel, ContainerNode, Node, isContainer } from "./config";
+import { ContainerNode, LayoutNode, isContainer } from "./layout-tree";
+import { CalendarPanel, UpcomingPanel } from "./panels";
+import { ContainerKind } from "./kinds";
 import { DayRecord } from "./data";
 import { fillCalendar, fillMonth, monthWindow, renderHeatmap, renderLine, renderMonth, renderStats, renderUpcoming } from "./render";
 
@@ -6,7 +8,7 @@ const DEFAULT_GAP = 20;
 
 
 /** Applies a node's own sizing within whatever container encloses it. */
-function applySizing(el: HTMLElement, node: Node): void {
+function applySizing(el: HTMLElement, node: LayoutNode): void {
 	if (node.flex !== undefined) {
 		// grow by the factor, never overflow on shrink
 		el.style.flex = `${node.flex} 1 0`;
@@ -19,9 +21,9 @@ function applyContainer(el: HTMLElement, node: ContainerNode, inheritedGap: numb
 	el.style.gap = `${gap}px`;
 
 	el.style.display = "flex";
-	el.style.flexDirection = node.type === "row" ? "row" : "column";
+	el.style.flexDirection = node.type === ContainerKind.Row ? "row" : "column";
 
-	if (node.type === "row") {
+	if (node.type === ContainerKind.Row) {
 		el.style.flexWrap = node.wrap === false ? "nowrap" : "wrap";
 		el.style.alignItems = "flex-start";
 	}
@@ -35,11 +37,11 @@ function applyContainer(el: HTMLElement, node: ContainerNode, inheritedGap: numb
  * caused them so one bad panel does not blank the dashboard.
  */
 /** Supplies calendar events; omitted when no feeds are configured. */
-export type CalendarFiller = (el: HTMLElement, panel: CalendarPanel) => void;
+export type CalendarFiller = (el: HTMLElement, panel: CalendarPanel | UpcomingPanel) => void;
 
 export function renderNode(
 	parent: HTMLElement,
-	node: Node,
+	node: LayoutNode,
 	days: DayRecord[],
 	inheritedGap: number,
 	onError: (el: HTMLElement, message: string) => void,

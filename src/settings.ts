@@ -1,6 +1,6 @@
 import { App, Plugin, PluginSettingTab, Setting } from "obsidian";
 import { AddCalendarModal } from "./add-calendar";
-import { ConfigError, countPanels, parseConfig } from "./config";
+import { ConfigError, countPanels, parseDashboard } from "./layout-tree";
 import { ConfirmModal, NameModal } from "./modal";
 import {
 	DEFAULT_CONFIG,
@@ -289,7 +289,7 @@ export class DashboardSettingTab extends PluginSettingTab {
 		this.status.empty();
 
 		try {
-			const config = parseConfig(source);
+			const config = parseDashboard(source);
 			const count = countPanels(config.root);
 			this.status.addClass("is-valid");
 			this.status.removeClass("is-error");

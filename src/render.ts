@@ -1,4 +1,4 @@
-import { HeatmapPanel, LinePanel, MonthPanel, RangeOptions, StatsPanel, Tile, UpcomingPanel } from "./config";
+import { CalendarPanel, HeatmapPanel, LinePanel, StatsPanel, StatsTile as Tile, UpcomingPanel } from "./panels";
 import { DayRecord, daysBetween, num, shiftDate, shiftMonths, toISO, today, truthy } from "./data";
 
 const DEFAULT_COLOR = "#3b82f6";
@@ -78,11 +78,11 @@ export function renderStats(el: HTMLElement, days: DayRecord[], panel: StatsPane
 
 /* ---------------------------------------------------------------- heatmap */
 
-export function hasRange(r: RangeOptions): boolean {
+export function hasRange(r: { year?: number; months?: number; back?: number; from?: string; to?: string }): boolean {
 	return (
 		r.year !== undefined ||
 		r.months !== undefined ||
-		r.days !== undefined ||
+		r.back !== undefined ||
 		r.from !== undefined ||
 		r.to !== undefined
 	);
@@ -98,7 +98,7 @@ export interface DateWindow {
 }
 
 export function resolveWindow(
-	range: RangeOptions,
+	range: { year?: number; months?: number; back?: number; from?: string; to?: string },
 	days: DayRecord[],
 	fallback: "year" | "all",
 ): DateWindow {
@@ -115,8 +115,8 @@ export function resolveWindow(
 		return { start: shiftDate(shiftMonths(now, -range.months), 1), end: now };
 	}
 
-	if (range.days !== undefined) {
-		return { start: shiftDate(now, -(range.days - 1)), end: now };
+	if (range.back !== undefined) {
+		return { start: shiftDate(now, -(range.back - 1)), end: now };
 	}
 
 	if (range.year !== undefined) {
@@ -435,7 +435,7 @@ export interface MonthWindow {
 }
 
 /** The month a panel opens on, and the window covering its whole grid. */
-export function monthWindow(panel: MonthPanel): MonthWindow {
+export function monthWindow(panel: CalendarPanel): MonthWindow {
 	const now = new Date();
 
 	const first = panel.month
@@ -457,7 +457,7 @@ export function monthWindow(panel: MonthPanel): MonthWindow {
 }
 
 /** The month shell: heading, weekday row, and 42 empty day cells. */
-export function renderMonth(el: HTMLElement, panel: MonthPanel, first: Date): HTMLElement {
+export function renderMonth(el: HTMLElement, panel: CalendarPanel, first: Date): HTMLElement {
 	const wrap = el.createDiv({ cls: "udash-month" });
 	const head = wrap.createDiv({ cls: "udash-heatmap-head" });
 
@@ -492,7 +492,7 @@ const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 /** Fills a shell from `renderMonth`. */
 export function fillMonth(
 	wrap: HTMLElement,
-	panel: MonthPanel,
+	panel: CalendarPanel,
 	first: Date,
 	events: MonthEvent[],
 	errors: string[],

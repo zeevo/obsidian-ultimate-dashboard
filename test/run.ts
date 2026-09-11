@@ -4,12 +4,12 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { load } from "js-yaml";
-import { ConfigError, ContainerNode, isContainer, parseConfig } from "../src/config";
+import { ConfigError, ContainerNode, countPanels, isContainer, needsSetup, parseDashboard } from "../src/layout-tree";
 import { DayRecord } from "../src/data";
 import { fillMonth, monthWindow, renderHeatmap, renderLine, renderMonth, renderStats } from "../src/render";
 import { renderNode } from "../src/layout";
 import { parseICS } from "../src/ics";
-import { serializeConfig } from "../src/serialize";
+import { serializeDashboard } from "../src/serialize";
 import { DEFAULT_CONFIG, activeDashboard, defaultSettings, findAccount, makeDashboard, migrate, uniqueName } from "../src/store";
 
 const VAULT = process.argv[2];
@@ -76,6 +76,9 @@ const days: DayRecord[] = readdirSync(join(VAULT, "Daily"))
 
 /* ---------------------------------------------------------------- checks */
 
+const strip = (o: unknown): unknown =>
+	JSON.parse(JSON.stringify(o, (k, v) => (k === "id" ? undefined : v)));
+
 let failures = 0;
 
 const check = (name: string, cond: boolean, detail = "") => {
@@ -88,34 +91,40 @@ console.log(`daily notes loaded: ${days.length}\n`);
 
 console.log("config parsing");
 
-const good = parseConfig(`
+const good = parseDashboard(`
 folder: Daily
-panels:
-  - type: stats
-    tiles:
-      - { label: Weight, property: weight, agg: latest }
-  - type: heatmap
-    property: lift
+layout:
+  type: column
+  children:
+    - type: stats
+      tiles:
+        - { label: Weight, property: weight, agg: latest }
+    - type: heatmap
+      property: lift
 `);
 
 check("valid config parses", good.root.children.length === 2 && good.folder === "Daily");
 
-check("gap defaults to 20", good.root.gap === 20);
+check("gap is read off the root", parseDashboard("layout:\n  type: column\n  gap: 14\n  children: []").root.gap === 14);
 
 const rejects = (src: string, name: string) => {
-	try { parseConfig(src); check(name, false, "no error thrown"); }
+	try { parseDashboard(src); check(name, false, "no error thrown"); }
 	catch (e) { check(name, e instanceof ConfigError, (e as Error).message.slice(0, 46)); }
 };
 
-rejects("panels: []", "empty panels rejected");
+rejects("layout: {}", "a root with no type rejected");
 
-rejects("panels:\n  - type: bogus", "unknown panel type rejected");
+rejects("layout:\n  type: column\n  children: [{ type: bogus }]", "unknown panel type rejected");
 
-rejects("panels:\n  - type: stats\n    tiles: []", "stats without tiles rejected");
+check("stats with no tiles parses but needs setup", (() => {
+	const c = parseDashboard("layout:\n  type: column\n  children: [{ type: stats, tiles: [] }]");
 
-rejects("panels:\n  - type: heatmap", "heatmap without property rejected");
+	return needsSetup(c.root.children[0]);
+})());
 
-rejects("panels:\n  - type: stats\n    tiles:\n      - { label: X, property: y, agg: nope }", "bad agg rejected");
+rejects("layout:\n  type: column\n  children: [{ type: heatmap }]", "heatmap without property rejected");
+
+rejects("layout:\n  type: column\n  children: [{ type: stats, tiles: [{ label: X, property: y, agg: nope }] }]", "bad agg rejected");
 
 console.log("\nICS parsing");
 
@@ -217,7 +226,7 @@ console.log("\ndashboard store");
 	check("active points at it", activeDashboard(fresh).id === fresh.dashboards[0].id);
 
 	// the v0.1 single-config shape must survive an upgrade
-	const upgraded = migrate({ config: "folder: X\npanels: [{ type: heatmap, property: lift }]" });
+	const upgraded = migrate({ config: "folder: X\nlayout: { type: column, children: [] }" });
 	check("v0.1 settings migrate", upgraded.dashboards.length === 1);
 	check("v0.1 config preserved", upgraded.dashboards[0].config.includes("folder: X"));
 	check("v0.1 gets a valid activeId", activeDashboard(upgraded).id === upgraded.dashboards[0].id);
@@ -239,7 +248,7 @@ console.log("\ndashboard store");
 
 	// v0.2 kept a single google account; it must become the first of a list
 	const oneAccount = migrate({
-		dashboards: [{ id: "a", name: "A", config: "panels: [{type: heatmap, property: lift}]" }],
+		dashboards: [{ id: "a", name: "A", config: "layout: { type: column, children: [] }" }],
 		activeId: "a",
 		google: { clientId: "cid", clientSecret: "sec", port: 42813, account: { refreshToken: "r1", email: "me@x.com" } },
 		calendars: [{ id: "c1", name: "Work", type: "google", calendarId: "cal1" }],
@@ -253,7 +262,7 @@ console.log("\ndashboard store");
 		oneAccount.calendars[0].accountId === oneAccount.google.accounts[0].id);
 
 	const twoAccounts = migrate({
-		dashboards: [{ id: "a", name: "A", config: "panels: [{type: heatmap, property: lift}]" }],
+		dashboards: [{ id: "a", name: "A", config: "layout: { type: column, children: [] }" }],
 		activeId: "a",
 		google: {
 			clientId: "cid", clientSecret: "sec", port: 42813,
@@ -290,20 +299,22 @@ console.log("\ndashboard store");
 console.log("\nshipped default config");
 
 {
-	const def = parseConfig(DEFAULT_CONFIG);
+	const def = parseDashboard(DEFAULT_CONFIG);
 	check("default config parses", isContainer(def.root));
 	check("default folder is Daily", def.folder === "Daily");
 	const host = new El();
 	let errs = 0;
 	renderNode(host as never, def.root, days, 20, () => errs++);
 	check("default config renders without error", errs === 0, `${errs} errors`);
-	check("default config draws panels", host.all.filter((e) => e.classes.has("udash-panel")).length === 4,
-		`${host.all.filter((e) => e.classes.has("udash-panel")).length} panels`);
+	const drawn = host.all.filter((e) => e.classes.has("udash-panel")).length;
+
+	check("default config draws every panel it declares", drawn === countPanels(def.root),
+		`${drawn} drawn, ${countPanels(def.root)} declared`);
 }
 
 console.log("\nlayout tree");
 
-const tree = parseConfig(`
+const tree = parseDashboard(`
 folder: Daily
 layout:
   type: column
@@ -341,18 +352,15 @@ check("flex parsed on a nested child", (inner.children[1] as { flex?: number }).
 check("stats carries no implicit sizing", (inner.children[0] as { flex?: number }).flex === undefined);
 
 // legacy flat form must keep working
-const flat = parseConfig("panels:\n  - { type: heatmap, property: lift }");
 
-check("flat panels still parse", isContainer(flat.root) && flat.root.type === "column");
 
-check("flat form wraps panels as children", flat.root.children.length === 1);
 
 rejects("layout:\n  type: line\n  property: weight", "panel as root rejected");
 
 rejects("layout:\n  type: row", "container with no children key rejected");
 
 check("an empty container is allowed", (() => {
-		const c = parseConfig("layout:\n  type: row\n  children: []");
+		const c = parseDashboard("layout:\n  type: row\n  children: []");
 
 		return isContainer(c.root) && c.root.children.length === 0;
 	})());
@@ -366,7 +374,7 @@ rejects("layout:\n  type: row\n  children: [{ type: heatmap, property: lift, spa
 
 rejects("layout:\n  type: row\n  columns: 2\n  children: [{ type: heatmap, property: lift }]", "columns is rejected outright");
 
-rejects("layout: { type: column, children: [] }\npanels: []", "layout plus panels rejected");
+rejects("layout:\n  type: column\n  children: []\npanels: []", "the flat form is rejected");
 
 let deep = "{ type: heatmap, property: lift }";
 
@@ -400,7 +408,7 @@ layout:
       color: "#ef4444"
       months: 6
     - type: upcoming
-      days: 21
+      ahead: 21
       limit: 12
       calendars: [Holidays, Work]
     - type: calendar
@@ -425,12 +433,12 @@ layout:
 	];
 
 	for (const [i, src] of sources.entries()) {
-		const once = parseConfig(src);
-		const text = serializeConfig(once);
+		const once = parseDashboard(src);
+		const text = serializeDashboard(once);
 		let twice;
 
 		try {
-			twice = parseConfig(text);
+			twice = parseDashboard(text);
 		} catch (e) {
 			check(`config ${i + 1} re-parses`, false, (e as Error).message);
 
@@ -438,13 +446,13 @@ layout:
 		}
 
 		check(`config ${i + 1} re-parses`, true);
-		check(`config ${i + 1} is stable`, JSON.stringify(once) === JSON.stringify(twice),
-			JSON.stringify(once) === JSON.stringify(twice) ? "" : "tree changed on round trip");
-		check(`config ${i + 1} serialises identically twice`, serializeConfig(twice) === text);
+		check(`config ${i + 1} is stable`, JSON.stringify(strip(once)) === JSON.stringify(strip(twice)),
+			JSON.stringify(strip(once)) === JSON.stringify(strip(twice)) ? "" : "tree changed on round trip");
+		check(`config ${i + 1} serialises identically twice`, serializeDashboard(twice) === text);
 	}
 
 	// values that would break if written unquoted
-	const tricky = parseConfig(`
+	const tricky = parseDashboard(`
 folder: Daily
 layout:
   type: column
@@ -453,12 +461,12 @@ layout:
     - { type: calendar, month: "2026-02" }
 `);
 
-	const out = serializeConfig(tricky);
+	const out = serializeDashboard(tricky);
 
-	check("a colon in a title survives", JSON.stringify(parseConfig(out)) === JSON.stringify(tricky),
+	check("a colon in a title survives", JSON.stringify(strip(parseDashboard(out))) === JSON.stringify(strip(tricky)),
 		out.split("\n").find((l) => l.includes("check")) ?? "");
 	check("a month stays a string, not a date",
-		(parseConfig(out).root.children[1] as { month?: string }).month === "2026-02");
+		(parseDashboard(out).root.children[1] as { month?: string }).month === "2026-02");
 	check("a hex colour stays quoted", out.includes('"#ef4444"'));
 }
 
@@ -467,7 +475,7 @@ console.log("\nvisual editor edits");
 {
 	// the editor mutates the tree and writes through the serialiser, so an edit
 	// is only correct if the result still parses back to what was intended
-	const base = () => parseConfig(`
+	const base = () => parseDashboard(`
 folder: Daily
 layout:
   type: column
@@ -480,8 +488,8 @@ layout:
 	const root = cfg.root;
 
 	// drop a new panel between the two existing ones
-	root.children.splice(1, 0, { type: "upcoming" });
-	const afterInsert = parseConfig(serializeConfig(cfg));
+	root.children.splice(1, 0, { id: "t", type: "upcoming" });
+	const afterInsert = parseDashboard(serializeDashboard(cfg));
 
 	check("an inserted panel survives the round trip",
 		afterInsert.root.children.map((c) => c.type).join() === "heatmap,upcoming,line",
@@ -493,14 +501,14 @@ layout:
 
 	moved.root.children.splice(0, 0, last);
 	check("a moved panel survives",
-		parseConfig(serializeConfig(moved)).root.children.map((c) => c.type).join() === "line,heatmap");
+		parseDashboard(serializeDashboard(moved)).root.children.map((c) => c.type).join() === "line,heatmap");
 
 	// wrap two panels in a row divider
 	const nested = base();
 	const taken = nested.root.children.splice(0, 2);
 
 	nested.root.children.push({ type: "row", children: taken });
-	const afterWrap = parseConfig(serializeConfig(nested));
+	const afterWrap = parseDashboard(serializeDashboard(nested));
 	const wrapped = afterWrap.root.children[0];
 
 	check("a divider can wrap existing panels",
@@ -509,18 +517,18 @@ layout:
 	// a freshly dropped panel is incomplete until configured
 	const bare = base();
 
-	bare.root.children.push({ type: "heatmap", property: "" });
+	bare.root.children.push({ id: "t", type: "heatmap", property: "" });
 	let rejected = false;
 
-	try { parseConfig(serializeConfig(bare)); } catch { rejected = true; }
+	try { parseDashboard(serializeDashboard(bare)); } catch { rejected = true; }
 
 	check("an unconfigured panel is caught by the parser", rejected);
 
 	// dropping a divider makes an empty container, which must survive a save
 	const withDivider = base();
 
-	withDivider.root.children.push({ type: "row", children: [] });
-	const dividerText = serializeConfig(withDivider);
+	withDivider.root.children.push({ id: "t", type: "row", children: [] });
+	const dividerText = serializeDashboard(withDivider);
 
 	check("an empty divider serialises as an explicit list", dividerText.includes("children: []"),
 		dividerText.split("\n").filter((l) => l.includes("children")).join(" | "));
@@ -528,30 +536,30 @@ layout:
 	let dividerOk = true;
 	let dividerMsg = "";
 
-	try { parseConfig(dividerText); } catch (e) { dividerOk = false; dividerMsg = (e as Error).message; }
+	try { parseDashboard(dividerText); } catch (e) { dividerOk = false; dividerMsg = (e as Error).message; }
 
 	check("an empty divider re-parses", dividerOk, dividerMsg);
 
 	// and nested empties too, since dividers can hold dividers
 	const deepEmpty = base();
 
-	deepEmpty.root.children.push({ type: "row", children: [{ type: "column", children: [] }] });
+	deepEmpty.root.children.push({ id: "t", type: "row", children: [{ type: "column", children: [] }] });
 	let deepOk = true;
 
-	try { parseConfig(serializeConfig(deepEmpty)); } catch { deepOk = false; }
+	try { parseDashboard(serializeDashboard(deepEmpty)); } catch { deepOk = false; }
 
 	check("a nested empty divider re-parses", deepOk);
 
 	// moving an existing panel into a divider, which is the whole point of one
 	const intoDivider = base();
 
-	intoDivider.root.children.push({ type: "row", children: [] });
+	intoDivider.root.children.push({ id: "t", type: "row", children: [] });
 	const [taken2] = intoDivider.root.children.splice(0, 1);
 	const divider = intoDivider.root.children[intoDivider.root.children.length - 1];
 
 	if (isContainer(divider)) divider.children.push(taken2);
 
-	const moved2 = parseConfig(serializeConfig(intoDivider));
+	const moved2 = parseDashboard(serializeDashboard(intoDivider));
 	const target = moved2.root.children.find((c) => isContainer(c));
 
 	check("a panel can move into a divider",
@@ -562,7 +570,7 @@ layout:
 		`${moved2.root.children.length} top level children`);
 
 	// reordering within a parent, which is what the up/down buttons do
-	const ordered = parseConfig(`
+	const ordered = parseDashboard(`
 folder: Daily
 layout:
   type: column
@@ -575,7 +583,7 @@ layout:
 	const kids = ordered.root.children;
 
 	const names = () =>
-		parseConfig(serializeConfig(ordered)).root.children.map(
+		parseDashboard(serializeDashboard(ordered)).root.children.map(
 			(c) => (c as { property?: string }).property,
 		).join();
 
@@ -612,7 +620,7 @@ layout:
 	check("past the last midpoint appends", idx(mids, 999) === 3, String(idx(mids, 999)));
 
 	// dropping onto its own position leaves the order alone
-	const stable = parseConfig(`
+	const stable = parseDashboard(`
 folder: Daily
 layout:
   type: column
@@ -639,7 +647,7 @@ layout:
 	check("dropping past the end moves to last", order() === "b,a", order());
 
 	// the editor must never save a layout it cannot read back
-	const guarded = parseConfig(`
+	const guarded = parseDashboard(`
 folder: Daily
 layout:
   type: column
@@ -647,13 +655,13 @@ layout:
     - { type: heatmap, property: lift }
 `);
 
-	const good = serializeConfig(guarded);
+	const good = serializeDashboard(guarded);
 
 	// a panel dropped but never configured
-	guarded.root.children.push({ type: "heatmap", property: "" });
+	guarded.root.children.push({ id: "t", type: "heatmap", property: "" });
 	let broke = false;
 
-	try { parseConfig(serializeConfig(guarded)); } catch { broke = true; }
+	try { parseDashboard(serializeDashboard(guarded)); } catch { broke = true; }
 
 	check("an unconfigured panel would break the layout", broke);
 
@@ -661,13 +669,13 @@ layout:
 	guarded.root.children.pop();
 	let recovered = true;
 
-	try { parseConfig(serializeConfig(guarded)); } catch { recovered = false; }
+	try { parseDashboard(serializeDashboard(guarded)); } catch { recovered = false; }
 
 	check("removing it recovers", recovered);
-	check("and matches the last good layout", serializeConfig(guarded) === good);
+	check("and matches the last good layout", serializeDashboard(guarded) === good);
 
 	// retyping a container must not leave options the new kind rejects
-	const retyped = parseConfig(`
+	const retyped = parseDashboard(`
 folder: Daily
 layout:
   type: row
@@ -682,11 +690,11 @@ layout:
 	let retypeOk = true;
 	let retypeErr = "";
 
-	try { parseConfig(serializeConfig(retyped)); } catch (e) { retypeOk = false; retypeErr = (e as Error).message; }
+	try { parseDashboard(serializeDashboard(retyped)); } catch (e) { retypeOk = false; retypeErr = (e as Error).message; }
 
 	check("a row can become a column", retypeOk, retypeErr);
 
-	const stale = parseConfig(`
+	const stale = parseDashboard(`
 folder: Daily
 layout:
   type: row
@@ -696,14 +704,16 @@ layout:
 `);
 
 	stale.root.type = "column";
-	let staleRejected = false;
 
-	try { parseConfig(serializeConfig(stale)); } catch { staleRejected = true; }
+	// the serialiser only writes `wrap` for a row, so retyping cannot produce an
+	// invalid document even when the caller forgets to clear it
+	const staleText = serializeDashboard(stale);
 
-	check("a stale wrap option would be rejected", staleRejected);
+	check("retyping drops the option the new kind rejects", !staleText.includes("wrap"),
+		staleText.split("\n").slice(1, 4).join(" | "));
 
 	// the shipped default starts as a plain stack now
-	const fresh = parseConfig(DEFAULT_CONFIG);
+	const fresh = parseDashboard(DEFAULT_CONFIG);
 
 	check("a new dashboard starts as a column", fresh.root.type === "column", fresh.root.type);
 
@@ -712,46 +722,46 @@ layout:
 
 	pruned.root.children.splice(0, 1);
 	check("a removed panel is gone",
-		parseConfig(serializeConfig(pruned)).root.children.length === 1);
+		parseDashboard(serializeDashboard(pruned)).root.children.length === 1);
 }
 
 console.log("\ncalendar panels");
 
 {
-	const cfg = parseConfig(`
+	const cfg = parseDashboard(`
 layout:
   type: column
   children:
-    - { type: upcoming, days: 21, limit: 12 }
-    - { type: calendar, month: "2026-02", maxPerDay: 2, weekStart: 1 }
+    - { type: upcoming, ahead: 21, limit: 12 }
+    - { type: calendar, month: "2026-02", maxPerDay: 2, weekStart: "1" }
 `);
 
 	const [up, month] = cfg.root.children as [Record<string, unknown>, Record<string, unknown>];
 
-	check("upcoming parses", up.type === "upcoming" && up.days === 21 && up.limit === 12);
+	check("upcoming parses", up.type === "upcoming" && up.ahead === 21 && up.limit === 12);
 	check("calendar parses as a month", month.type === "calendar" && month.month === "2026-02");
-	check("month options parsed", month.maxPerDay === 2 && month.weekStart === 1);
+	check("month options parsed", month.maxPerDay === 2 && month.weekStart === "1");
 
 	rejects('layout:\n  type: column\n  children: [{ type: calendar, month: "nope" }]', "bad month rejected");
-	rejects("layout:\n  type: column\n  children: [{ type: calendar, weekStart: 3 }]", "bad weekStart rejected");
+	rejects("layout:\n  type: column\n  children: [{ type: calendar, weekStart: \"3\" }]", "bad weekStart rejected");
 	rejects("layout:\n  type: column\n  children: [{ type: calendar, maxPerDay: 0 }]", "bad maxPerDay rejected");
 
 	// the grid must always be six full weeks, starting on the chosen weekday
-	const feb = monthWindow({ type: "calendar", month: "2026-02", weekStart: 0 });
+	const feb = monthWindow({ id: "t", type: "calendar", month: "2026-02", weekStart: 0 });
 
 	check("month opens on the first", feb.first.getDate() === 1 && feb.first.getMonth() === 1);
 	check("grid starts on the week start", feb.from.getDay() === 0, `day ${feb.from.getDay()}`);
 	check("grid covers 42 days",
 		Math.round((feb.to.getTime() - feb.from.getTime()) / 86400000) === 42);
 
-	const monday = monthWindow({ type: "calendar", month: "2026-02", weekStart: 1 });
+	const monday = monthWindow({ id: "t", type: "calendar", month: "2026-02", weekStart: 1 });
 
 	check("weekStart 1 starts on Monday", monday.from.getDay() === 1, `day ${monday.from.getDay()}`);
 
 	const host = new El();
-	const shell = renderMonth(host as never, { type: "calendar", month: "2026-02" }, feb.first);
+	const shell = renderMonth(host as never, { id: "t", type: "calendar", month: "2026-02" }, feb.first);
 
-	fillMonth(shell as never, { type: "calendar", month: "2026-02", maxPerDay: 2 }, feb.first, [
+	fillMonth(shell as never, { id: "t", type: "calendar", month: "2026-02", maxPerDay: 2 }, feb.first, [
 		{ summary: "One", start: new Date(2026, 1, 10, 9), end: new Date(2026, 1, 10, 10), allDay: false },
 		{ summary: "Two", start: new Date(2026, 1, 10, 11), end: new Date(2026, 1, 10, 12), allDay: false },
 		{ summary: "Three", start: new Date(2026, 1, 10, 13), end: new Date(2026, 1, 10, 14), allDay: false },
@@ -783,23 +793,23 @@ console.log("\nline ranges");
 		};
 	};
 
-	const full = dotsOf({ type: "line", property: "weight", rolling: 7 });
+	const full = dotsOf({ id: "t", type: "line", property: "weight", rolling: 7 });
 	check("no range plots every reading", full.dots > 0, `${full.dots} dots`);
 
-	const yr = dotsOf({ type: "line", property: "weight", rolling: 7, year: 2026 });
+	const yr = dotsOf({ id: "t", type: "line", property: "weight", rolling: 7, year: 2026 });
 	check("year narrows the line", yr.dots > 0 && yr.dots < full.dots, `${yr.dots} of ${full.dots}`);
 
-	const win = dotsOf({ type: "line", property: "weight", rolling: 7, from: "2026-01-01", to: "2026-06-30" });
+	const win = dotsOf({ id: "t", type: "line", property: "weight", rolling: 7, from: "2026-01-01", to: "2026-06-30" });
 	check("from/to narrows further", win.dots <= yr.dots, `${win.dots}`);
 	check("windowed path has no NaN", !/NaN|undefined/.test(win.path), win.path.slice(0, 26));
 
 	// the average at the left edge must use readings from before the window
 	const edge = new El();
-	renderLine(edge, days, { type: "line", property: "weight", rolling: 30, from: "2026-08-01" });
+	renderLine(edge, days, { id: "t", type: "line", property: "weight", rolling: 30, from: "2026-08-01" });
 	const edgePath = edge.all.find((x) => x.tag === "svg")?.children.find((c) => c.tag === "path")?.attrs.d ?? "";
 	check("rolling average survives a windowed start", edgePath.startsWith("M") && !/NaN/.test(edgePath));
 
-	const empty = dotsOf({ type: "line", property: "weight", from: "2000-01-01", to: "2000-12-31" });
+	const empty = dotsOf({ id: "t", type: "line", property: "weight", from: "2000-01-01", to: "2000-12-31" });
 	check("empty window degrades gracefully", empty.el.byClass("udash-empty").length === 1);
 }
 
@@ -807,11 +817,11 @@ rejects("layout:\n  type: column\n  children: [{ type: line, property: weight, y
 
 rejects('layout:\n  type: column\n  children: [{ type: line, property: weight, from: "bad" }]', "bad line date rejected");
 
-check("rolling and days are independent",
-	(() => { const l = parseConfig("layout:\n  type: column\n  children: [{ type: line, property: weight, rolling: 7, days: 90 }]")
-		.root.children[0] as { rolling?: number; days?: number };
+check("rolling and back are independent",
+	(() => { const l = parseDashboard("layout:\n  type: column\n  children: [{ type: line, property: weight, rolling: 7, back: 90 }]")
+		.root.children[0] as { rolling?: number; back?: number };
 
-		return l.rolling === 7 && l.days === 90; })());
+		return l.rolling === 7 && l.back === 90; })());
 
 console.log("\ntree rendering");
 
@@ -846,15 +856,17 @@ console.log("\nstats panel");
 
 const stats = new El();
 
-renderStats(stats, days, parseConfig(`
-panels:
-  - type: stats
-    tiles:
-      - { label: Weight, property: weight, agg: latest, unit: lb }
-      - { label: Average, property: weight, agg: mean, days: 7 }
-      - { label: Lifts, property: lift, agg: count, days: 7, target: 3 }
-      - { label: Miles, property: miles, agg: sum }
-      - { label: Nothing, property: nosuchprop, agg: latest }
+renderStats(stats, days, parseDashboard(`
+layout:
+  type: column
+  children:
+    - type: stats
+      tiles:
+        - { label: Weight, property: weight, agg: latest, unit: lb }
+        - { label: Average, property: weight, agg: mean, days: 7 }
+        - { label: Lifts, property: lift, agg: count, days: 7, target: 3 }
+        - { label: Miles, property: miles, agg: sum }
+        - { label: Nothing, property: nosuchprop, agg: latest }
 `).root.children[0] as never);
 
 const tiles = stats.byClass("udash-tile");
@@ -877,7 +889,7 @@ console.log("\nheatmap panel");
 
 const hm = new El();
 
-renderHeatmap(hm, days, { type: "heatmap", property: "lift", title: "Lifting", year: 2026 });
+renderHeatmap(hm, days, { id: "t", type: "heatmap", property: "lift", title: "Lifting", year: 2026 });
 
 const boxes = hm.byClass("udash-box");
 
@@ -893,7 +905,7 @@ check("month labels present", hm.byClass("udash-month").length === 12);
 
 const hmMiles = new El();
 
-renderHeatmap(hmMiles, days, { type: "heatmap", property: "miles", intensity: "miles", year: 2026 });
+renderHeatmap(hmMiles, days, { id: "t", type: "heatmap", property: "miles", intensity: "miles", year: 2026 });
 
 const shades = new Set(hmMiles.byClass("udash-box").map((b) => b.style["backgroundColor"]).filter(Boolean));
 
@@ -910,32 +922,32 @@ console.log("\nheatmap ranges");
 		return { total: all.length, pads: e.byClass("udash-box-pad").length, el: e };
 	};
 
-	const y = boxesOf({ type: "heatmap", property: "lift", year: 2026 });
+	const y = boxesOf({ id: "t", type: "heatmap", property: "lift", year: 2026 });
 	check("year gives 365 day cells", y.total - y.pads === 365, `${y.total - y.pads}`);
 
-	const d90 = boxesOf({ type: "heatmap", property: "lift", days: 90 });
-	check("days: 90 gives 90 cells", d90.total - d90.pads === 90, `${d90.total - d90.pads}`);
+	const d90 = boxesOf({ id: "t", type: "heatmap", property: "lift", back: 90 });
+	check("back: 90 gives 90 cells", d90.total - d90.pads === 90, `${d90.total - d90.pads}`);
 
-	const m6 = boxesOf({ type: "heatmap", property: "lift", months: 6 });
+	const m6 = boxesOf({ id: "t", type: "heatmap", property: "lift", months: 6 });
 	const span6 = m6.total - m6.pads;
 	check("months: 6 spans about half a year", span6 >= 180 && span6 <= 185, `${span6} days`);
 
-	const exact = boxesOf({ type: "heatmap", property: "lift", from: "2026-03-01", to: "2026-03-31" });
+	const exact = boxesOf({ id: "t", type: "heatmap", property: "lift", from: "2026-03-01", to: "2026-03-31" });
 	check("from/to is inclusive", exact.total - exact.pads === 31, `${exact.total - exact.pads}`);
 	check("month label present for a one month window", exact.el.byClass("udash-month").length === 1);
 
 	// a window starting mid-month should still be labelled
-	const mid = boxesOf({ type: "heatmap", property: "lift", from: "2026-03-15", to: "2026-04-10" });
+	const mid = boxesOf({ id: "t", type: "heatmap", property: "lift", from: "2026-03-15", to: "2026-04-10" });
 	check("partial first month still labelled", mid.el.byClass("udash-month").length === 2,
 		`${mid.el.byClass("udash-month").length} labels`);
 
-	const cross = boxesOf({ type: "heatmap", property: "lift", from: "2025-11-01", to: "2026-02-28" });
+	const cross = boxesOf({ id: "t", type: "heatmap", property: "lift", from: "2025-11-01", to: "2026-02-28" });
 	const labels = cross.el.byClass("udash-month").map((e) => e.text);
 	check("cross-year labels carry the year", labels.every((l) => /\s\d{2}$/.test(l)), labels.join(" "));
 
 	// values outside the window must not be counted
 	const narrow = new El();
-	renderHeatmap(narrow, days, { type: "heatmap", property: "lift", from: "2026-01-01", to: "2026-01-02" });
+	renderHeatmap(narrow, days, { id: "t", type: "heatmap", property: "lift", from: "2026-01-01", to: "2026-01-02" });
 	const shadedNarrow = narrow.byClass("udash-box").filter((b) => b.style["backgroundColor"]).length;
 	check("out-of-window days excluded", shadedNarrow === 0, `${shadedNarrow} shaded`);
 
@@ -956,7 +968,7 @@ console.log("\nline panel");
 
 const line = new El();
 
-renderLine(line, days, { type: "line", property: "weight", rolling: 7, unit: "lb" });
+renderLine(line, days, { id: "t", type: "line", property: "weight", rolling: 7, unit: "lb" });
 
 const svg = line.all.find((e) => e.tag === "svg");
 
@@ -974,7 +986,7 @@ check("path has no NaN", !!paths[0] && !/NaN|Infinity|undefined/.test(paths[0].a
 
 const sparse = new El();
 
-renderLine(sparse, [days[0]], { type: "line", property: "weight" });
+renderLine(sparse, [days[0]], { id: "t", type: "line", property: "weight" });
 
 check("single reading degrades gracefully", sparse.byClass("udash-empty").length === 1);
 

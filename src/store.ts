@@ -67,28 +67,10 @@ layout:
       tiles:
         - { label: Weight, property: weight, agg: latest, unit: lb }
         - { label: 7 day average, property: weight, agg: mean, days: 7, unit: lb }
-        - { label: Change, property: weight, agg: delta, days: 28, unit: lb }
-        - { label: Lifts this week, property: lift, agg: count, days: 7, target: 3 }
-
-    - type: line
-      title: Weight
-      property: weight
-      rolling: 7
-      unit: lb
-      months: 6
-
-    - type: heatmap
-      title: Lifting
-      property: lift
-      color: "#ef4444"
-      months: 6
-
-    - type: heatmap
-      title: Cardio
-      property: cardio
-      intensity: miles
-      color: "#3b82f6"
-      months: 6
+    - type: row
+      children:
+        - { type: line, title: Weight, property: weight, rolling: 7, unit: lb, months: 6, flex: 2 }
+        - { type: heatmap, title: Lifting, property: lift, color: "#ef4444", months: 6, flex: 1 }
 `;
 
 export function newId(): string {

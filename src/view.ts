@@ -1,13 +1,13 @@
 import { ItemView, WorkspaceLeaf, setIcon, setTooltip } from "obsidian";
-import { ConfigError, countPanels, parseConfig } from "./config";
+import { ConfigError, countPanels, parseDashboard } from "./layout-tree";
 import { readDays } from "./data";
 import { CalendarFiller, DEFAULT_GAP, renderNode } from "./layout";
 import { CalendarService } from "./calendar";
-import { CalendarPanel } from "./config";
+import { CalendarPanel, UpcomingPanel } from "./panels";
 import { fillCalendar, fillMonth, monthWindow } from "./render";
 import { EventModal, NameModal } from "./modal";
 import { VisualEditor } from "./editor";
-import { serializeConfig } from "./serialize";
+import { serializeDashboard } from "./serialize";
 import { CalendarSource, DashboardSettings, activeDashboard, makeDashboard, uniqueName } from "./store";
 
 export const VIEW_TYPE_DASHBOARD = "ultimate-dashboard-view";
@@ -93,7 +93,7 @@ export class DashboardView extends ItemView {
 		let config;
 
 		try {
-			config = parseConfig(current.config);
+			config = parseDashboard(current.config);
 		} catch (e) {
 			this.error(root, e instanceof ConfigError ? e.message : String(e));
 
@@ -176,7 +176,7 @@ export class DashboardView extends ItemView {
 
 		if (sources.length === 0) return undefined;
 
-		return (shell: HTMLElement, panel: CalendarPanel) => {
+		return (shell: HTMLElement, panel: CalendarPanel | UpcomingPanel) => {
 			const wanted = panel.calendars
 				? sources.filter((s) => panel.calendars!.includes(s.name))
 				: sources;
@@ -210,7 +210,7 @@ export class DashboardView extends ItemView {
 			const from = new Date();
 
 			if (!panel.past) from.setHours(0, 0, 0, 0);
-			const to = new Date(from.getTime() + (panel.days ?? 14) * 86400000);
+			const to = new Date(from.getTime() + (panel.ahead ?? 14) * 86400000);
 
 			void this.host.calendars.events(wanted, from, to).then(({ events, errors }) => {
 				if (!shell.isConnected) return;
@@ -278,7 +278,7 @@ export class DashboardView extends ItemView {
 		let parsed;
 
 		try {
-			parsed = parseConfig(current.config);
+			parsed = parseDashboard(current.config);
 		} catch (e) {
 			this.error(
 				root,
@@ -296,7 +296,7 @@ export class DashboardView extends ItemView {
 				calendars: this.host.settings.calendars.map((c) => c.name),
 			},
 			(next) => {
-				current.config = serializeConfig(next);
+				current.config = serializeDashboard(next);
 				void this.host.saveSettings();
 				this.render();
 			},
@@ -329,7 +329,7 @@ export class DashboardView extends ItemView {
 			status.empty();
 
 			try {
-				const parsed = parseConfig(source);
+				const parsed = parseDashboard(source);
 				const n = countPanels(parsed.root);
 				status.removeClass("is-error");
 				status.addClass("is-valid");

@@ -1,26 +1,24 @@
-import { ContainerNode, DashboardConfig, Node, Tile, isContainer } from "./config";
+import { ContainerKind } from "./kinds";
+import { Dashboard, LayoutNode, isContainer } from "./layout-tree";
+import { StatsTile, specFor } from "./panels";
+import { FieldValue } from "./schema";
 
 /**
- * Turns a layout tree back into the YAML the parser reads.
+ * The layout tree back to YAML.
  *
- * The visual editor works on the tree and writes through this, so a dashboard
- * built by dragging is the same artefact as one typed by hand: both round trip
- * through `parseConfig`, and either editor can pick up where the other left off.
+ * Fields come from each panel's declaration rather than a hand-written list per
+ * type, so a field cannot be added to a panel and forgotten here. That failure
+ * was silent: the option simply vanished the next time anyone edited.
  */
 
-/** Any value a node field can hold. */
-type Scalar = string | number | boolean;
-
 /** Quotes only where YAML would otherwise misread the value. */
-function scalar(v: Scalar): string {
-	// eslint-disable-next-line
+function scalar(v: FieldValue): string {
 	if (typeof v !== "string") return String(v);
 
 	if (v === "") return '""';
 
-	// leading/trailing space, or anything that could parse as another type
 	const risky =
-		/^[\s]|[\s]$/.test(v) ||
+		/^\s|\s$/.test(v) ||
 		/^(true|false|null|~|yes|no|on|off)$/i.test(v) ||
 		/^[-+]?[\d.]+$/.test(v) ||
 		/^\d{4}-\d{2}(-\d{2})?$/.test(v) ||
@@ -29,70 +27,10 @@ function scalar(v: Scalar): string {
 	return risky ? JSON.stringify(v) : v;
 }
 
-function inlineList(values: string[]): string {
-	return `[${values.map((v) => scalar(v)).join(", ")}]`;
-}
-
-/** Key/value lines for a node, skipping anything left at its default. */
-function fields(node: Node): [string, string][] {
-	const out: [string, string][] = [];
-
-	const put = (k: string, v: string | number | boolean | undefined) => {
-		if (v === undefined) return;
-		out.push([k, scalar(v)]);
-	};
-
-	if (isContainer(node)) {
-		put("gap", node.gap);
-		put("wrap", node.wrap);
-	} else if (node.type === "stats") {
-		// tiles are written separately, as a nested list
-	} else if (node.type === "heatmap") {
-		put("title", node.title);
-		put("property", node.property);
-		put("intensity", node.intensity);
-		put("color", node.color);
-		put("year", node.year);
-		put("months", node.months);
-		put("days", node.days);
-		put("from", node.from);
-		put("to", node.to);
-	} else if (node.type === "line") {
-		put("title", node.title);
-		put("property", node.property);
-		put("rolling", node.rolling);
-		put("unit", node.unit);
-		put("color", node.color);
-		put("year", node.year);
-		put("months", node.months);
-		put("days", node.days);
-		put("from", node.from);
-		put("to", node.to);
-	} else if (node.type === "upcoming") {
-		put("title", node.title);
-		put("days", node.days);
-		put("limit", node.limit);
-		put("past", node.past);
-	} else {
-		put("title", node.title);
-		put("month", node.month);
-		put("maxPerDay", node.maxPerDay);
-		put("weekStart", node.weekStart);
-	}
-
-	if ("calendars" in node && node.calendars) {
-		out.push(["calendars", inlineList(node.calendars)]);
-	}
-
-	put("flex", node.flex);
-
-	return out;
-}
-
-function tileLine(tile: Tile): string {
+function tileLine(tile: StatsTile): string {
 	const parts: string[] = [];
 
-	const put = (k: string, v: string | number | undefined) => {
+	const put = (k: string, v: FieldValue | undefined) => {
 		if (v !== undefined) parts.push(`${k}: ${scalar(v)}`);
 	};
 
@@ -107,11 +45,41 @@ function tileLine(tile: Tile): string {
 	return `{ ${parts.join(", ")} }`;
 }
 
-function writeNode(node: Node, indent: string, lines: string[]): void {
+/** Every option a node carries, in a stable order. `id` is runtime only. */
+function optionsOf(node: LayoutNode): [string, string][] {
+	const out: [string, string][] = [];
+
+	const put = (k: string, v: FieldValue | undefined) => {
+		if (v !== undefined) out.push([k, scalar(v)]);
+	};
+
+	if (isContainer(node)) {
+		put("gap", node.gap);
+
+		if (node.type === ContainerKind.Row) put("wrap", node.wrap);
+	} else {
+		// SAFETY: reading a panel by its own declared field keys is what the
+		// registry exists for; every key below comes from that panel's spec.
+		const values = node as unknown as Record<string, FieldValue | undefined>;
+
+		for (const field of specFor(node.type).fields) {
+			const v = values[field.key];
+
+			if (v === undefined) continue;
+			out.push([field.key, Array.isArray(v) ? `[${v.map(scalar).join(", ")}]` : scalar(v)]);
+		}
+	}
+
+	put("flex", node.flex);
+
+	return out;
+}
+
+function writeNode(node: LayoutNode, indent: string, lines: string[]): void {
 	lines.push(`${indent}- type: ${node.type}`);
 	const inner = indent + "  ";
 
-	for (const [k, v] of fields(node)) lines.push(`${inner}${k}: ${v}`);
+	for (const [k, v] of optionsOf(node)) lines.push(`${inner}${k}: ${v}`);
 
 	if (node.type === "stats") {
 		lines.push(`${inner}tiles:`);
@@ -119,34 +87,29 @@ function writeNode(node: Node, indent: string, lines: string[]): void {
 		for (const tile of node.tiles) lines.push(`${inner}  - ${tileLine(tile)}`);
 	}
 
-	if (isContainer(node)) {
-		// a bare `children:` reads back as null, so an empty container needs []
-		if (node.children.length === 0) {
-			lines.push(`${inner}children: []`);
-		} else {
-			lines.push(`${inner}children:`);
-
-			for (const child of node.children) writeNode(child, `${inner}  `, lines);
-		}
-	}
+	if (isContainer(node)) writeChildren(node.children, inner, lines);
 }
 
-/** The whole block, ready to store or hand to the text editor. */
-export function serializeConfig(config: DashboardConfig): string {
-	const lines: string[] = [`folder: ${scalar(config.folder)}`, "layout:"];
-	const root: ContainerNode = config.root;
+function writeChildren(children: LayoutNode[], indent: string, lines: string[]): void {
+	// a bare `children:` reads back as null, so an empty container needs []
+	if (children.length === 0) {
+		lines.push(`${indent}children: []`);
 
-	lines.push(`  type: ${root.type}`);
-
-	for (const [k, v] of fields(root)) lines.push(`  ${k}: ${v}`);
-
-	if (root.children.length === 0) {
-		lines.push("  children: []");
-	} else {
-		lines.push("  children:");
-
-		for (const child of root.children) writeNode(child, "    ", lines);
+		return;
 	}
+
+	lines.push(`${indent}children:`);
+
+	for (const child of children) writeNode(child, `${indent}  `, lines);
+}
+
+export function serializeDashboard(dashboard: Dashboard): string {
+	const lines: string[] = [`folder: ${scalar(dashboard.folder)}`, "layout:"];
+
+	lines.push(`  type: ${dashboard.root.type}`);
+
+	for (const [k, v] of optionsOf(dashboard.root)) lines.push(`  ${k}: ${v}`);
+	writeChildren(dashboard.root.children, "  ", lines);
 
 	return lines.join("\n") + "\n";
 }

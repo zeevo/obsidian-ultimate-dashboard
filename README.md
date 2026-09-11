@@ -53,6 +53,31 @@ Community plugins → Ultimate Dashboard.
 
 Layouts are stored in the plugin's `data.json`, not in your notes.
 
+## Adding a panel type
+
+Panels are declared once, in `src/panels.ts`:
+
+```ts
+const heatmap: PanelSpec<HeatmapPanel> = {
+  type: PanelKind.Heatmap,
+  label: "Heatmap",
+  hint: "A year of activity",
+  fields: [
+    { key: "property", kind: FieldKind.Property, label: "Property", required: true },
+    { key: "color",    kind: FieldKind.Colour,   label: "Color" },
+    ...RANGE_FIELDS,
+  ],
+  summary: (p) => p.property || "not configured",
+  validate: validateRange,
+};
+```
+
+Parsing, validation, serialising, the configuration form and the editor palette
+are all derived from that declaration. `fields` keys are typed against the panel
+interface, so a rename is a compile error rather than a field that silently
+stops loading. Cross-field rules that a per-field schema cannot see go in
+`validate`.
+
 ## Layout YAML
 
 ```yaml
@@ -274,18 +299,15 @@ rules with `INTERVAL`, `COUNT` and `UNTIL`. It is not a complete RFC 5545
 implementation: a `TZID` is read as local time, since resolving one properly
 needs a timezone database.
 
-### Flat form
+### Removed
 
-The older flat form still works and is treated as a single column:
 
-```yaml
-gap: 20
-panels:
-  - { type: stats, tiles: [...] }
-  - { type: heatmap, property: lift }
-```
+`panels`, `grid`, `span`, `columns` and `minWidth` are gone. A layout is one
+tree of rows and columns, sized with `flex`. The parser rejects each removed key
+with a message naming its replacement.
 
-Use `layout` or `panels`, not both.
+On a time range, `days` was ambiguous: it meant a trailing window on a chart and
+a forward window on an agenda. It is now `back` and `ahead`.
 
 ### `type: stats`
 

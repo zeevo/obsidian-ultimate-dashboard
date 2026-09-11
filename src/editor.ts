@@ -1,7 +1,9 @@
 import { App, Notice, setIcon, setTooltip } from "obsidian";
-import { ConfigError, ContainerNode, DashboardConfig, Node, Panel, isContainer, parseConfig } from "./config";
-import { serializeConfig } from "./serialize";
-import { PanelModal, label } from "./panel-modal";
+import { ConfigError, ContainerNode, Dashboard, LayoutNode, isContainer, needsSetup, nextId, parseDashboard } from "./layout-tree";
+import { Panel, PANELS, specFor } from "./panels";
+import { ContainerKind, PanelKind, toPanelKind } from "./kinds";
+import { serializeDashboard } from "./serialize";
+import { PanelForm } from "./panel-form";
 
 /**
  * The visual editor: a palette you drag from, and a canvas of drop zones that
@@ -9,33 +11,38 @@ import { PanelModal, label } from "./panel-modal";
  * the text editor and this one are two views of the same document.
  */
 
-const PALETTE: { type: Node["type"]; hint: string }[] = [
-	{ type: "stats", hint: "Numbers at a glance" },
-	{ type: "line", hint: "A value over time" },
-	{ type: "heatmap", hint: "A year of activity" },
-	{ type: "upcoming", hint: "Agenda list" },
-	{ type: "calendar", hint: "Month grid" },
-];
+const DIVIDERS = [
+	{ type: ContainerKind.Row, label: "Columns", hint: "Split into columns, side by side" },
+	{ type: ContainerKind.Column, label: "Rows", hint: "Split into rows, stacked" },
+] as const;
 
-const DIVIDERS: { type: "row" | "column"; hint: string }[] = [
-	{ type: "row", hint: "Split into columns, side by side" },
-	{ type: "column", hint: "Split into rows, stacked" },
-];
+/** A fresh node of the given type, carrying only what the parser demands. */
+function blank(type: PanelKind | ContainerKind): LayoutNode {
+	const id = nextId();
 
-/** A fresh node of the given type, with only what the parser demands. */
-function blank(type: Node["type"]): Node {
-	if (type === "stats") return { type: "stats", tiles: [] };
+	if (type === ContainerKind.Row || type === ContainerKind.Column) {
+		return { id, type, children: [] };
+	}
 
-	if (type === "line") return { type: "line", property: "" };
+	if (type === PanelKind.Stats) return { id, type, tiles: [] };
 
-	if (type === "heatmap") return { type: "heatmap", property: "" };
+	if (type === PanelKind.Line) return { id, type, property: "" };
 
-	if (type === "upcoming") return { type: "upcoming" };
+	if (type === PanelKind.Heatmap) return { id, type, property: "" };
 
-	if (type === "calendar") return { type: "calendar" };
+	if (type === PanelKind.Upcoming) return { id, type };
 
-	// SAFETY: the remaining cases are the container kinds, which take children.
-	return { type, children: [] } as ContainerNode;
+	return { id, type: PanelKind.Calendar };
+}
+
+/** The label shown on a card and in the palette. */
+function label(type: PanelKind | ContainerKind): string {
+	const divider = DIVIDERS.find((d) => d.type === type);
+
+	if (divider) return divider.label;
+	const panel = toPanelKind(type);
+
+	return panel ? specFor(panel).label : type;
 }
 
 /** Where a dragged item is headed: into `parent` at `index`. */
@@ -44,7 +51,7 @@ interface Target {
 	index: number;
 }
 
-type DragPayload = { kind: "new"; type: Node["type"] } | { kind: "move"; path: number[] };
+type DragPayload = { kind: "new"; type: LayoutNode["type"] } | { kind: "move"; path: number[] };
 
 const pathOf = (path: number[]) => path.join(".");
 
@@ -57,11 +64,11 @@ export class VisualEditor {
 
 	constructor(
 		private app: App,
-		private config: DashboardConfig,
+		private config: Dashboard,
 		private context: { properties: string[]; calendars: string[] },
-		private onChange: (config: DashboardConfig) => void,
+		private onChange: (config: Dashboard) => void,
 	) {
-		this.lastGood = serializeConfig(config);
+		this.lastGood = serializeDashboard(config);
 	}
 
 	render(host: HTMLElement): void {
@@ -83,7 +90,7 @@ export class VisualEditor {
 
 		const panels = el.createDiv({ cls: "udash-palette-row" });
 
-		for (const item of PALETTE) this.chip(panels, item.type, item.hint);
+		for (const spec of Object.values(PANELS)) this.chip(panels, spec.type, spec.hint);
 
 		el.createDiv({ cls: "udash-palette-label", text: "Dividers" });
 
@@ -97,7 +104,7 @@ export class VisualEditor {
 		});
 	}
 
-	private chip(parent: HTMLElement, type: Node["type"], hint: string): void {
+	private chip(parent: HTMLElement, type: PanelKind | ContainerKind, hint: string): void {
 		const chip = parent.createDiv({ cls: "udash-chip", text: label(type) });
 
 		setTooltip(chip, hint);
@@ -152,7 +159,7 @@ export class VisualEditor {
 		const head = box.createDiv({ cls: "udash-node-head" });
 
 		head.createSpan({ cls: "udash-node-kind", text: label(node.type) });
-		head.createSpan({ cls: "udash-node-meta", text: describe(node) });
+		head.createSpan({ cls: "udash-node-meta", text: specFor(node.type).summary(node) });
 		this.controls(head, node, path);
 	}
 
@@ -173,7 +180,7 @@ export class VisualEditor {
 		});
 	}
 
-	private controls(head: HTMLElement, node: Node, path: number[], isRoot = false): void {
+	private controls(head: HTMLElement, node: LayoutNode, path: number[], isRoot = false): void {
 		const actions = head.createDiv({ cls: "udash-node-actions" });
 
 		{
@@ -294,11 +301,11 @@ export class VisualEditor {
 
 			target.parent.children.splice(target.index, 0, node);
 
-			if (!isContainer(node) && PanelModal.needsSetup(node)) {
+			if (!isContainer(node) && needsSetup(node)) {
 				// Cancelling must not leave a half-made panel behind: it would be
 				// serialised without its required fields and fail to parse.
 				this.configure(node, () => {
-					if (PanelModal.needsSetup(node)) {
+					if (needsSetup(node)) {
 						const at = target.parent.children.indexOf(node);
 
 						if (at >= 0) target.parent.children.splice(at, 1);
@@ -334,8 +341,8 @@ export class VisualEditor {
 		this.commit();
 	}
 
-	private configure(node: Node, onDismiss?: () => void): void {
-		const modal = new PanelModal(this.app, node, this.context, () => this.commit());
+	private configure(node: LayoutNode, onDismiss?: () => void): void {
+		const modal = new PanelForm(this.app, node, this.context, () => this.commit());
 
 		if (onDismiss) modal.onDismiss = onDismiss;
 		modal.open();
@@ -348,12 +355,12 @@ export class VisualEditor {
 		parent.children.splice(path[path.length - 1], 1);
 	}
 
-	private nodeAt(path: number[]): Node | null {
-		let node: Node = this.config.root;
+	private nodeAt(path: number[]): LayoutNode | null {
+		let node: LayoutNode = this.config.root;
 
 		for (const i of path) {
 			if (!isContainer(node)) return null;
-			const next: Node | undefined = node.children[i];
+			const next: LayoutNode | undefined = node.children[i];
 
 			if (!next) return null;
 			node = next;
@@ -375,10 +382,10 @@ export class VisualEditor {
 	 * back to the canvas.
 	 */
 	private commit(): void {
-		const text = serializeConfig(this.config);
+		const text = serializeDashboard(this.config);
 
 		try {
-			parseConfig(text);
+			parseDashboard(text);
 		} catch (err) {
 			new Notice(
 				`That change would break the layout: ${
@@ -386,7 +393,7 @@ export class VisualEditor {
 				}`,
 				8000,
 			);
-			this.config = parseConfig(this.lastGood);
+			this.config = parseDashboard(this.lastGood);
 			this.rerender();
 
 			return;
@@ -402,7 +409,7 @@ export class VisualEditor {
 }
 
 /** Whether `haystack` contains `needle` anywhere below it. */
-function contains(haystack: ContainerNode, needle: Node): boolean {
+function contains(haystack: ContainerNode, needle: LayoutNode): boolean {
 	if (haystack === needle) return true;
 
 	for (const child of haystack.children) {
@@ -414,20 +421,6 @@ function contains(haystack: ContainerNode, needle: Node): boolean {
 	return false;
 }
 
-/** The one-line summary shown on a panel card. */
-function describe(node: Panel): string {
-	if (node.type === "stats") {
-		return `${node.tiles.length} ${node.tiles.length === 1 ? "tile" : "tiles"}`;
-	}
-
-	if (node.type === "line" || node.type === "heatmap") {
-		return node.property || "not configured";
-	}
-
-	if (node.type === "upcoming") return `${node.days ?? 14} days`;
-
-	return node.month ?? "this month";
-}
 
 /** The child cards of a container body, ignoring hints and indicators. */
 function cardsIn(body: HTMLElement): HTMLElement[] {
