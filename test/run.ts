@@ -674,6 +674,53 @@ layout:
 	check("removing it recovers", recovered);
 	check("and matches the last good layout", serializeConfig(guarded) === good);
 
+	// retyping a container must not leave options the new kind rejects
+	const retyped = parseConfig(`
+folder: Daily
+layout:
+  type: grid
+  columns: 3
+  minWidth: 300
+  children:
+    - { type: heatmap, property: lift }
+`);
+
+	const rootNode = retyped.root;
+
+	// grid -> row, as the Layout dropdown does
+	rootNode.type = "row";
+	delete rootNode.columns;
+	delete rootNode.minWidth;
+
+	let retypeOk = true;
+	let retypeErr = "";
+
+	try { parseConfig(serializeConfig(retyped)); } catch (e) { retypeOk = false; retypeErr = (e as Error).message; }
+
+	check("a grid can become a row", retypeOk, retypeErr);
+
+	// leaving `columns` behind is exactly what the parser rejects
+	const stale = parseConfig(`
+folder: Daily
+layout:
+  type: grid
+  columns: 3
+  children:
+    - { type: heatmap, property: lift }
+`);
+
+	stale.root.type = "row";
+	let staleRejected = false;
+
+	try { parseConfig(serializeConfig(stale)); } catch { staleRejected = true; }
+
+	check("a stale columns option would be rejected", staleRejected);
+
+	// the shipped default starts as a plain stack now
+	const fresh = parseConfig(DEFAULT_CONFIG);
+
+	check("a new dashboard starts as a column", fresh.root.type === "column", fresh.root.type);
+
 	// removing a panel
 	const pruned = base();
 

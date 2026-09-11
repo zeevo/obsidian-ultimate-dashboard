@@ -30,6 +30,12 @@ The palette's **dividers** are containers: *Columns* lays its children out side
 by side, *Rows* stacks them. Drop panels inside one to segment the dashboard,
 and nest them for more involved layouts.
 
+Every container, the outermost one included, has a pencil. Its **Layout**
+setting switches between rows, columns and a grid, so nothing about the shape is
+fixed: a new dashboard is a plain stack, and you build any arrangement by adding
+dividers rather than configuring a preset. Only the outermost container cannot
+be moved or deleted.
+
 **YAML** is the same document as text. The visual editor writes through the
 serialiser, so the two are views of one thing and either can pick up where the
 other left off.

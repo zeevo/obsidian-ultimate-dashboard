@@ -60,12 +60,10 @@ export interface DashboardSettings {
 
 export const DEFAULT_CONFIG = `folder: Daily
 layout:
-  type: grid
-  columns: 2
+  type: column
   gap: 22
   children:
     - type: stats
-      span: 1
       tiles:
         - { label: Weight, property: weight, agg: latest, unit: lb }
         - { label: 7 day average, property: weight, agg: mean, days: 7, unit: lb }

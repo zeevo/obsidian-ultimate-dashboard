@@ -129,7 +129,8 @@ export class VisualEditor {
 			head.createSpan({ cls: "udash-node-meta", text: `${node.columns ?? "auto"} columns` });
 		}
 
-		if (path.length > 0) this.controls(head, node, path);
+		// the root cannot be moved or deleted, but it is still configurable
+		this.controls(head, node, path, path.length === 0);
 
 		const body = box.createDiv({ cls: "udash-node-body" });
 
@@ -178,10 +179,10 @@ export class VisualEditor {
 		});
 	}
 
-	private controls(head: HTMLElement, node: Node, path: number[]): void {
+	private controls(head: HTMLElement, node: Node, path: number[], isRoot = false): void {
 		const actions = head.createDiv({ cls: "udash-node-actions" });
 
-		if (!isContainer(node)) {
+		{
 			const edit = actions.createEl("button", { cls: "udash-icon-button" });
 
 			edit.draggable = false;
@@ -192,6 +193,8 @@ export class VisualEditor {
 				this.configure(node);
 			});
 		}
+
+		if (isRoot) return;
 
 		const remove = actions.createEl("button", { cls: "udash-icon-button" });
 

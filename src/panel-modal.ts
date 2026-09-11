@@ -1,5 +1,5 @@
 import { App, Modal, Setting } from "obsidian";
-import { Node, StatsPanel } from "./config";
+import { ContainerKind, Node, StatsPanel, isContainer } from "./config";
 
 /**
  * Configures one panel. Opened when a type that needs settings is dropped onto
@@ -71,6 +71,22 @@ export class PanelModal extends Modal {
 			this.number("Events per day", () => node.maxPerDay, (v) => (node.maxPerDay = v));
 			this.calendars(() => node.calendars, (v) => (node.calendars = v));
 		} else {
+			new Setting(contentEl)
+				.setName("Layout")
+				.setDesc("How this container arranges its children.")
+				.addDropdown((dd) => {
+					dd.addOption("column", "Rows, stacked");
+					dd.addOption("row", "Columns, side by side");
+					dd.addOption("grid", "Grid");
+					dd.setValue(node.type);
+					dd.onChange((v) => {
+						retype(node, toKind(v));
+						// the available options differ per kind, so redraw the form
+						this.contentEl.empty();
+						this.onOpen();
+					});
+				});
+
 			this.number("Gap (px)", () => node.gap, (v) => (node.gap = v));
 
 			if (node.type === "grid") {
@@ -79,6 +95,7 @@ export class PanelModal extends Modal {
 					() => (node.columns === "auto" ? undefined : node.columns),
 					(v) => (node.columns = v ?? "auto"),
 				);
+				this.number("Min column width (px)", () => node.minWidth, (v) => (node.minWidth = v));
 			}
 		}
 
@@ -230,4 +247,29 @@ const LABELS = new Map<Node["type"], string>([
 
 export function label(type: Node["type"]): string {
 	return LABELS.get(type) ?? type;
+}
+
+const KINDS: ContainerKind[] = ["row", "column", "grid"];
+
+function toKind(v: string): ContainerKind {
+	return KINDS.find((k) => k === v) ?? "column";
+}
+
+/**
+ * Switches a container between kinds, dropping options the new kind does not
+ * understand. Leaving a stale `columns` on a row, say, would be rejected by the
+ * parser the next time the layout is saved.
+ */
+function retype(node: Node, kind: ContainerKind): void {
+	if (!isContainer(node)) return;
+	node.type = kind;
+
+	if (kind !== "grid") {
+		delete node.columns;
+		delete node.minWidth;
+	} else if (node.columns === undefined) {
+		node.columns = "auto";
+	}
+
+	if (kind !== "row") delete node.wrap;
 }
