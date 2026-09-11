@@ -247,6 +247,13 @@ change height from month to month.
 An event spanning several days appears in every cell it covers. Both panels
 refer to calendars by name, from the one pool configured in settings.
 
+### Creating events
+
+A panel showing at least one writable Google calendar gets a `+` in its header.
+On a month grid you can also **click any day** to open the form with that date
+already filled in; days are only clickable when a writable calendar is in scope,
+so a read-only dashboard stays inert.
+
 ### Calendars
 
 Two kinds of source, both configured under Settings → Community plugins → Life
@@ -286,12 +293,8 @@ renderer enforces CORS and calendar hosts do not send the headers that would
 allow it, and cached for ten minutes. **Ultimate Dashboard: Refresh calendars**
 clears the cache.
 
-### Creating events
-
-A calendar panel showing at least one writable Google calendar gets a `+` button
-in its header. It asks for a title, date, times or all-day, and location, then
-writes straight to Google. ICS panels have no button: the format has no write
-verb.
+The form asks for a title, date, times or all-day, and location, then writes
+straight to Google. ICS panels have no button: the format has no write verb.
 
 The ICS reader handles folded lines, escaped text, all-day and timed events,
 `EXDATE`, and `RRULE` for daily, weekly (including `BYDAY`), monthly and yearly

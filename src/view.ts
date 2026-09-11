@@ -195,11 +195,21 @@ export class DashboardView extends ItemView {
 
 			if (panel.type === "calendar") {
 				const { first, from, to } = monthWindow(panel);
+				const targets = this.writableTargets(wanted);
+
+				this.addEventButton(shell, wanted);
 
 				void this.host.calendars.events(wanted, from, to).then(({ events, errors }) => {
 					// the view may have re-rendered while the fetch was in flight
 					if (!shell.isConnected) return;
-					fillMonth(shell, panel, first, events, errors);
+					fillMonth(
+						shell,
+						panel,
+						first,
+						events,
+						errors,
+						targets.length > 0 ? (day) => this.createEvent(targets, day) : undefined,
+					);
 				});
 
 				return;
@@ -226,7 +236,7 @@ export class DashboardView extends ItemView {
 	}
 
 	/** Only Google calendars marked writable can take a new event. */
-	private addEventButton(shell: HTMLElement, sources: CalendarSource[]): void {
+	private writableTargets(sources: CalendarSource[]): { id: string; accountId: string; name: string }[] {
 		const targets: { id: string; accountId: string; name: string }[] = [];
 
 		for (const source of sources) {
@@ -237,6 +247,28 @@ export class DashboardView extends ItemView {
 			targets.push({ id: source.calendarId, accountId: source.accountId, name: source.name });
 		}
 
+		return targets;
+	}
+
+	/** Opens the new-event form, optionally on a chosen day. */
+	private createEvent(
+		targets: { id: string; accountId: string; name: string }[],
+		on?: Date,
+	): void {
+		new EventModal(
+			this.app,
+			targets,
+			async (accountId, calendarId, event) => {
+				await this.host.calendars.create(accountId, calendarId, event);
+				this.render();
+			},
+			on,
+		).open();
+	}
+
+	private addEventButton(shell: HTMLElement, sources: CalendarSource[]): void {
+		const targets = this.writableTargets(sources);
+
 		if (targets.length === 0) return;
 		const actions = shell.querySelector(".udash-calendar-actions");
 
@@ -244,12 +276,7 @@ export class DashboardView extends ItemView {
 		const button = actions.createEl("button", { cls: "udash-bar-button", text: "+" });
 
 		setTooltip(button, "New event");
-		button.addEventListener("click", () => {
-			new EventModal(this.app, targets, async (accountId, calendarId, event) => {
-				await this.host.calendars.create(accountId, calendarId, event);
-				this.render();
-			}).open();
-		});
+		button.addEventListener("click", () => this.createEvent(targets));
 	}
 
 	/** Edit mode: a visual canvas, or the raw YAML behind it. */

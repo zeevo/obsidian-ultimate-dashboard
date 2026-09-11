@@ -485,6 +485,8 @@ export function fillMonth(
 	first: Date,
 	events: MonthEvent[],
 	errors: string[],
+	/** Supplied when a writable calendar is in scope, so a day can be clicked. */
+	onPickDay?: (day: Date) => void,
 ): void {
 	// SAFETY: a div created by renderMonth on this same element; the early return
 	// below covers its absence if the shell was replaced.
@@ -510,6 +512,13 @@ export function fillMonth(
 		day.setDate(day.getDate() + i);
 
 		const cell = grid.createDiv({ cls: "udash-month-cell" });
+
+		if (onPickDay) {
+			const picked = new Date(day);
+
+			cell.addClass("is-clickable");
+			cell.addEventListener("click", () => onPickDay(picked));
+		}
 
 		if (day.getMonth() !== first.getMonth()) cell.addClass("is-outside");
 

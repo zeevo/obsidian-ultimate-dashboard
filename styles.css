@@ -585,3 +585,12 @@
 	border: 1px dashed var(--background-modifier-border);
 	border-radius: 6px;
 }
+
+/* A day accepts a click only when a writable calendar is in scope. */
+.udash-month-cell.is-clickable {
+	cursor: pointer;
+}
+
+.udash-month-cell.is-clickable:hover {
+	background: var(--background-modifier-hover);
+}

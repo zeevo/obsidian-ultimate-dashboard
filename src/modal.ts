@@ -108,12 +108,14 @@ export class EventModal extends Modal {
 		app: App,
 		private targets: { id: string; accountId: string; name: string }[],
 		private onSubmit: (accountId: string, calendarId: string, event: NewEvent) => Promise<void>,
+		/** Pre-selects a day, for a click on a month cell. */
+		on?: Date,
 	) {
 		super(app);
 		const now = new Date();
 
 		now.setMinutes(now.getMinutes() < 30 ? 30 : 60, 0, 0);
-		this.date = toDateInput(now);
+		this.date = toDateInput(on ?? now);
 		this.startTime = toTimeInput(now);
 		this.endTime = toTimeInput(new Date(now.getTime() + 3600000));
 		this.calendarId = targets[0]?.id ?? "";
