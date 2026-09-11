@@ -550,6 +550,25 @@ layout:
 
 	check("a nested empty divider re-parses", deepOk);
 
+	// moving an existing panel into a divider, which is the whole point of one
+	const intoDivider = base();
+
+	intoDivider.root.children.push({ type: "row", children: [] });
+	const [taken2] = intoDivider.root.children.splice(0, 1);
+	const divider = intoDivider.root.children[intoDivider.root.children.length - 1];
+
+	if (isContainer(divider)) divider.children.push(taken2);
+
+	const moved2 = parseConfig(serializeConfig(intoDivider));
+	const target = moved2.root.children.find((c) => isContainer(c));
+
+	check("a panel can move into a divider",
+		!!target && isContainer(target) && target.children.length === 1 &&
+			target.children[0].type === "heatmap",
+		target && isContainer(target) ? target.children.map((c) => c.type).join() : "no divider");
+	check("the panel left its old parent", moved2.root.children.length === 2,
+		`${moved2.root.children.length} top level children`);
+
 	// removing a panel
 	const pruned = base();
 

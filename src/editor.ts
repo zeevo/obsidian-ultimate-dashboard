@@ -51,6 +51,8 @@ const pathOf = (path: number[]) => path.join(".");
 
 export class VisualEditor {
 	private dragging: DragPayload | null = null;
+	/** The editor root, so a drag can widen every drop zone at once. */
+	private hostEl: HTMLElement | null = null;
 
 	constructor(
 		private app: App,
@@ -62,6 +64,7 @@ export class VisualEditor {
 	render(host: HTMLElement): void {
 		host.empty();
 		host.addClass("udash-editor");
+		this.hostEl = host;
 
 		this.renderPalette(host.createDiv({ cls: "udash-palette" }));
 
@@ -99,8 +102,9 @@ export class VisualEditor {
 		chip.addEventListener("dragstart", (e) => {
 			this.dragging = { kind: "new", type };
 			e.dataTransfer?.setData("text/plain", type);
+			this.setDragging(true);
 		});
-		chip.addEventListener("dragend", () => (this.dragging = null));
+		chip.addEventListener("dragend", () => this.endDrag());
 	}
 
 	/* ------------------------------------------------------------- canvas */
@@ -119,6 +123,12 @@ export class VisualEditor {
 
 		const body = box.createDiv({ cls: "udash-node-body" });
 
+		if (node.children.length === 0) {
+			this.dropZone(body, { parent: node, index: 0 }, "Drop a panel here");
+
+			return;
+		}
+
 		this.dropZone(body, { parent: node, index: 0 });
 
 		node.children.forEach((child, i) => {
@@ -128,10 +138,6 @@ export class VisualEditor {
 			else this.renderLeaf(body, child, childPath);
 			this.dropZone(body, { parent: node, index: i + 1 });
 		});
-
-		if (node.children.length === 0) {
-			body.createDiv({ cls: "udash-empty-hint", text: "Drop a panel here" });
-		}
 	}
 
 	private renderLeaf(el: HTMLElement, node: Panel, path: number[]): void {
@@ -142,8 +148,9 @@ export class VisualEditor {
 			this.dragging = { kind: "move", path };
 			e.dataTransfer?.setData("text/plain", pathOf(path));
 			e.stopPropagation();
+			this.setDragging(true);
 		});
-		box.addEventListener("dragend", () => (this.dragging = null));
+		box.addEventListener("dragend", () => this.endDrag());
 
 		const head = box.createDiv({ cls: "udash-node-head" });
 
@@ -177,9 +184,16 @@ export class VisualEditor {
 		});
 	}
 
-	/** A thin strip that accepts a drop between two siblings. */
-	private dropZone(el: HTMLElement, target: Target): void {
-		const zone = el.createDiv({ cls: "udash-dropzone" });
+	/**
+	 * A strip that accepts a drop between two siblings. With a label it becomes
+	 * the whole body of an empty container, so a divider is easy to drop into.
+	 */
+	private dropZone(el: HTMLElement, target: Target, label?: string): void {
+		const zone = el.createDiv({
+			cls: label ? "udash-dropzone udash-dropzone-empty" : "udash-dropzone",
+		});
+
+		if (label) zone.setText(label);
 
 		zone.addEventListener("dragover", (e) => {
 			if (!this.dragging) return;
@@ -196,12 +210,21 @@ export class VisualEditor {
 		});
 	}
 
+	private setDragging(on: boolean): void {
+		this.hostEl?.toggleClass("is-dragging", on);
+	}
+
+	private endDrag(): void {
+		this.dragging = null;
+		this.setDragging(false);
+	}
+
 	/* -------------------------------------------------------------- edits */
 
 	private drop(target: Target): void {
 		const payload = this.dragging;
 
-		this.dragging = null;
+		this.endDrag();
 
 		if (!payload) return;
 

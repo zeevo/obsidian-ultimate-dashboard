@@ -553,13 +553,28 @@
 	min-height: 14px;
 }
 
-.udash-empty-hint {
+/* An empty container is entirely a drop target, so a divider you just added is
+   as easy to hit as the gap between two existing panels. */
+.udash-dropzone-empty {
+	min-height: 54px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 	font-size: 0.76em;
 	color: var(--text-muted);
-	padding: 10px;
-	text-align: center;
 	border: 1px dashed var(--background-modifier-border);
 	border-radius: 6px;
+}
+
+/* While something is in flight, every gap grows into a target you can hit. */
+.udash-editor.is-dragging .udash-dropzone {
+	min-height: 26px;
+	border: 1px dashed color-mix(in srgb, var(--interactive-accent) 35%, transparent);
+}
+
+.udash-editor.is-dragging .udash-node-row > .udash-node-body > .udash-dropzone {
+	min-width: 26px;
+	flex: 0 0 26px;
 }
 
 .udash-editor-tabs {
