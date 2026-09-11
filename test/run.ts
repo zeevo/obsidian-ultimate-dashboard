@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { load } from "js-yaml";
 import { ConfigError, ContainerNode, countPanels, isContainer, needsSetup, parseDashboard } from "../src/layout-tree";
 import { DayRecord } from "../src/data";
-import { fillMonth, monthWindow, renderHeatmap, renderLine, renderMonth, renderStats } from "../src/render";
+import { fillMonth, monthWindow, renderHeatmap, renderLine, renderMonth, renderStat } from "../src/render";
 import { renderNode } from "../src/layout";
 import { parseICS } from "../src/ics";
 import { serializeDashboard } from "../src/serialize";
@@ -96,9 +96,7 @@ folder: Daily
 layout:
   type: column
   children:
-    - type: stats
-      tiles:
-        - { label: Weight, property: weight, agg: latest }
+    - { type: stat, label: Weight, property: weight }
     - type: heatmap
       property: lift
 `);
@@ -116,15 +114,11 @@ rejects("layout: {}", "a root with no type rejected");
 
 rejects("layout:\n  type: column\n  children: [{ type: bogus }]", "unknown panel type rejected");
 
-check("stats with no tiles parses but needs setup", (() => {
-	const c = parseDashboard("layout:\n  type: column\n  children: [{ type: stats, tiles: [] }]");
-
-	return needsSetup(c.root.children[0]);
-})());
+check("a stat with no property needs setup", needsSetup({ id: "t", type: "stat", property: "" } as never));
 
 rejects("layout:\n  type: column\n  children: [{ type: heatmap }]", "heatmap without property rejected");
 
-rejects("layout:\n  type: column\n  children: [{ type: stats, tiles: [{ label: X, property: y, agg: nope }] }]", "bad agg rejected");
+rejects("layout:\n  type: column\n  children: [{ type: stat, property: y, agg: nope }]", "bad agg rejected");
 
 console.log("\nICS parsing");
 
@@ -326,7 +320,7 @@ layout:
         - { type: heatmap, property: lift }
     - type: row
       children:
-        - { type: stats, tiles: [{ label: A, property: weight }] }
+        - { type: stat, property: weight }
         - { type: heatmap, property: read, flex: 2 }
         - { type: heatmap, property: vitamins }
 `);
@@ -349,7 +343,7 @@ check("nested row parsed", inner.type === "row" && inner.children.length === 3);
 
 check("flex parsed on a nested child", (inner.children[1] as { flex?: number }).flex === 2);
 
-check("stats carries no implicit sizing", (inner.children[0] as { flex?: number }).flex === undefined);
+check("a stat carries no implicit sizing", (inner.children[0] as { flex?: number }).flex === undefined);
 
 // legacy flat form must keep working
 
@@ -392,10 +386,8 @@ layout:
   type: column
   gap: 22
   children:
-    - type: stats
-      tiles:
-        - { label: Weight, property: weight, agg: latest, unit: lb }
-        - { label: Lifts, property: lift, agg: count, days: 7, target: 3 }
+    - { type: stat, label: Weight, property: weight, unit: lb }
+    - { type: stat, label: Lifts, property: lift, agg: count, back: 7, target: 3 }
     - type: line
       title: Weight
       property: weight
@@ -856,18 +848,23 @@ console.log("\nstats panel");
 
 const stats = new El();
 
-renderStats(stats, days, parseDashboard(`
+/** The old stats panel is now a row of stat panels, so render them as one. */
+const renderStatRow = (host: El, d: typeof days, panels: never) => {
+	for (const p of panels as unknown as Parameters<typeof renderStat>[2][]) {
+		renderStat(host as never, d, p);
+	}
+};
+
+renderStatRow(stats, days, parseDashboard(`
 layout:
-  type: column
+  type: row
   children:
-    - type: stats
-      tiles:
-        - { label: Weight, property: weight, agg: latest, unit: lb }
-        - { label: Average, property: weight, agg: mean, days: 7 }
-        - { label: Lifts, property: lift, agg: count, days: 7, target: 3 }
-        - { label: Miles, property: miles, agg: sum }
-        - { label: Nothing, property: nosuchprop, agg: latest }
-`).root.children[0] as never);
+    - { type: stat, label: Weight, property: weight, agg: latest, unit: lb }
+    - { type: stat, label: Average, property: weight, agg: mean, back: 7 }
+    - { type: stat, label: Lifts, property: lift, agg: count, back: 7, target: 3 }
+    - { type: stat, label: Miles, property: miles, agg: sum }
+    - { type: stat, label: Nothing, property: nosuchprop, agg: latest }
+`).root.children as never);
 
 const tiles = stats.byClass("udash-tile");
 

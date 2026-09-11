@@ -309,22 +309,29 @@ with a message naming its replacement.
 On a time range, `days` was ambiguous: it meant a trailing window on a chart and
 a forward window on an agenda. It is now `back` and `ahead`.
 
-### `type: stats`
+### `type: stat`
 
-Takes a `tiles` list. Each tile:
+One number. Arrange several with rows and columns, like any other panel.
 
 | Key | Meaning |
 |-----|---------|
-| `label` | Caption |
-| `property` | Frontmatter key |
-| `agg` | `latest`, `mean`, `sum`, `count`, `delta` |
-| `days` | Rolling window; omit for all history |
+| `property` | Frontmatter key. Required |
+| `label` | Caption. Defaults to the property name |
+| `agg` | `latest`, `mean`, `sum`, `count`, `delta`. Default `latest` |
+| `back` | Rolling window in days; omit for all history |
 | `target` | Renders as `value / target` |
 | `unit` | Suffix |
 | `precision` | Decimal places (default 1, or 0 for `count`) |
 
+```yaml
+- type: row
+  children:
+    - { type: stat, label: Weight, property: weight, unit: lb }
+    - { type: stat, label: Lifts, property: lift, agg: count, back: 7, target: 3 }
+```
+
 `count` counts days where the property is truthy, so it suits checkboxes.
-`delta` is last minus first inside the window. A tile with no data shows `—`.
+`delta` is last minus first inside the window. A stat with no data shows `—`.
 
 ### `type: heatmap`
 

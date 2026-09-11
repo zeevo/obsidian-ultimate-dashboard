@@ -1,7 +1,7 @@
 import { App, Modal, Setting } from "obsidian";
 import { LayoutNode, isContainer } from "./layout-tree";
 import { ContainerKind, assertNever } from "./kinds";
-import { AGGS, StatsPanel, specFor } from "./panels";
+import { specFor } from "./panels";
 import { Field, FieldKind, FieldValue } from "./schema";
 
 /**
@@ -42,7 +42,6 @@ export class PanelForm extends Modal {
 
 			for (const field of spec.fields) this.field(field, node);
 
-			if (node.type === "stats") this.tiles(node);
 		}
 
 		new Setting(contentEl).addButton((b) =>
@@ -217,44 +216,4 @@ export class PanelForm extends Modal {
 		for (const o of options) list.createEl("option", { value: o });
 	}
 
-	/* --------------------------------------------------------------- tiles */
-
-	private tiles(panel: StatsPanel): void {
-		new Setting(this.contentEl).setName("Tiles").setHeading();
-
-		panel.tiles.forEach((tile, i) => {
-			const row = new Setting(this.contentEl);
-
-			row.addText((t) =>
-				t.setPlaceholder("Label").setValue(tile.label).onChange((v) => (tile.label = v.trim() || "Tile")),
-			);
-			row.addText((t) => {
-				t.setPlaceholder("property").setValue(tile.property).onChange((v) => (tile.property = v.trim()));
-				this.suggest(t.inputEl, this.context.properties);
-			});
-			row.addDropdown((dd) => {
-				for (const agg of AGGS) dd.addOption(agg, agg);
-				dd.setValue(tile.agg);
-				dd.onChange((v) => (tile.agg = AGGS.find((a) => a === v) ?? tile.agg));
-			});
-			row.addExtraButton((b) =>
-				b
-					.setIcon("trash-2")
-					.setTooltip("Remove")
-					.onClick(() => {
-						panel.tiles.splice(i, 1);
-						this.contentEl.empty();
-						this.onOpen();
-					}),
-			);
-		});
-
-		new Setting(this.contentEl).addButton((b) =>
-			b.setButtonText("Add tile").onClick(() => {
-				panel.tiles.push({ label: "Tile", property: "", agg: "latest" });
-				this.contentEl.empty();
-				this.onOpen();
-			}),
-		);
-	}
 }

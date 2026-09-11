@@ -18,16 +18,6 @@ export interface NodeBase {
 	flex?: number;
 }
 
-export interface StatsTile {
-	label: string;
-	property: string;
-	agg: Agg;
-	days?: number;
-	target?: number;
-	unit?: string;
-	precision?: number;
-}
-
 export const Agg = {
 	Latest: "latest",
 	Mean: "mean",
@@ -46,10 +36,18 @@ export function toAgg(v: unknown): Agg | null {
 
 /* -------------------------------------------------------------- the panels */
 
-export interface StatsPanel extends NodeBase {
-	type: typeof PanelKind.Stats;
-	title?: string;
-	tiles: StatsTile[];
+export interface StatPanel extends NodeBase {
+	type: typeof PanelKind.Stat;
+	/** Caption. Defaults to the property name. */
+	label?: string;
+	property: string;
+	agg?: Agg;
+	/** Rolling window, in days back from today. Omit for the whole history. */
+	back?: number;
+	/** Shown as `value / target`. */
+	target?: number;
+	unit?: string;
+	precision?: number;
 }
 
 interface Ranged {
@@ -96,7 +94,7 @@ export interface CalendarPanel extends NodeBase {
 	weekStart?: number;
 }
 
-export type Panel = StatsPanel | LinePanel | HeatmapPanel | UpcomingPanel | CalendarPanel;
+export type Panel = StatPanel | LinePanel | HeatmapPanel | UpcomingPanel | CalendarPanel;
 
 /* ------------------------------------------------------------ field groups */
 
@@ -148,12 +146,25 @@ function validateRange(panel: Ranged): string | null {
 	return null;
 }
 
-const stats: PanelSpec<StatsPanel> = {
-	type: PanelKind.Stats,
-	label: "Stats",
-	hint: "Numbers at a glance",
-	fields: [{ key: "title", kind: FieldKind.Text, label: "Title" }],
-	summary: (p) => `${p.tiles.length} ${p.tiles.length === 1 ? "tile" : "tiles"}`,
+const stat: PanelSpec<StatPanel> = {
+	type: PanelKind.Stat,
+	label: "Stat",
+	hint: "One number",
+	fields: [
+		{ key: "label", kind: FieldKind.Text, label: "Caption" },
+		{ key: "property", kind: FieldKind.Property, label: "Property", required: true },
+		{
+			key: "agg",
+			kind: FieldKind.Choice,
+			label: "Aggregate",
+			choices: AGGS.map((a) => ({ value: a, label: a })),
+		},
+		{ key: "back", kind: FieldKind.Number, label: "Days back" },
+		{ key: "target", kind: FieldKind.Number, label: "Target" },
+		{ key: "unit", kind: FieldKind.Text, label: "Unit", placeholder: "lb" },
+		{ key: "precision", kind: FieldKind.Number, label: "Decimal places", min: 0 },
+	],
+	summary: (p) => (p.property ? `${p.agg ?? Agg.Latest} of ${p.property}` : "not configured"),
 };
 
 const line: PanelSpec<LinePanel> = {
@@ -225,7 +236,7 @@ const calendar: PanelSpec<CalendarPanel> = {
 
 /** Every panel type, keyed by its discriminant. */
 export const PANELS: { readonly [K in PanelKind]: PanelSpec } = {
-	[PanelKind.Stats]: stats as PanelSpec,
+	[PanelKind.Stat]: stat as PanelSpec,
 	[PanelKind.Line]: line as PanelSpec,
 	[PanelKind.Heatmap]: heatmap as PanelSpec,
 	[PanelKind.Upcoming]: upcoming as PanelSpec,

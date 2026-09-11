@@ -25,15 +25,10 @@
 	}
 }
 
-/* ------------------------------------------------------------------ tiles */
-
-.udash-tiles {
-	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-	gap: 10px;
-}
+/* ------------------------------------------------------------------- stat */
 
 .udash-tile {
+	height: 100%;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 8px;
 	padding: 10px 12px;

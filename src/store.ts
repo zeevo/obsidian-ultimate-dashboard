@@ -63,10 +63,11 @@ layout:
   type: column
   gap: 22
   children:
-    - type: stats
-      tiles:
-        - { label: Weight, property: weight, agg: latest, unit: lb }
-        - { label: 7 day average, property: weight, agg: mean, days: 7, unit: lb }
+    - type: row
+      children:
+        - { type: stat, label: Weight, property: weight, unit: lb }
+        - { type: stat, label: 7 day average, property: weight, agg: mean, back: 7, unit: lb }
+        - { type: stat, label: Lifts this week, property: lift, agg: count, back: 7, target: 3 }
     - type: row
       children:
         - { type: line, title: Weight, property: weight, rolling: 7, unit: lb, months: 6, flex: 2 }

@@ -1,4 +1,5 @@
-import { CalendarPanel, HeatmapPanel, LinePanel, StatsPanel, StatsTile as Tile, UpcomingPanel } from "./panels";
+import { Agg, CalendarPanel, HeatmapPanel, LinePanel, StatPanel, UpcomingPanel } from "./panels";
+import { assertNever } from "./kinds";
 import { DayRecord, daysBetween, num, shiftDate, shiftMonths, toISO, today, truthy } from "./data";
 
 const DEFAULT_COLOR = "#3b82f6";
@@ -12,68 +13,66 @@ function shade(hex: string, alpha: number): string {
 	return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 }
 
-/* ------------------------------------------------------------------ stats */
+/* ------------------------------------------------------------------- stat */
 
-function aggregate(days: DayRecord[], tile: Tile): number | null {
-	const from = tile.days ? shiftDate(today(), -(tile.days - 1)) : null;
+function aggregate(days: DayRecord[], panel: StatPanel): number | null {
+	const from = panel.back ? shiftDate(today(), -(panel.back - 1)) : null;
 	const scope = from ? days.filter((d) => d.date >= from) : days;
+	const agg = panel.agg ?? Agg.Latest;
 
-	if (tile.agg === "count") {
-		return scope.filter((d) => truthy(d, tile.property)).length;
+	if (agg === Agg.Count) return scope.filter((d) => truthy(d, panel.property)).length;
+
+	const vals: number[] = [];
+
+	for (const day of scope) {
+		const v = num(day, panel.property);
+
+		if (v !== null) vals.push(v);
 	}
-
-	const vals = scope
-		.map((d) => ({ date: d.date, v: num(d, tile.property) }))
-		.filter((x): x is { date: string; v: number } => x.v !== null);
 
 	if (vals.length === 0) return null;
 
-	switch (tile.agg) {
-		case "latest":
-			return vals[vals.length - 1].v;
-		case "sum":
-			return vals.reduce((s, x) => s + x.v, 0);
-		case "mean":
-			return vals.reduce((s, x) => s + x.v, 0) / vals.length;
-		case "delta":
-			return vals[vals.length - 1].v - vals[0].v;
+	switch (agg) {
+		case Agg.Latest:
+			return vals[vals.length - 1];
+		case Agg.Sum:
+			return vals.reduce((a, b) => a + b, 0);
+		case Agg.Mean:
+			return vals.reduce((a, b) => a + b, 0) / vals.length;
+		case Agg.Delta:
+			return vals[vals.length - 1] - vals[0];
+		default:
+			return assertNever(agg, "aggregate");
 	}
 }
 
-export function renderStats(el: HTMLElement, days: DayRecord[], panel: StatsPanel): void {
-	const grid = el.createDiv({ cls: "udash-tiles" });
+/** One number. Arrange several with rows and columns. */
+export function renderStat(el: HTMLElement, days: DayRecord[], panel: StatPanel): void {
+	const agg = panel.agg ?? Agg.Latest;
+	const value = aggregate(days, panel);
+	const precision = panel.precision ?? (agg === Agg.Count ? 0 : 1);
+	const card = el.createDiv({ cls: "udash-tile" });
 
-	for (const tile of panel.tiles) {
-		const value = aggregate(days, tile);
-		const precision = tile.precision ?? (tile.agg === "count" ? 0 : 1);
+	card.createDiv({ cls: "udash-tile-label", text: panel.label ?? panel.property });
 
-		const card = grid.createDiv({ cls: "udash-tile" });
-		card.createDiv({ cls: "udash-tile-label", text: tile.label });
+	const valueEl = card.createDiv({ cls: "udash-tile-value" });
 
-		const valueEl = card.createDiv({ cls: "udash-tile-value" });
+	if (value === null) {
+		valueEl.setText("\u2014");
+	} else {
+		const shown =
+			agg === Agg.Delta && value > 0 ? "+" + value.toFixed(precision) : value.toFixed(precision);
 
-		if (value === null) {
-			valueEl.setText("—");
-		} else {
-			const shown =
-				tile.agg === "delta" && value > 0
-					? "+" + value.toFixed(precision)
-					: value.toFixed(precision);
+		valueEl.setText(shown);
 
-			valueEl.setText(shown);
-
-			if (tile.target !== undefined) {
-				valueEl.createSpan({ cls: "udash-tile-target", text: ` / ${tile.target}` });
-			}
-
-			if (tile.unit) {
-				valueEl.createSpan({ cls: "udash-tile-unit", text: ` ${tile.unit}` });
-			}
+		if (panel.target !== undefined) {
+			valueEl.createSpan({ cls: "udash-tile-target", text: ` / ${panel.target}` });
 		}
 
-		const sub = tile.days ? `last ${tile.days} days` : tile.agg;
-		card.createDiv({ cls: "udash-tile-sub", text: sub });
+		if (panel.unit) valueEl.createSpan({ cls: "udash-tile-unit", text: ` ${panel.unit}` });
 	}
+
+	card.createDiv({ cls: "udash-tile-sub", text: panel.back ? `last ${panel.back} days` : agg });
 }
 
 /* ---------------------------------------------------------------- heatmap */

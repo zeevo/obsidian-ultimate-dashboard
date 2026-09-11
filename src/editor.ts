@@ -24,7 +24,7 @@ function blank(type: PanelKind | ContainerKind): LayoutNode {
 		return { id, type, children: [] };
 	}
 
-	if (type === PanelKind.Stats) return { id, type, tiles: [] };
+	if (type === PanelKind.Stat) return { id, type, property: "" };
 
 	if (type === PanelKind.Line) return { id, type, property: "" };
 

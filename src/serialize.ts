@@ -1,6 +1,6 @@
 import { ContainerKind } from "./kinds";
 import { Dashboard, LayoutNode, isContainer } from "./layout-tree";
-import { StatsTile, specFor } from "./panels";
+import { specFor } from "./panels";
 import { FieldValue } from "./schema";
 
 /**
@@ -25,24 +25,6 @@ function scalar(v: FieldValue): string {
 		/[:#{}[\],&*?|<>=!%@`"']/.test(v);
 
 	return risky ? JSON.stringify(v) : v;
-}
-
-function tileLine(tile: StatsTile): string {
-	const parts: string[] = [];
-
-	const put = (k: string, v: FieldValue | undefined) => {
-		if (v !== undefined) parts.push(`${k}: ${scalar(v)}`);
-	};
-
-	put("label", tile.label);
-	put("property", tile.property);
-	put("agg", tile.agg);
-	put("days", tile.days);
-	put("target", tile.target);
-	put("unit", tile.unit);
-	put("precision", tile.precision);
-
-	return `{ ${parts.join(", ")} }`;
 }
 
 /** Every option a node carries, in a stable order. `id` is runtime only. */
@@ -81,11 +63,6 @@ function writeNode(node: LayoutNode, indent: string, lines: string[]): void {
 
 	for (const [k, v] of optionsOf(node)) lines.push(`${inner}${k}: ${v}`);
 
-	if (node.type === "stats") {
-		lines.push(`${inner}tiles:`);
-
-		for (const tile of node.tiles) lines.push(`${inner}  - ${tileLine(tile)}`);
-	}
 
 	if (isContainer(node)) writeChildren(node.children, inner, lines);
 }

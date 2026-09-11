@@ -14,7 +14,7 @@ export const ContainerKind = {
 export type ContainerKind = (typeof ContainerKind)[keyof typeof ContainerKind];
 
 export const PanelKind = {
-	Stats: "stats",
+	Stat: "stat",
 	Line: "line",
 	Heatmap: "heatmap",
 	Upcoming: "upcoming",

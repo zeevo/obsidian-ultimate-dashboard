@@ -1,6 +1,6 @@
 import { parseYaml } from "obsidian";
 import { ContainerKind, assertNever, toContainerKind, toPanelKind } from "./kinds";
-import { NodeBase, Panel, StatsTile, specFor, toAgg } from "./panels";
+import { NodeBase, Panel, specFor } from "./panels";
 import { FieldError, isComplete, parseFields } from "./schema";
 
 /**
@@ -65,49 +65,8 @@ function readFlex(raw: Record<string, unknown>, where: string): number | undefin
 	return v;
 }
 
-function parseTile(raw: unknown, i: number, where: string): StatsTile {
-	const t = asRecord(raw, `${where} tile ${i + 1}`);
-	const at = `${where} tile ${i + 1}`;
-
-	const str = (key: string, required: boolean): string => {
-		const v = t[key];
-
-		if (typeof v === "string" && v.trim()) return v.trim();
-
-		if (required) throw new ConfigError(`${at}: \`${key}\` is required`);
-
-		return "";
-	};
-
-	const num = (key: string): number | undefined => {
-		const v = t[key];
-
-		if (v === undefined || v === null) return undefined;
-
-		if (typeof v !== "number" || !Number.isFinite(v)) {
-			throw new ConfigError(`${at}: \`${key}\` must be a number`);
-		}
-
-		return v;
-	};
-
-	const agg = toAgg(t.agg ?? "latest");
-
-	if (agg === null) throw new ConfigError(`${at}: unknown agg "${String(t.agg)}"`);
-
-	return {
-		label: str("label", true),
-		property: str("property", true),
-		agg,
-		days: num("days"),
-		target: num("target"),
-		unit: typeof t.unit === "string" ? t.unit : undefined,
-		precision: num("precision"),
-	};
-}
-
 /** Keys handled by the tree rather than by a panel's own field list. */
-const STRUCTURAL = ["type", "flex", "children", "gap", "wrap", "tiles"] as const;
+const STRUCTURAL = ["type", "flex", "children", "gap", "wrap"] as const;
 
 function parseNode(raw: unknown, where: string, depth: number): LayoutNode {
 	if (depth > MAX_DEPTH) {
@@ -180,14 +139,8 @@ function parseNode(raw: unknown, where: string, depth: number): LayoutNode {
 		throw e instanceof FieldError ? new ConfigError(e.message) : e;
 	}
 
-	const tiles =
-		panel === "stats"
-			? (Array.isArray(node.tiles) ? node.tiles : []).map((t, i) => parseTile(t, i, where))
-			: undefined;
 
 	const built: Record<string, unknown> = { id: nextId(), type: panel, flex, ...fields };
-
-	if (tiles) built.tiles = tiles;
 
 	// SAFETY: every key came from this panel's own field declaration, and every
 	// value was validated against the kind that declaration names.
@@ -232,11 +185,8 @@ export function parseDashboard(source: string): Dashboard {
 /** Whether a panel still needs configuring before it can be drawn. */
 export function needsSetup(node: LayoutNode): boolean {
 	if (isContainer(node)) return false;
-	const spec = specFor(node.type);
 
-	if (node.type === "stats") return node.tiles.length === 0;
-
-	return !isComplete(spec.fields, node);
+	return !isComplete(specFor(node.type).fields, node);
 }
 
 export function countPanels(node: LayoutNode): number {
