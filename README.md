@@ -57,7 +57,6 @@ Layouts are stored in the plugin's `data.json`, not in your notes.
 
 ```yaml
 folder: Daily
-minWidth: 520
 panels:
   - type: stats
     tiles:
@@ -87,8 +86,6 @@ Notes are picked up when they live in `folder` and are named `YYYY-MM-DD`.
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `folder` | `Daily` | Folder holding the dated notes |
-| `columns` | `auto` | Fixed column count (1 to 12), or `auto` |
-| `minWidth` | `520` | Column width the `auto` grid fits against. Ignored when `columns` is a number |
 | `gap` | `20` | Space between panels, in pixels |
 | `panels` | required | List of panels |
 
@@ -125,7 +122,7 @@ layout:
 ```
 
 Containers nest to 8 levels. The root must be a container, and a panel cannot
-take `children`: wrap panels in a `row`, `column` or `grid` instead.
+take `children`: wrap panels in a `row` or `column` instead.
 
 **Container options**
 
@@ -143,13 +140,12 @@ take `children`: wrap panels in a `row`, `column` or `grid` instead.
 | Key | Valid inside | Meaning |
 |-----|-------------|---------|
 | `flex` | row, column | Growth factor, like CSS `flex-grow` |
-| `span` | grid | Columns to occupy, or `full` |
 
 `span`, `columns` and `minWidth` were removed along with the grid type; the
 parser rejects them with a message pointing at the replacement.
 
-Below 700px every row becomes a column and every grid a single track, so a
-deeply nested dashboard stays readable in a split pane or on a phone.
+Below 700px every row becomes a column, so a deeply nested dashboard stays
+readable in a split pane or on a phone.
 
 
 ### Ranges
@@ -221,7 +217,6 @@ change height from month to month.
   month: 2026-09
   weekStart: 1
   maxPerDay: 4
-  span: full
 ```
 
 An event spanning several days appears in every cell it covers. Both panels
