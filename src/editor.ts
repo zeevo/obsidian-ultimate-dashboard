@@ -111,6 +111,8 @@ export class VisualEditor {
 
 	private renderContainer(el: HTMLElement, node: ContainerNode, path: number[]): void {
 		const box = el.createDiv({ cls: `udash-node udash-node-${node.type}` });
+
+		if (path.length > 0) this.makeDraggable(box, path);
 		const head = box.createDiv({ cls: "udash-node-head" });
 
 		head.createSpan({ cls: "udash-node-kind", text: label(node.type) });
@@ -143,14 +145,7 @@ export class VisualEditor {
 	private renderLeaf(el: HTMLElement, node: Panel, path: number[]): void {
 		const box = el.createDiv({ cls: `udash-node udash-node-leaf udash-node-${node.type}` });
 
-		box.draggable = true;
-		box.addEventListener("dragstart", (e) => {
-			this.dragging = { kind: "move", path };
-			e.dataTransfer?.setData("text/plain", pathOf(path));
-			e.stopPropagation();
-			this.setDragging(true);
-		});
-		box.addEventListener("dragend", () => this.endDrag());
+		this.makeDraggable(box, path);
 
 		const head = box.createDiv({ cls: "udash-node-head" });
 
@@ -159,12 +154,39 @@ export class VisualEditor {
 		this.controls(head, node, path);
 	}
 
+	private makeDraggable(box: HTMLElement, path: number[]): void {
+		box.draggable = true;
+		box.addEventListener("dragstart", (e) => {
+			this.dragging = { kind: "move", path };
+			e.dataTransfer?.setData("text/plain", pathOf(path));
+			e.stopPropagation();
+			this.setDragging(true);
+		});
+		box.addEventListener("dragend", () => this.endDrag());
+	}
+
 	private controls(head: HTMLElement, node: Node, path: number[]): void {
 		const actions = head.createDiv({ cls: "udash-node-actions" });
+		const parent = this.parentOf(path);
+		const index = path[path.length - 1];
+
+		// Buttons are the reliable way to reorder: dragging depends on hitting a
+		// gap, and inside a Columns divider those gaps are narrow.
+		this.moveButton(actions, "chevron-up", "Move up", parent !== null && index > 0, () =>
+			this.swap(path, -1),
+		);
+		this.moveButton(
+			actions,
+			"chevron-down",
+			"Move down",
+			parent !== null && index < parent.children.length - 1,
+			() => this.swap(path, 1),
+		);
 
 		if (!isContainer(node)) {
 			const edit = actions.createEl("button", { cls: "udash-icon-button" });
 
+			edit.draggable = false;
 			setIcon(edit, "pencil");
 			setTooltip(edit, "Configure");
 			edit.addEventListener("click", (e) => {
@@ -175,6 +197,7 @@ export class VisualEditor {
 
 		const remove = actions.createEl("button", { cls: "udash-icon-button" });
 
+		remove.draggable = false;
 		setIcon(remove, "trash-2");
 		setTooltip(remove, "Remove");
 		remove.addEventListener("click", (e) => {
@@ -182,6 +205,41 @@ export class VisualEditor {
 			this.removeAt(path);
 			this.commit();
 		});
+	}
+
+	private moveButton(
+		actions: HTMLElement,
+		icon: string,
+		tip: string,
+		enabled: boolean,
+		run: () => void,
+	): void {
+		const button = actions.createEl("button", { cls: "udash-icon-button" });
+
+		setIcon(button, icon);
+		setTooltip(button, tip);
+		button.disabled = !enabled;
+		button.draggable = false;
+		button.addEventListener("click", (e) => {
+			e.stopPropagation();
+
+			if (enabled) run();
+		});
+	}
+
+	/** Moves a node one place within its parent. */
+	private swap(path: number[], delta: number): void {
+		const parent = this.parentOf(path);
+
+		if (!parent) return;
+		const from = path[path.length - 1];
+		const to = from + delta;
+
+		if (to < 0 || to >= parent.children.length) return;
+		const [node] = parent.children.splice(from, 1);
+
+		parent.children.splice(to, 0, node);
+		this.commit();
 	}
 
 	/**

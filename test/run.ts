@@ -569,6 +569,40 @@ layout:
 	check("the panel left its old parent", moved2.root.children.length === 2,
 		`${moved2.root.children.length} top level children`);
 
+	// reordering within a parent, which is what the up/down buttons do
+	const ordered = parseConfig(`
+folder: Daily
+layout:
+  type: column
+  children:
+    - { type: heatmap, property: a }
+    - { type: heatmap, property: b }
+    - { type: heatmap, property: c }
+`);
+
+	const kids = ordered.root.children;
+
+	const names = () =>
+		parseConfig(serializeConfig(ordered)).root.children.map(
+			(c) => (c as { property?: string }).property,
+		).join();
+
+	// move the middle one up
+	const [middle] = kids.splice(1, 1);
+
+	kids.splice(0, 0, middle);
+	check("moving up reorders", names() === "b,a,c", names());
+
+	// and back down
+	const [first] = kids.splice(0, 1);
+
+	kids.splice(1, 0, first);
+	check("moving down reorders", names() === "a,b,c", names());
+
+	// the ends must not wrap around
+	check("the first has nothing above it", kids.indexOf(kids[0]) === 0);
+	check("the last has nothing below it", kids.indexOf(kids[2]) === kids.length - 1);
+
 	// removing a panel
 	const pruned = base();
 

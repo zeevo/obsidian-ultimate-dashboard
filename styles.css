@@ -607,3 +607,8 @@
 	background: var(--background-secondary);
 	color: var(--text-normal);
 }
+
+.udash-editor .udash-icon-button:disabled {
+	opacity: 0.25;
+	cursor: default;
+}

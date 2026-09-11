@@ -18,9 +18,14 @@ second one.
 The pencil opens edit mode, which has two tabs.
 
 **Visual** is a palette and a canvas. Drag a panel type onto a drop zone to add
-it; drag one already on the canvas to move it. Dropping a type that needs
-settings, like a heatmap with no property yet, opens its configuration straight
-away. Each card has a pencil to reconfigure and a bin to remove.
+it; drag one already on the canvas to move it anywhere, including into a
+divider. Dropping a type that needs settings, like a heatmap with no property
+yet, opens its configuration straight away.
+
+Each card carries up and down arrows to reorder it within its parent, a pencil
+to reconfigure, and a bin to remove. The arrows are the dependable route:
+dragging means hitting a gap, and inside a Columns divider those gaps are
+narrow.
 
 The palette's **dividers** are containers: *Columns* lays its children out side
 by side, *Rows* stacks them. Drop panels inside one to segment the dashboard,
