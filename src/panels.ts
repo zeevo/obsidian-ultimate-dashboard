@@ -131,11 +131,23 @@ export const RANGE_KEYS = ["year", "months", "back", "from", "to"] as const;
 
 /* ---------------------------------------------------------------- registry */
 
+/**
+ * A new panel of this type, before the tree assigns it an id. Written as a
+ * conditional so it distributes over the union rather than collapsing to the
+ * keys every panel shares.
+ */
+export type NewPanel<P extends Panel = Panel> = P extends Panel ? Omit<P, "id"> : never;
+
 export interface PanelSpec<P extends Panel = Panel> {
 	readonly type: P["type"];
 	readonly label: string;
 	readonly hint: string;
 	readonly fields: readonly Field<P>[];
+	/**
+	 * What dropping this type onto the canvas creates. Required fields start
+	 * empty, so a fresh panel reads as needing setup and opens its form.
+	 */
+	blank(): NewPanel<P>;
 	/** A one line summary for the editor's card. */
 	summary(panel: P): string;
 	/**
@@ -180,6 +192,7 @@ const stat: PanelSpec<StatPanel> = {
 		{ key: "unit", kind: FieldKind.Text, label: "Unit", placeholder: "lb" },
 		{ key: "precision", kind: FieldKind.Number, label: "Decimal places", min: 0 },
 	],
+	blank: () => ({ type: PanelKind.Stat, property: "" }),
 	summary: (p) => (p.property ? `${p.agg ?? Agg.Latest} of ${p.property}` : "not configured"),
 };
 
@@ -195,6 +208,7 @@ const line: PanelSpec<LinePanel> = {
 		{ key: "color", kind: FieldKind.Colour, label: "Color", placeholder: "#3b82f6" },
 		...RANGE_FIELDS,
 	],
+	blank: () => ({ type: PanelKind.Line, property: "" }),
 	summary: (p) => p.property || "not configured",
 	validate: validateRange,
 };
@@ -210,6 +224,7 @@ const heatmap: PanelSpec<HeatmapPanel> = {
 		{ key: "color", kind: FieldKind.Colour, label: "Color", placeholder: "#3b82f6" },
 		...RANGE_FIELDS,
 	],
+	blank: () => ({ type: PanelKind.Heatmap, property: "" }),
 	summary: (p) => p.property || "not configured",
 	validate: validateRange,
 };
@@ -225,6 +240,7 @@ const upcoming: PanelSpec<UpcomingPanel> = {
 		{ key: "limit", kind: FieldKind.Number, label: "Most events" },
 		{ key: "past", kind: FieldKind.Toggle, label: "Include today's finished events" },
 	],
+	blank: () => ({ type: PanelKind.Upcoming }),
 	summary: (p) => `${p.ahead ?? 14} days`,
 };
 
@@ -247,6 +263,7 @@ const calendar: PanelSpec<CalendarPanel> = {
 			],
 		},
 	],
+	blank: () => ({ type: PanelKind.Calendar }),
 	summary: (p) => p.month ?? "this month",
 };
 
@@ -265,6 +282,7 @@ const note: PanelSpec<NotePanel> = {
 		},
 		{ key: "height", kind: FieldKind.Number, label: "Height (px)", min: 60 },
 	],
+	blank: () => ({ type: PanelKind.Note, path: "" }),
 	summary: (p) => p.path || "not configured",
 };
 

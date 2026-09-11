@@ -10,6 +10,9 @@ import { fillMonth, monthWindow, renderHeatmap, renderLine, renderMonth, renderN
 import { renderNode } from "../src/layout";
 import { parseICS } from "../src/ics";
 import { serializeDashboard } from "../src/serialize";
+import { blank } from "../src/editor";
+import { CONTAINER_KINDS, PANEL_KINDS } from "../src/kinds";
+import { specFor } from "../src/panels";
 import { DEFAULT_CONFIG, activeDashboard, defaultSettings, findAccount, makeDashboard, migrate, uniqueName } from "../src/store";
 
 const VAULT = process.argv[2];
@@ -1019,6 +1022,33 @@ console.log("\nnote panel");
 	check("a note without frontmatter is untouched", stripFrontmatter("# Title\n\nBody") === "# Title\n\nBody");
 	check("a horizontal rule mid-note survives", stripFrontmatter("Intro\n\n---\n\nMore") === "Intro\n\n---\n\nMore");
 	check("only the first block goes", stripFrontmatter("---\na: 1\n---\ntext\n---\nmore") === "text\n---\nmore");
+}
+
+console.log("\nblank nodes from the palette");
+
+{
+	// the palette offers every registered kind, so dropping one has to create
+	// that kind. This used to fall through to a Month panel for anything the
+	// factory had no branch for, silently.
+	for (const kind of PANEL_KINDS) {
+		check(`dropping ${kind} creates a ${kind}`, blank(kind).type === kind, blank(kind).type);
+	}
+
+	for (const kind of CONTAINER_KINDS) {
+		const node = blank(kind);
+
+		check(`dropping ${kind} creates an empty ${kind}`,
+			node.type === kind && isContainer(node) && node.children.length === 0);
+	}
+
+	// a fresh panel with required fields must read as incomplete, so the editor
+	// opens its form instead of saving a panel that cannot render
+	for (const kind of PANEL_KINDS) {
+		const wants = specFor(kind).fields.some((f) => f.required);
+
+		check(`a new ${kind} ${wants ? "opens its form" : "needs no setup"}`,
+			needsSetup(blank(kind)) === wants);
+	}
 }
 
 console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED"}`);

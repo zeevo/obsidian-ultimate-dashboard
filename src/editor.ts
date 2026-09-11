@@ -1,7 +1,7 @@
 import { App, Notice, setIcon, setTooltip } from "obsidian";
 import { ConfigError, ContainerNode, Dashboard, LayoutNode, isContainer, needsSetup, nextId, parseDashboard } from "./layout-tree";
 import { Panel, PANELS, specFor } from "./panels";
-import { ContainerKind, PanelKind, toPanelKind } from "./kinds";
+import { ContainerKind, PanelKind, toContainerKind, toPanelKind } from "./kinds";
 import { serializeDashboard } from "./serialize";
 import { FormContext, PanelForm } from "./panel-form";
 
@@ -16,23 +16,24 @@ const DIVIDERS = [
 	{ type: ContainerKind.Column, label: "Rows", hint: "Split into rows, stacked" },
 ] as const;
 
-/** A fresh node of the given type, carrying only what the parser demands. */
-function blank(type: PanelKind | ContainerKind): LayoutNode {
+/**
+ * A fresh node of the given type, carrying only what the parser demands.
+ *
+ * Each panel declares its own starter in the registry. This used to be a chain
+ * of `if`s ending in a bare `return calendar`, which meant a type nobody had
+ * added a branch for came out as a Month panel with no error at all.
+ */
+export function blank(type: PanelKind | ContainerKind): LayoutNode {
 	const id = nextId();
+	const container = toContainerKind(type);
 
-	if (type === ContainerKind.Row || type === ContainerKind.Column) {
-		return { id, type, children: [] };
-	}
+	if (container !== null) return { id, type: container, children: [] };
 
-	if (type === PanelKind.Stat) return { id, type, property: "" };
+	const panel = toPanelKind(type);
 
-	if (type === PanelKind.Line) return { id, type, property: "" };
+	if (panel === null) throw new Error(`blank: \`${type}\` is neither a container nor a panel`);
 
-	if (type === PanelKind.Heatmap) return { id, type, property: "" };
-
-	if (type === PanelKind.Upcoming) return { id, type };
-
-	return { id, type: PanelKind.Calendar };
+	return { id, ...specFor(panel).blank() };
 }
 
 /** The label shown on a card and in the palette. */
