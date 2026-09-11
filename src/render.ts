@@ -586,9 +586,9 @@ export function renderNote(el: HTMLElement, panel: NotePanel): HTMLElement {
 const DEFAULT_BLANK_HEIGHT = 120;
 
 /**
- * A placeholder that holds space and draws nothing. Useful for trying a layout
- * out before deciding what goes in each slot: it is visible, so you can see the
- * region it claims, but carries no data of its own.
+ * A placeholder that holds space and draws nothing at all. Useful for trying a
+ * layout out before deciding what goes in each slot, and for padding a row so
+ * its siblings sit where you want them.
  */
 export function renderBlank(el: HTMLElement, panel: BlankPanel): void {
 	const box = el.createDiv({ cls: "udash-blank" });

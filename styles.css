@@ -625,9 +625,6 @@
 	align-items: center;
 	justify-content: center;
 	height: 100%;
-	border: 1px dashed var(--background-modifier-border);
-	border-radius: 8px;
-	background: var(--background-primary-alt);
 }
 
 .udash-blank-label {

@@ -412,9 +412,9 @@ belongs in each slot.
     - { type: blank, label: sidebar, flex: 1 }
 ```
 
-It draws a dashed outline rather than nothing at all, since a layout you cannot
-see is not one you can judge. Use `flex` to try column widths and `height` to
-try row heights.
+Nothing is drawn: it is an invisible spacer, so it also works for pushing a
+row's other children into place. Use `flex` to try column widths and `height` to
+try row heights. Give it a `label` if you want to see where it lands.
 
 ## Development
 
