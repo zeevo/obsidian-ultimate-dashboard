@@ -627,6 +627,11 @@
 	box-shadow: inset 0 -3px 0 0 var(--interactive-accent);
 }
 
+/* The card you are dragging must stop intercepting, or it sits under the cursor
+   and swallows every dragover: you end up releasing onto yourself, which is
+   correctly a no-op, and nothing appears to happen. With events off, the drop
+   zones and cards beneath it become reachable. */
 .udash-editor .udash-node.is-dragging-self {
 	opacity: 0.4;
+	pointer-events: none;
 }

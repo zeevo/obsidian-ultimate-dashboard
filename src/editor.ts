@@ -208,7 +208,9 @@ export class VisualEditor {
 			if (e.dataTransfer) e.dataTransfer.effectAllowed = "copyMove";
 			e.stopPropagation();
 			this.setDragging(true);
-			box.addClass("is-dragging-self");
+			// Deferred by a tick: the class turns off pointer events, and applying
+			// that synchronously inside dragstart cancels the drag in Chromium.
+			window.setTimeout(() => box.addClass("is-dragging-self"), 0);
 		});
 		box.addEventListener("dragend", () => {
 			box.removeClass("is-dragging-self");
