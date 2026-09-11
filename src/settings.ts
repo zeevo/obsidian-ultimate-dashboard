@@ -136,12 +136,12 @@ export class DashboardSettingTab extends PluginSettingTab {
 					}),
 			);
 
-		const editor = containerEl.createEl("textarea", { cls: "lifedash-config-editor" });
+		const editor = containerEl.createEl("textarea", { cls: "udash-config-editor" });
 		editor.value = current.config;
 		editor.rows = 22;
 		editor.spellcheck = false;
 
-		this.status = containerEl.createDiv({ cls: "lifedash-config-status" });
+		this.status = containerEl.createDiv({ cls: "udash-config-status" });
 		this.validate(editor.value);
 
 		editor.addEventListener("input", async () => {
@@ -244,7 +244,7 @@ export class DashboardSettingTab extends PluginSettingTab {
 						await this.host.saveSettings();
 						this.host.invalidateCalendars();
 					});
-				t.inputEl.addClass("lifedash-url-input");
+				t.inputEl.addClass("udash-url-input");
 			});
 			row.addColorPicker((c) =>
 				c.setValue(cal.color ?? "#3b82f6").onChange(async (v) => {

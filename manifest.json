@@ -1,9 +1,9 @@
 {
-	"id": "life-dashboard",
-	"name": "Life Dashboard",
+	"id": "ultimate-dashboard",
+	"name": "Ultimate Dashboard",
 	"version": "0.1.0",
 	"minAppVersion": "1.4.0",
-	"description": "Render stat tiles, year heatmaps and rolling-average line charts from daily note frontmatter, using a declarative dashboard code block.",
+	"description": "A configurable dashboard for daily notes: stat tiles, year heatmaps, rolling-average charts, and calendars from Google or ICS.",
 	"author": "zeevo",
 	"isDesktopOnly": false
 }

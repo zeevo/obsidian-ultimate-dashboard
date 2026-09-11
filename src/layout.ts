@@ -61,7 +61,7 @@ export function renderNode(
 	onError: (el: HTMLElement, message: string) => void,
 	fillCalendarPanel?: CalendarFiller,
 ): void {
-	const el = parent.createDiv({ cls: `lifedash-node lifedash-${node.type}` });
+	const el = parent.createDiv({ cls: `udash-node udash-${node.type}` });
 	applySizing(el, node);
 
 	if (isContainer(node)) {
@@ -74,7 +74,7 @@ export function renderNode(
 		return;
 	}
 
-	el.addClass("lifedash-panel");
+	el.addClass("udash-panel");
 
 	try {
 		if (node.type === "stats") renderStats(el, days, node);

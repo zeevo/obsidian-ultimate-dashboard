@@ -41,16 +41,16 @@ function aggregate(days: DayRecord[], tile: Tile): number | null {
 }
 
 export function renderStats(el: HTMLElement, days: DayRecord[], panel: StatsPanel): void {
-	const grid = el.createDiv({ cls: "lifedash-tiles" });
+	const grid = el.createDiv({ cls: "udash-tiles" });
 
 	for (const tile of panel.tiles) {
 		const value = aggregate(days, tile);
 		const precision = tile.precision ?? (tile.agg === "count" ? 0 : 1);
 
-		const card = grid.createDiv({ cls: "lifedash-tile" });
-		card.createDiv({ cls: "lifedash-tile-label", text: tile.label });
+		const card = grid.createDiv({ cls: "udash-tile" });
+		card.createDiv({ cls: "udash-tile-label", text: tile.label });
 
-		const valueEl = card.createDiv({ cls: "lifedash-tile-value" });
+		const valueEl = card.createDiv({ cls: "udash-tile-value" });
 
 		if (value === null) {
 			valueEl.setText("—");
@@ -63,16 +63,16 @@ export function renderStats(el: HTMLElement, days: DayRecord[], panel: StatsPane
 			valueEl.setText(shown);
 
 			if (tile.target !== undefined) {
-				valueEl.createSpan({ cls: "lifedash-tile-target", text: ` / ${tile.target}` });
+				valueEl.createSpan({ cls: "udash-tile-target", text: ` / ${tile.target}` });
 			}
 
 			if (tile.unit) {
-				valueEl.createSpan({ cls: "lifedash-tile-unit", text: ` ${tile.unit}` });
+				valueEl.createSpan({ cls: "udash-tile-unit", text: ` ${tile.unit}` });
 			}
 		}
 
 		const sub = tile.days ? `last ${tile.days} days` : tile.agg;
-		card.createDiv({ cls: "lifedash-tile-sub", text: sub });
+		card.createDiv({ cls: "udash-tile-sub", text: sub });
 	}
 }
 
@@ -161,16 +161,16 @@ export function renderHeatmap(el: HTMLElement, days: DayRecord[], panel: Heatmap
 		? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.9))] || sorted[sorted.length - 1]
 		: 1;
 
-	const wrap = el.createDiv({ cls: "lifedash-heatmap" });
-	const head = wrap.createDiv({ cls: "lifedash-heatmap-head" });
+	const wrap = el.createDiv({ cls: "udash-heatmap" });
+	const head = wrap.createDiv({ cls: "udash-heatmap-head" });
 	head.createSpan({ text: panel.title ?? panel.property });
 	head.createSpan({
-		cls: "lifedash-heatmap-count",
+		cls: "udash-heatmap-count",
 		text: `${values.size} ${values.size === 1 ? "day" : "days"}`,
 	});
 
-	const months = wrap.createDiv({ cls: "lifedash-heatmap-months" });
-	const boxes = wrap.createDiv({ cls: "lifedash-heatmap-boxes" });
+	const months = wrap.createDiv({ cls: "udash-heatmap-months" });
+	const boxes = wrap.createDiv({ cls: "udash-heatmap-boxes" });
 
 	const total = Math.max(1, daysBetween(start, end));
 	const lead = new Date(start + "T00:00:00").getDay();
@@ -178,7 +178,7 @@ export function renderHeatmap(el: HTMLElement, days: DayRecord[], panel: Heatmap
 	months.style.gridTemplateColumns = `repeat(${weeks}, minmax(0, 1fr))`;
 	boxes.style.gridTemplateColumns = `repeat(${weeks}, minmax(0, 1fr))`;
 
-	for (let i = 0; i < lead; i++) boxes.createDiv({ cls: "lifedash-box lifedash-box-pad" });
+	for (let i = 0; i < lead; i++) boxes.createDiv({ cls: "udash-box udash-box-pad" });
 
 	const todayISO = today();
 	const monthAtColumn = new Map<number, { column: number; year: number }>();
@@ -197,7 +197,7 @@ export function renderHeatmap(el: HTMLElement, days: DayRecord[], panel: Heatmap
 			}
 		}
 
-		const box = boxes.createDiv({ cls: "lifedash-box" });
+		const box = boxes.createDiv({ cls: "udash-box" });
 		const v = values.get(iso);
 
 		if (v !== undefined) {
@@ -207,7 +207,7 @@ export function renderHeatmap(el: HTMLElement, days: DayRecord[], panel: Heatmap
 			box.setAttr("aria-label", `${iso}: ${panel.intensity ? v : "yes"}`);
 		}
 
-		if (iso === todayISO) box.addClass("lifedash-box-today");
+		if (iso === todayISO) box.addClass("udash-box-today");
 	}
 
 	// a window spanning more than one year needs the year to disambiguate
@@ -215,7 +215,7 @@ export function renderHeatmap(el: HTMLElement, days: DayRecord[], panel: Heatmap
 
 	for (const [month, { column, year }] of monthAtColumn) {
 		const label = months.createSpan({
-			cls: "lifedash-month",
+			cls: "udash-month",
 			text: multiYear ? `${MONTH_NAMES[month]} ${String(year).slice(2)}` : MONTH_NAMES[month],
 		});
 
@@ -237,16 +237,16 @@ export function renderLine(el: HTMLElement, days: DayRecord[], panel: LinePanel)
 	const { start, end } = resolveWindow(panel, days, "all");
 	const points = all.filter((p) => p.date >= start && p.date <= end);
 
-	const wrap = el.createDiv({ cls: "lifedash-line" });
-	const head = wrap.createDiv({ cls: "lifedash-heatmap-head" });
+	const wrap = el.createDiv({ cls: "udash-line" });
+	const head = wrap.createDiv({ cls: "udash-heatmap-head" });
 	head.createSpan({ text: panel.title ?? panel.property });
 	head.createSpan({
-		cls: "lifedash-heatmap-count",
+		cls: "udash-heatmap-count",
 		text: `${points.length} ${points.length === 1 ? "reading" : "readings"}`,
 	});
 
 	if (points.length < 2) {
-		wrap.createDiv({ cls: "lifedash-empty", text: "Not enough readings to plot yet." });
+		wrap.createDiv({ cls: "udash-empty", text: "Not enough readings to plot yet." });
 
 		return;
 	}
@@ -280,7 +280,7 @@ export function renderLine(el: HTMLElement, days: DayRecord[], panel: LinePanel)
 	const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
 	svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
 	svg.setAttribute("width", "100%");
-	svg.addClass("lifedash-svg");
+	svg.addClass("udash-svg");
 
 	const add = (tag: string, attrs: Record<string, string>, text?: string) => {
 		const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
@@ -296,8 +296,8 @@ export function renderLine(el: HTMLElement, days: DayRecord[], panel: LinePanel)
 	for (let i = 0; i < 4; i++) {
 		const v = lo + ((hi - lo) * i) / 3;
 		const y = Y(v).toFixed(1);
-		add("line", { x1: String(ml), y1: y, x2: String(W - mr), y2: y, class: "lifedash-grid" });
-		add("text", { x: String(ml - 8), y, "text-anchor": "end", "dominant-baseline": "middle", class: "lifedash-axis" }, v.toFixed(1) + (panel.unit ? ` ${panel.unit}` : ""));
+		add("line", { x1: String(ml), y1: y, x2: String(W - mr), y2: y, class: "udash-grid" });
+		add("text", { x: String(ml - 8), y, "text-anchor": "end", "dominant-baseline": "middle", class: "udash-axis" }, v.toFixed(1) + (panel.unit ? ` ${panel.unit}` : ""));
 	}
 
 	let seen = "";
@@ -307,11 +307,11 @@ export function renderLine(el: HTMLElement, days: DayRecord[], panel: LinePanel)
 
 		if (key === seen) continue;
 		seen = key;
-		add("text", { x: X(p.date).toFixed(1), y: String(H - 7), "text-anchor": "middle", class: "lifedash-axis" }, key);
+		add("text", { x: X(p.date).toFixed(1), y: String(H - 7), "text-anchor": "middle", class: "udash-axis" }, key);
 	}
 
 	for (const p of points) {
-		add("circle", { cx: X(p.date).toFixed(1), cy: Y(p.v).toFixed(1), r: "2", class: "lifedash-dot" });
+		add("circle", { cx: X(p.date).toFixed(1), cy: Y(p.v).toFixed(1), r: "2", class: "udash-dot" });
 	}
 
 	const d = smoothed
@@ -346,11 +346,11 @@ const hhmm = (d: Date) =>
  * a loading line, and `fillCalendar` replaces the body once the feeds resolve.
  */
 export function renderUpcoming(el: HTMLElement, panel: UpcomingPanel): HTMLElement {
-	const wrap = el.createDiv({ cls: "lifedash-calendar" });
-	const head = wrap.createDiv({ cls: "lifedash-heatmap-head" });
+	const wrap = el.createDiv({ cls: "udash-calendar" });
+	const head = wrap.createDiv({ cls: "udash-heatmap-head" });
 	head.createSpan({ text: panel.title ?? "Upcoming" });
-	const body = wrap.createDiv({ cls: "lifedash-calendar-body" });
-	body.createDiv({ cls: "lifedash-empty", text: "Loading calendars\u2026" });
+	const body = wrap.createDiv({ cls: "udash-calendar-body" });
+	body.createDiv({ cls: "udash-empty", text: "Loading calendars\u2026" });
 
 	return wrap;
 }
@@ -374,19 +374,19 @@ export function fillCalendar(
 ): void {
 	// SAFETY: a div created by renderCalendar on this same element; the early
 	// return below covers its absence if the shell was replaced.
-	const body = wrap.querySelector(".lifedash-calendar-body") as HTMLElement | null;
+	const body = wrap.querySelector(".udash-calendar-body") as HTMLElement | null;
 
 	if (!body) return;
 	body.empty();
 
 	for (const message of errors) {
-		const err = body.createDiv({ cls: "lifedash-error" });
-		err.createSpan({ cls: "lifedash-error-tag", text: "calendar" });
+		const err = body.createDiv({ cls: "udash-error" });
+		err.createSpan({ cls: "udash-error-tag", text: "calendar" });
 		err.createSpan({ text: message });
 	}
 
 	if (events.length === 0) {
-		if (errors.length === 0) body.createDiv({ cls: "lifedash-empty", text: "Nothing scheduled." });
+		if (errors.length === 0) body.createDiv({ cls: "udash-empty", text: "Nothing scheduled." });
 
 		return;
 	}
@@ -399,25 +399,25 @@ export function fillCalendar(
 
 		if (key !== lastDay) {
 			lastDay = key;
-			body.createDiv({ cls: "lifedash-agenda-day", text: dayLabel(e.start, today) });
+			body.createDiv({ cls: "udash-agenda-day", text: dayLabel(e.start, today) });
 		}
 
-		const row = body.createDiv({ cls: "lifedash-agenda-row" });
+		const row = body.createDiv({ cls: "udash-agenda-row" });
 
 		if (e.color) {
-			const dot = row.createDiv({ cls: "lifedash-agenda-dot" });
+			const dot = row.createDiv({ cls: "udash-agenda-dot" });
 			dot.style.backgroundColor = e.color;
 		}
 
 		row.createSpan({
-			cls: "lifedash-agenda-time",
+			cls: "udash-agenda-time",
 			text: e.allDay ? "all day" : hhmm(e.start),
 		});
-		const main = row.createDiv({ cls: "lifedash-agenda-main" });
-		main.createSpan({ cls: "lifedash-agenda-summary", text: e.summary });
+		const main = row.createDiv({ cls: "udash-agenda-main" });
+		main.createSpan({ cls: "udash-agenda-summary", text: e.summary });
 		const meta = [showCalendarName ? e.calendar : "", e.location ?? ""].filter(Boolean).join(" \u00b7 ");
 
-		if (meta) main.createSpan({ cls: "lifedash-agenda-meta", text: meta });
+		if (meta) main.createSpan({ cls: "udash-agenda-meta", text: meta });
 	}
 }
 
@@ -458,23 +458,23 @@ export function monthWindow(panel: MonthPanel): MonthWindow {
 
 /** The month shell: heading, weekday row, and 42 empty day cells. */
 export function renderMonth(el: HTMLElement, panel: MonthPanel, first: Date): HTMLElement {
-	const wrap = el.createDiv({ cls: "lifedash-month" });
-	const head = wrap.createDiv({ cls: "lifedash-heatmap-head" });
+	const wrap = el.createDiv({ cls: "udash-month" });
+	const head = wrap.createDiv({ cls: "udash-heatmap-head" });
 
 	head.createSpan({
-		cls: "lifedash-month-title",
+		cls: "udash-month-title",
 		text: panel.title ?? `${MONTH_NAMES[first.getMonth()]} ${first.getFullYear()}`,
 	});
-	head.createDiv({ cls: "lifedash-calendar-actions" });
+	head.createDiv({ cls: "udash-calendar-actions" });
 
 	const weekStart = panel.weekStart ?? 0;
-	const dows = wrap.createDiv({ cls: "lifedash-month-dows" });
+	const dows = wrap.createDiv({ cls: "udash-month-dows" });
 
 	for (let i = 0; i < 7; i++) {
-		dows.createDiv({ cls: "lifedash-month-dow", text: DOW_SHORT[(i + weekStart) % 7] });
+		dows.createDiv({ cls: "udash-month-dow", text: DOW_SHORT[(i + weekStart) % 7] });
 	}
 
-	wrap.createDiv({ cls: "lifedash-month-grid" });
+	wrap.createDiv({ cls: "udash-month-grid" });
 
 	return wrap;
 }
@@ -499,15 +499,15 @@ export function fillMonth(
 ): void {
 	// SAFETY: a div created by renderMonth on this same element; the early return
 	// below covers its absence if the shell was replaced.
-	const grid = wrap.querySelector(".lifedash-month-grid") as HTMLElement | null;
+	const grid = wrap.querySelector(".udash-month-grid") as HTMLElement | null;
 
 	if (!grid) return;
 	grid.empty();
 
 	for (const message of errors) {
-		const err = wrap.createDiv({ cls: "lifedash-error" });
+		const err = wrap.createDiv({ cls: "udash-error" });
 
-		err.createSpan({ cls: "lifedash-error-tag", text: "calendar" });
+		err.createSpan({ cls: "udash-error-tag", text: "calendar" });
 		err.createSpan({ text: message });
 	}
 
@@ -520,12 +520,12 @@ export function fillMonth(
 
 		day.setDate(day.getDate() + i);
 
-		const cell = grid.createDiv({ cls: "lifedash-month-cell" });
+		const cell = grid.createDiv({ cls: "udash-month-cell" });
 
 		if (day.getMonth() !== first.getMonth()) cell.addClass("is-outside");
 
 		if (sameDay(day, today)) cell.addClass("is-today");
-		cell.createDiv({ cls: "lifedash-month-daynum", text: String(day.getDate()) });
+		cell.createDiv({ cls: "udash-month-daynum", text: String(day.getDate()) });
 
 		// an event belongs to every day it spans, not just the one it starts on
 		const onDay = events.filter((e) => {
@@ -535,23 +535,23 @@ export function fillMonth(
 		});
 
 		for (const e of onDay.slice(0, maxPerDay)) {
-			const chip = cell.createDiv({ cls: "lifedash-month-chip" });
+			const chip = cell.createDiv({ cls: "udash-month-chip" });
 
 			if (e.color) chip.style.borderLeftColor = e.color;
 
 			if (!e.allDay) {
 				chip.createSpan({
-					cls: "lifedash-month-chip-time",
+					cls: "udash-month-chip-time",
 					text: `${e.start.getHours()}:${String(e.start.getMinutes()).padStart(2, "0")}`,
 				});
 			}
 
-			chip.createSpan({ cls: "lifedash-month-chip-text", text: e.summary });
+			chip.createSpan({ cls: "udash-month-chip-text", text: e.summary });
 		}
 
 		if (onDay.length > maxPerDay) {
 			cell.createDiv({
-				cls: "lifedash-month-more",
+				cls: "udash-month-more",
 				text: `+${onDay.length - maxPerDay} more`,
 			});
 		}

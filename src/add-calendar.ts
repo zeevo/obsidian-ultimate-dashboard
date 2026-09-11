@@ -114,7 +114,7 @@ export class AddCalendarModal extends Modal {
 
 		new Setting(contentEl).setName("URL").addText((t) => {
 			t.setPlaceholder("https://.../basic.ics").onChange((v) => (this.icsUrl = v));
-			t.inputEl.addClass("lifedash-url-input");
+			t.inputEl.addClass("udash-url-input");
 		});
 
 		this.footer("Add", async () => {
@@ -160,14 +160,14 @@ export class AddCalendarModal extends Modal {
 			.addText((t) => {
 				t.setValue(redirectUri(g.port));
 				t.inputEl.readOnly = true;
-				t.inputEl.addClass("lifedash-url-input");
+				t.inputEl.addClass("udash-url-input");
 			});
 
 		new Setting(contentEl).setName("Client ID").addText((t) => {
 			t.setPlaceholder("....apps.googleusercontent.com")
 				.setValue(g.clientId)
 				.onChange((v) => (g.clientId = v.trim()));
-			t.inputEl.addClass("lifedash-url-input");
+			t.inputEl.addClass("udash-url-input");
 		});
 
 		new Setting(contentEl).setName("Client secret").addText((t) => {
@@ -175,7 +175,7 @@ export class AddCalendarModal extends Modal {
 				.setValue(g.clientSecret)
 				.onChange((v) => (g.clientSecret = v.trim()));
 			t.inputEl.type = "password";
-			t.inputEl.addClass("lifedash-url-input");
+			t.inputEl.addClass("udash-url-input");
 		});
 
 		this.footer("Sign in", async () => {

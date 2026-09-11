@@ -5,7 +5,7 @@ import { DashboardSettings, defaultSettings, makeDashboard, migrate, uniqueName 
 import { DashboardView, VIEW_TYPE_DASHBOARD } from "./view";
 import { NameModal } from "./modal";
 
-export default class LifeDashboardPlugin extends Plugin {
+export default class UltimateDashboardPlugin extends Plugin {
 	settings: DashboardSettings = defaultSettings();
 	calendars = new CalendarService();
 
@@ -42,7 +42,7 @@ export default class LifeDashboardPlugin extends Plugin {
 			callback: () => this.promptNewDashboard(),
 		});
 
-		this.addRibbonIcon("layout-dashboard", "Life Dashboard", () => this.activateView());
+		this.addRibbonIcon("layout-dashboard", "Ultimate Dashboard", () => this.activateView());
 
 		this.calendars.useGoogle(() => ({
 			config: this.settings.google,

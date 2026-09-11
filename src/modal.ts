@@ -32,7 +32,7 @@ export class NameModal extends Modal {
 			window.setTimeout(() => text.inputEl.select(), 0);
 		});
 
-		setting.controlEl.addClass("lifedash-name-control");
+		setting.controlEl.addClass("udash-name-control");
 
 		new Setting(contentEl)
 			.addButton((b) => b.setButtonText("Cancel").onClick(() => this.close()))

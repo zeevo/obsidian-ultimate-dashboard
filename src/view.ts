@@ -8,7 +8,7 @@ import { fillCalendar, fillMonth, monthWindow } from "./render";
 import { EventModal, NameModal } from "./modal";
 import { CalendarSource, DashboardSettings, activeDashboard, makeDashboard, uniqueName } from "./store";
 
-export const VIEW_TYPE_DASHBOARD = "life-dashboard-view";
+export const VIEW_TYPE_DASHBOARD = "ultimate-dashboard-view";
 
 /** Obsidian's settings window, attached to app at runtime but not typed. */
 interface SettingsWindow {
@@ -46,7 +46,7 @@ export class DashboardView extends ItemView {
 	getDisplayText(): string {
 		const current = activeDashboard(this.host.settings);
 
-		return current ? `Dashboard: ${current.name}` : "Life Dashboard";
+		return current ? `Dashboard: ${current.name}` : "Ultimate Dashboard";
 	}
 
 	getIcon(): string {
@@ -67,7 +67,7 @@ export class DashboardView extends ItemView {
 	render(): void {
 		const host = this.contentEl;
 		host.empty();
-		host.addClass("lifedash-view");
+		host.addClass("udash-view");
 
 		this.renderHeader(host);
 
@@ -120,10 +120,10 @@ export class DashboardView extends ItemView {
 	/** A switcher and a new-dashboard button. Hidden entirely when there is nothing to switch. */
 	private renderHeader(host: HTMLElement): void {
 		const { settings } = this.host;
-		const bar = host.createDiv({ cls: "lifedash-bar" });
+		const bar = host.createDiv({ cls: "udash-bar" });
 
 		if (settings.dashboards.length > 1) {
-			const select = bar.createEl("select", { cls: "lifedash-switcher dropdown" });
+			const select = bar.createEl("select", { cls: "udash-switcher dropdown" });
 
 			for (const d of settings.dashboards) {
 				const opt = select.createEl("option", { text: d.name, value: d.id });
@@ -139,13 +139,13 @@ export class DashboardView extends ItemView {
 			});
 		} else {
 			const only = settings.dashboards[0];
-			bar.createSpan({ cls: "lifedash-bar-title", text: only ? only.name : "Life Dashboard" });
+			bar.createSpan({ cls: "udash-bar-title", text: only ? only.name : "Ultimate Dashboard" });
 		}
 
-		const spacer = bar.createDiv({ cls: "lifedash-bar-spacer" });
+		const spacer = bar.createDiv({ cls: "udash-bar-spacer" });
 		spacer.setAttr("aria-hidden", "true");
 
-		const toggle = bar.createEl("button", { cls: "lifedash-bar-button" });
+		const toggle = bar.createEl("button", { cls: "udash-bar-button" });
 		setIcon(toggle, this.mode === "edit" ? "eye" : "pencil");
 		setTooltip(toggle, this.mode === "edit" ? "Back to the dashboard" : "Edit this layout");
 		toggle.toggleClass("is-active", this.mode === "edit");
@@ -154,15 +154,15 @@ export class DashboardView extends ItemView {
 			this.render();
 		});
 
-		const add = bar.createEl("button", { cls: "lifedash-bar-button" });
+		const add = bar.createEl("button", { cls: "udash-bar-button" });
 		setIcon(add, "plus");
 		setTooltip(add, "New dashboard");
 		add.addEventListener("click", () => this.promptNew());
 
-		const cog = bar.createEl("button", { cls: "lifedash-bar-button" });
+		const cog = bar.createEl("button", { cls: "udash-bar-button" });
 
 		setIcon(cog, "settings");
-		setTooltip(cog, "Life Dashboard settings");
+		setTooltip(cog, "Ultimate Dashboard settings");
 		cog.addEventListener("click", () => this.openSettings());
 	}
 
@@ -234,10 +234,10 @@ export class DashboardView extends ItemView {
 		}
 
 		if (targets.length === 0) return;
-		const actions = shell.querySelector(".lifedash-calendar-actions");
+		const actions = shell.querySelector(".udash-calendar-actions");
 
 		if (!actions) return;
-		const button = actions.createEl("button", { cls: "lifedash-bar-button", text: "+" });
+		const button = actions.createEl("button", { cls: "udash-bar-button", text: "+" });
 
 		setTooltip(button, "New event");
 		button.addEventListener("click", () => {
@@ -250,11 +250,11 @@ export class DashboardView extends ItemView {
 
 	/** Edit mode: the raw YAML, validated as you type. */
 	private renderEditor(root: HTMLElement, current: { config: string }): void {
-		const editor = root.createEl("textarea", { cls: "lifedash-config-editor" });
+		const editor = root.createEl("textarea", { cls: "udash-config-editor" });
 		editor.value = current.config;
 		editor.spellcheck = false;
 
-		const status = root.createDiv({ cls: "lifedash-config-status" });
+		const status = root.createDiv({ cls: "udash-config-status" });
 
 		const validate = (source: string): boolean => {
 			status.empty();
@@ -317,8 +317,8 @@ export class DashboardView extends ItemView {
 	}
 
 	private error(el: HTMLElement, message: string): void {
-		const box = el.createDiv({ cls: "lifedash-error" });
-		box.createSpan({ cls: "lifedash-error-tag", text: "dashboard" });
+		const box = el.createDiv({ cls: "udash-error" });
+		box.createSpan({ cls: "udash-error-tag", text: "dashboard" });
 		box.createSpan({ text: message });
 	}
 }

@@ -1,4 +1,4 @@
-# Life Dashboard
+# Ultimate Dashboard
 
 An Obsidian plugin that renders stat tiles, year heatmaps and rolling-average
 line charts from daily note frontmatter, driven by a declarative YAML layout.
@@ -9,7 +9,7 @@ Heatmap Calendar.
 
 ## Using it
 
-Run **Life Dashboard: Open dashboard** from the command palette, or click the
+Run **Ultimate Dashboard: Open dashboard** from the command palette, or click the
 ribbon icon. Running it again focuses the existing tab rather than opening a
 second one.
 
@@ -23,7 +23,7 @@ The tab has a small bar across the top:
 
 Edit mode validates as you type and saves continuously; click the eye to go
 back. The same editor, plus rename, duplicate and delete, lives in Settings →
-Community plugins → Life Dashboard.
+Community plugins → Ultimate Dashboard.
 
 Layouts are stored in the plugin's `data.json`, not in your notes.
 
@@ -236,7 +236,7 @@ API is a better tool than XML over the same auth.
 
 Feeds are fetched with Obsidian's `requestUrl` rather than `fetch`, because the
 renderer enforces CORS and calendar hosts do not send the headers that would
-allow it, and cached for ten minutes. **Life Dashboard: Refresh calendars**
+allow it, and cached for ten minutes. **Ultimate Dashboard: Refresh calendars**
 clears the cache.
 
 ### Creating events
@@ -349,7 +349,7 @@ npm test -- /path/to/vault
 ## Install
 
 Copy `main.js`, `manifest.json` and `styles.css` into
-`<vault>/.obsidian/plugins/life-dashboard/`, then enable it in
+`<vault>/.obsidian/plugins/ultimate-dashboard/`, then enable it in
 Settings → Community plugins.
 
 ## Design notes

@@ -296,8 +296,8 @@ console.log("\nshipped default config");
 	let errs = 0;
 	renderNode(host as never, def.root, days, 20, () => errs++);
 	check("default config renders without error", errs === 0, `${errs} errors`);
-	check("default config draws panels", host.all.filter((e) => e.classes.has("lifedash-panel")).length === 4,
-		`${host.all.filter((e) => e.classes.has("lifedash-panel")).length} panels`);
+	check("default config draws panels", host.all.filter((e) => e.classes.has("udash-panel")).length === 4,
+		`${host.all.filter((e) => e.classes.has("udash-panel")).length} panels`);
 }
 
 console.log("\nlayout tree");
@@ -416,14 +416,14 @@ layout:
 		{ summary: "Trip", start: new Date(2026, 1, 20), end: new Date(2026, 1, 23), allDay: true },
 	], []);
 
-	check("42 cells drawn", host.byClass("lifedash-month-cell").length === 42,
-		`${host.byClass("lifedash-month-cell").length}`);
-	check("7 weekday headers", host.byClass("lifedash-month-dow").length === 7);
-	check("maxPerDay collapses the rest", host.byClass("lifedash-month-more").length === 1);
+	check("42 cells drawn", host.byClass("udash-month-cell").length === 42,
+		`${host.byClass("udash-month-cell").length}`);
+	check("7 weekday headers", host.byClass("udash-month-dow").length === 7);
+	check("maxPerDay collapses the rest", host.byClass("udash-month-more").length === 1);
 	check("a multi-day event spans its days", host.all.filter((e) => e.text === "Trip").length === 3,
 		`${host.all.filter((e) => e.text === "Trip").length} days`);
 	check("cells outside the month are marked",
-		host.byClass("lifedash-month-cell").filter((c) => c.classes.has("is-outside")).length > 0);
+		host.byClass("udash-month-cell").filter((c) => c.classes.has("is-outside")).length > 0);
 }
 
 console.log("\nline ranges");
@@ -458,7 +458,7 @@ console.log("\nline ranges");
 	check("rolling average survives a windowed start", edgePath.startsWith("M") && !/NaN/.test(edgePath));
 
 	const empty = dotsOf({ type: "line", property: "weight", from: "2000-01-01", to: "2000-12-31" });
-	check("empty window degrades gracefully", empty.el.byClass("lifedash-empty").length === 1);
+	check("empty window degrades gracefully", empty.el.byClass("udash-empty").length === 1);
 }
 
 rejects("layout:\n  type: column\n  children: [{ type: line, property: weight, year: 2026, days: 30 }]", "two ranges on a line rejected");
@@ -477,7 +477,7 @@ console.log("\ntree rendering");
 	const host = new El();
 	renderNode(host as never, tree.root, days, 20, (el, m) => (el as unknown as El).setText("ERR " + m));
 	const rootEl = host.children[0];
-	check("root div created", !!rootEl && rootEl.classes.has("lifedash-column"));
+	check("root div created", !!rootEl && rootEl.classes.has("udash-column"));
 	check("root is flex column", rootEl.style["display"] === "flex" && rootEl.style["flexDirection"] === "column");
 	check("root gap applied", rootEl.style["gap"] === "24px");
 
@@ -492,10 +492,10 @@ console.log("\ntree rendering");
 	check("span child sized", gridEl.children[1].style["gridColumn"] === "span 2");
 	check("stats spans full row", gridEl.children[0].style["gridColumn"] === "1 / -1");
 
-	const panels = host.all.filter((e) => e.classes.has("lifedash-panel"));
+	const panels = host.all.filter((e) => e.classes.has("udash-panel"));
 	check("every leaf rendered a panel", panels.length === 5, `${panels.length}`);
-	check("no error nodes", host.all.filter((e) => e.classes.has("lifedash-error")).length === 0);
-	check("heatmaps drawn inside the tree", host.byClass("lifedash-box").length > 0);
+	check("no error nodes", host.all.filter((e) => e.classes.has("udash-error")).length === 0);
+	check("heatmaps drawn inside the tree", host.byClass("udash-box").length > 0);
 	check("line chart drawn inside the tree", !!host.all.find((e) => e.tag === "svg"));
 }
 
@@ -514,11 +514,11 @@ panels:
       - { label: Nothing, property: nosuchprop, agg: latest }
 `).root.children[0] as never);
 
-const tiles = stats.byClass("lifedash-tile");
+const tiles = stats.byClass("udash-tile");
 
 check("one card per tile", tiles.length === 5, `${tiles.length}`);
 
-const values = stats.byClass("lifedash-tile-value").map((e) => e.text);
+const values = stats.byClass("udash-tile-value").map((e) => e.text);
 
 check("missing property renders as dash", values[4] === "—", JSON.stringify(values[4]));
 
@@ -526,7 +526,7 @@ check("latest weight is numeric", /^\d+\.\d$/.test(values[0]), values[0]);
 
 check("count is a whole number", /^\d+$/.test(values[2]), values[2]);
 
-check("target rendered", stats.byClass("lifedash-tile-target").length === 1);
+check("target rendered", stats.byClass("udash-tile-target").length === 1);
 
 console.log(`         values: ${JSON.stringify(values)}`);
 
@@ -536,9 +536,9 @@ const hm = new El();
 
 renderHeatmap(hm, days, { type: "heatmap", property: "lift", title: "Lifting", year: 2026 });
 
-const boxes = hm.byClass("lifedash-box");
+const boxes = hm.byClass("udash-box");
 
-const pads = hm.byClass("lifedash-box-pad");
+const pads = hm.byClass("udash-box-pad");
 
 check("365 day cells for 2026 plus lead padding", boxes.length - pads.length === 365, `${boxes.length - pads.length}`);
 
@@ -546,13 +546,13 @@ const filled = boxes.filter((b) => b.style["backgroundColor"]);
 
 check("lift days shaded", filled.length > 0, `${filled.length} shaded`);
 
-check("month labels present", hm.byClass("lifedash-month").length === 12);
+check("month labels present", hm.byClass("udash-month").length === 12);
 
 const hmMiles = new El();
 
 renderHeatmap(hmMiles, days, { type: "heatmap", property: "miles", intensity: "miles", year: 2026 });
 
-const shades = new Set(hmMiles.byClass("lifedash-box").map((b) => b.style["backgroundColor"]).filter(Boolean));
+const shades = new Set(hmMiles.byClass("udash-box").map((b) => b.style["backgroundColor"]).filter(Boolean));
 
 check("intensity produces varied shading", shades.size > 1, `${shades.size} distinct shades`);
 
@@ -562,9 +562,9 @@ console.log("\nheatmap ranges");
 	const boxesOf = (panel: Parameters<typeof renderHeatmap>[2]) => {
 		const e = new El();
 		renderHeatmap(e, days, panel);
-		const all = e.byClass("lifedash-box");
+		const all = e.byClass("udash-box");
 
-		return { total: all.length, pads: e.byClass("lifedash-box-pad").length, el: e };
+		return { total: all.length, pads: e.byClass("udash-box-pad").length, el: e };
 	};
 
 	const y = boxesOf({ type: "heatmap", property: "lift", year: 2026 });
@@ -579,24 +579,24 @@ console.log("\nheatmap ranges");
 
 	const exact = boxesOf({ type: "heatmap", property: "lift", from: "2026-03-01", to: "2026-03-31" });
 	check("from/to is inclusive", exact.total - exact.pads === 31, `${exact.total - exact.pads}`);
-	check("month label present for a one month window", exact.el.byClass("lifedash-month").length === 1);
+	check("month label present for a one month window", exact.el.byClass("udash-month").length === 1);
 
 	// a window starting mid-month should still be labelled
 	const mid = boxesOf({ type: "heatmap", property: "lift", from: "2026-03-15", to: "2026-04-10" });
-	check("partial first month still labelled", mid.el.byClass("lifedash-month").length === 2,
-		`${mid.el.byClass("lifedash-month").length} labels`);
+	check("partial first month still labelled", mid.el.byClass("udash-month").length === 2,
+		`${mid.el.byClass("udash-month").length} labels`);
 
 	const cross = boxesOf({ type: "heatmap", property: "lift", from: "2025-11-01", to: "2026-02-28" });
-	const labels = cross.el.byClass("lifedash-month").map((e) => e.text);
+	const labels = cross.el.byClass("udash-month").map((e) => e.text);
 	check("cross-year labels carry the year", labels.every((l) => /\s\d{2}$/.test(l)), labels.join(" "));
 
 	// values outside the window must not be counted
 	const narrow = new El();
 	renderHeatmap(narrow, days, { type: "heatmap", property: "lift", from: "2026-01-01", to: "2026-01-02" });
-	const shadedNarrow = narrow.byClass("lifedash-box").filter((b) => b.style["backgroundColor"]).length;
+	const shadedNarrow = narrow.byClass("udash-box").filter((b) => b.style["backgroundColor"]).length;
 	check("out-of-window days excluded", shadedNarrow === 0, `${shadedNarrow} shaded`);
 
-	check("grid columns set from the window", !!exact.el.byClass("lifedash-heatmap-boxes")[0].style["gridTemplateColumns"]);
+	check("grid columns set from the window", !!exact.el.byClass("udash-heatmap-boxes")[0].style["gridTemplateColumns"]);
 }
 
 rejects("layout:\n  type: column\n  children: [{ type: heatmap, property: lift, year: 2026, months: 6 }]", "two ranges rejected");
@@ -633,7 +633,7 @@ const sparse = new El();
 
 renderLine(sparse, [days[0]], { type: "line", property: "weight" });
 
-check("single reading degrades gracefully", sparse.byClass("lifedash-empty").length === 1);
+check("single reading degrades gracefully", sparse.byClass("udash-empty").length === 1);
 
 console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED"}`);
 

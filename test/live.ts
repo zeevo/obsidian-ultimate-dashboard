@@ -81,13 +81,13 @@ renderNode(host as never, cfg.root, days, 20, (el, m) => { errors++; console.log
 
 console.log("\nrendered:");
 
-console.log(`  panels:        ${host.all.filter(e => e.classes.has("lifedash-panel")).length}`);
+console.log(`  panels:        ${host.all.filter(e => e.classes.has("udash-panel")).length}`);
 
-console.log(`  heatmap boxes: ${host.byClass("lifedash-box").length}`);
+console.log(`  heatmap boxes: ${host.byClass("udash-box").length}`);
 
-console.log(`  shaded days:   ${host.byClass("lifedash-box").filter(b => b.style["backgroundColor"]).length}`);
+console.log(`  shaded days:   ${host.byClass("udash-box").filter(b => b.style["backgroundColor"]).length}`);
 
-console.log(`  tiles:         ${host.byClass("lifedash-tile").length}`);
+console.log(`  tiles:         ${host.byClass("udash-tile").length}`);
 
 console.log(`  svg charts:    ${host.all.filter(e => e.tag === "svg").length}`);
 

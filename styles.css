@@ -1,80 +1,80 @@
-/* Life Dashboard. All colour comes from Obsidian theme variables so the
+/* Ultimate Dashboard. All colour comes from Obsidian theme variables so the
    dashboard follows light and dark mode without configuration. */
 
 /* Layout tree. Containers set display/gap/columns inline from the config, so
    these rules only cover what CSS must own: shrink behaviour and the narrow
    screen collapse. */
 
-.lifedash-node {
+.udash-node {
 	min-width: 0;
 }
 
-.lifedash-row > .lifedash-node {
+.udash-row > .udash-node {
 	flex: 1 1 0;
 }
 
-.lifedash-column > .lifedash-node {
+.udash-column > .udash-node {
 	width: 100%;
 }
 
 /* Below this width every row becomes a column and every grid a single track,
    so a deeply nested dashboard stays readable in a split pane or on a phone. */
 @media (max-width: 700px) {
-	.lifedash-row {
+	.udash-row {
 		flex-direction: column !important;
 	}
-	.lifedash-grid {
+	.udash-grid {
 		grid-template-columns: 1fr !important;
 	}
-	.lifedash-grid > .lifedash-node {
+	.udash-grid > .udash-node {
 		grid-column: 1 / -1 !important;
 	}
 }
 
 /* ------------------------------------------------------------------ tiles */
 
-.lifedash-tiles {
+.udash-tiles {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 	gap: 10px;
 }
 
-.lifedash-tile {
+.udash-tile {
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 8px;
 	padding: 10px 12px;
 	background: var(--background-secondary);
 }
 
-.lifedash-tile-label {
+.udash-tile-label {
 	font-size: 0.72em;
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
 	color: var(--text-muted);
 }
 
-.lifedash-tile-value {
+.udash-tile-value {
 	font-size: 1.7em;
 	font-weight: 600;
 	line-height: 1.25;
 	color: var(--text-normal);
 }
 
-.lifedash-tile-target,
-.lifedash-tile-unit {
+.udash-tile-target,
+.udash-tile-unit {
 	font-size: 0.55em;
 	font-weight: 500;
 	opacity: 0.6;
 }
 
-.lifedash-tile-sub {
+.udash-tile-sub {
 	font-size: 0.72em;
 	color: var(--text-muted);
 }
 
 /* ---------------------------------------------------------------- heatmap */
 
-.lifedash-heatmap-head {
+.udash-heatmap-head {
 	display: flex;
 	justify-content: space-between;
 	align-items: baseline;
@@ -84,13 +84,13 @@
 	margin-bottom: 4px;
 }
 
-.lifedash-heatmap-count {
+.udash-heatmap-count {
 	font-weight: 400;
 	font-size: 0.85em;
 	opacity: 0.75;
 }
 
-.lifedash-heatmap-months {
+.udash-heatmap-months {
 	display: grid;
 	grid-template-columns: repeat(53, minmax(0, 1fr));
 	font-size: 0.62em;
@@ -98,7 +98,7 @@
 	margin-bottom: 2px;
 }
 
-.lifedash-heatmap-boxes {
+.udash-heatmap-boxes {
 	display: grid;
 	grid-template-rows: repeat(7, minmax(0, 1fr));
 	grid-auto-flow: column;
@@ -106,46 +106,46 @@
 	gap: 2px;
 }
 
-.lifedash-box {
+.udash-box {
 	aspect-ratio: 1 / 1;
 	border-radius: 2px;
 	background: var(--background-modifier-border);
 }
 
-.lifedash-box-pad {
+.udash-box-pad {
 	background: transparent;
 }
 
-.lifedash-box-today {
+.udash-box-today {
 	outline: 1px solid var(--text-accent);
 	outline-offset: 1px;
 }
 
 /* ------------------------------------------------------------------- line */
 
-.lifedash-svg {
+.udash-svg {
 	overflow: visible;
 	color: var(--text-normal);
 }
 
-.lifedash-grid-line,
-.lifedash-svg .lifedash-grid {
+.udash-grid-line,
+.udash-svg .udash-grid {
 	stroke: currentColor;
 	opacity: 0.12;
 }
 
-.lifedash-svg .lifedash-axis {
+.udash-svg .udash-axis {
 	font-size: 10px;
 	fill: currentColor;
 	opacity: 0.6;
 }
 
-.lifedash-svg .lifedash-dot {
+.udash-svg .udash-dot {
 	fill: currentColor;
 	opacity: 0.28;
 }
 
-.lifedash-empty {
+.udash-empty {
 	font-size: 0.75em;
 	color: var(--text-muted);
 	margin-top: 4px;
@@ -153,7 +153,7 @@
 
 /* ------------------------------------------------------------------ error */
 
-.lifedash-error {
+.udash-error {
 	border: 1px solid var(--text-error);
 	border-radius: 6px;
 	padding: 8px 10px;
@@ -161,7 +161,7 @@
 	color: var(--text-error);
 }
 
-.lifedash-error-tag {
+.udash-error-tag {
 	font-family: var(--font-monospace);
 	font-size: 0.85em;
 	opacity: 0.7;
@@ -171,14 +171,14 @@
 /* ------------------------------------------------------------------- view */
 
 /* The standalone tab needs its own padding; a code block inherits the note's. */
-.lifedash-view {
+.udash-view {
 	padding: 16px 20px 32px;
 	overflow-y: auto;
 }
 
 /* ----------------------------------------------------------- settings tab */
 
-.lifedash-config-editor {
+.udash-config-editor {
 	width: 100%;
 	font-family: var(--font-monospace);
 	font-size: 12px;
@@ -187,72 +187,72 @@
 	tab-size: 2;
 }
 
-.lifedash-config-status {
+.udash-config-status {
 	font-size: 0.8em;
 	margin-top: 6px;
 	font-family: var(--font-monospace);
 }
 
-.lifedash-config-status.is-valid {
+.udash-config-status.is-valid {
 	color: var(--text-muted);
 }
 
-.lifedash-config-status.is-error {
+.udash-config-status.is-error {
 	color: var(--text-error);
 }
 
 /* --------------------------------------------------------------- view bar */
 
-.lifedash-bar {
+.udash-bar {
 	display: flex;
 	align-items: center;
 	gap: 8px;
 	margin-bottom: 14px;
 }
 
-.lifedash-bar-title {
+.udash-bar-title {
 	font-weight: 600;
 	color: var(--text-normal);
 }
 
-.lifedash-switcher {
+.udash-switcher {
 	font-size: 0.9em;
 	max-width: 240px;
 }
 
-.lifedash-bar-button {
+.udash-bar-button {
 	padding: 2px 9px;
 	line-height: 1.2;
 	font-size: 1.05em;
 	cursor: pointer;
 }
 
-.lifedash-name-control input {
+.udash-name-control input {
 	width: 100%;
 }
 
-.lifedash-bar-spacer {
+.udash-bar-spacer {
 	flex: 1;
 }
 
-.lifedash-bar-button.is-active {
+.udash-bar-button.is-active {
 	color: var(--text-accent);
 }
 
 /* In the view the editor should fill the pane, not sit in a short box. */
-.lifedash-view .lifedash-config-editor {
+.udash-view .udash-config-editor {
 	min-height: 60vh;
 }
 
 /* --------------------------------------------------------------- calendar */
 
-.lifedash-calendar-body {
+.udash-calendar-body {
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
 }
 
-.lifedash-agenda-day {
+.udash-agenda-day {
 	font-size: 0.72em;
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
@@ -260,11 +260,11 @@
 	margin: 10px 0 2px;
 }
 
-.lifedash-agenda-day:first-child {
+.udash-agenda-day:first-child {
 	margin-top: 2px;
 }
 
-.lifedash-agenda-row {
+.udash-agenda-row {
 	display: flex;
 	align-items: baseline;
 	gap: 8px;
@@ -272,7 +272,7 @@
 	border-bottom: 1px solid var(--background-modifier-border);
 }
 
-.lifedash-agenda-dot {
+.udash-agenda-dot {
 	width: 7px;
 	height: 7px;
 	border-radius: 50%;
@@ -280,7 +280,7 @@
 	align-self: center;
 }
 
-.lifedash-agenda-time {
+.udash-agenda-time {
 	font-variant-numeric: tabular-nums;
 	font-size: 0.82em;
 	color: var(--text-muted);
@@ -288,29 +288,29 @@
 	min-width: 52px;
 }
 
-.lifedash-agenda-main {
+.udash-agenda-main {
 	display: flex;
 	flex-direction: column;
 	min-width: 0;
 }
 
-.lifedash-agenda-summary {
+.udash-agenda-summary {
 	color: var(--text-normal);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 
-.lifedash-agenda-meta {
+.udash-agenda-meta {
 	font-size: 0.75em;
 	color: var(--text-muted);
 }
 
-.lifedash-url-input {
+.udash-url-input {
 	width: 22em;
 }
 
-.lifedash-calendar-actions {
+.udash-calendar-actions {
 	display: flex;
 	gap: 4px;
 	margin-left: 8px;
@@ -322,17 +322,17 @@
 
 /* ------------------------------------------------------------ month grid */
 
-.lifedash-month-title {
+.udash-month-title {
 	font-weight: 600;
 }
 
-.lifedash-month-dows,
-.lifedash-month-grid {
+.udash-month-dows,
+.udash-month-grid {
 	display: grid;
 	grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 
-.lifedash-month-dow {
+.udash-month-dow {
 	font-size: 0.7em;
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
@@ -340,12 +340,12 @@
 	padding: 2px 4px;
 }
 
-.lifedash-month-grid {
+.udash-month-grid {
 	border-top: 1px solid var(--background-modifier-border);
 	border-left: 1px solid var(--background-modifier-border);
 }
 
-.lifedash-month-cell {
+.udash-month-cell {
 	min-height: 84px;
 	border-right: 1px solid var(--background-modifier-border);
 	border-bottom: 1px solid var(--background-modifier-border);
@@ -353,36 +353,36 @@
 	overflow: hidden;
 }
 
-.lifedash-month-cell.is-outside {
+.udash-month-cell.is-outside {
 	background: var(--background-secondary);
 }
 
-.lifedash-month-cell.is-outside .lifedash-month-daynum {
+.udash-month-cell.is-outside .udash-month-daynum {
 	opacity: 0.4;
 }
 
 /* Today: a soft accent wash over the cell rather than a solid block, so it
    reads as a highlight instead of a selection. The first background is the
    fallback for renderers without color-mix; the second wins where it exists. */
-.lifedash-month-cell.is-today {
+.udash-month-cell.is-today {
 	background: var(--background-modifier-hover);
 	background: color-mix(in srgb, var(--interactive-accent) 8%, transparent);
 	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 25%, transparent);
 }
 
-.lifedash-month-cell.is-today .lifedash-month-daynum {
+.udash-month-cell.is-today .udash-month-daynum {
 	color: var(--text-accent);
 	font-weight: 600;
 	opacity: 1;
 }
 
-.lifedash-month-daynum {
+.udash-month-daynum {
 	font-size: 0.78em;
 	color: var(--text-muted);
 	margin-bottom: 2px;
 }
 
-.lifedash-month-chip {
+.udash-month-chip {
 	display: flex;
 	gap: 4px;
 	align-items: baseline;
@@ -396,17 +396,17 @@
 	text-overflow: ellipsis;
 }
 
-.lifedash-month-chip-time {
+.udash-month-chip-time {
 	color: var(--text-muted);
 	font-variant-numeric: tabular-nums;
 }
 
-.lifedash-month-chip-text {
+.udash-month-chip-text {
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
 
-.lifedash-month-more {
+.udash-month-more {
 	font-size: 0.68em;
 	color: var(--text-muted);
 	padding-left: 4px;
