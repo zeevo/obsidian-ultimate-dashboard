@@ -13,6 +13,23 @@ Run **Ultimate Dashboard: Open dashboard** from the command palette, or click th
 ribbon icon. Running it again focuses the existing tab rather than opening a
 second one.
 
+### Editing
+
+The pencil opens edit mode, which has two tabs.
+
+**Visual** is a palette and a canvas. Drag a panel type onto a drop zone to add
+it; drag one already on the canvas to move it. Dropping a type that needs
+settings, like a heatmap with no property yet, opens its configuration straight
+away. Each card has a pencil to reconfigure and a bin to remove.
+
+The palette's **dividers** are containers: *Columns* lays its children out side
+by side, *Rows* stacks them. Drop panels inside one to segment the dashboard,
+and nest them for more involved layouts.
+
+**YAML** is the same document as text. The visual editor writes through the
+serialiser, so the two are views of one thing and either can pick up where the
+other left off.
+
 The tab has a small bar across the top:
 
 | Control | Does |

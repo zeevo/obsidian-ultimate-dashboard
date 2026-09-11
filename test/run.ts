@@ -9,6 +9,7 @@ import { DayRecord } from "../src/data";
 import { fillMonth, monthWindow, renderHeatmap, renderLine, renderMonth, renderStats } from "../src/render";
 import { renderNode } from "../src/layout";
 import { parseICS } from "../src/ics";
+import { serializeConfig } from "../src/serialize";
 import { DEFAULT_CONFIG, activeDashboard, defaultSettings, findAccount, makeDashboard, migrate, uniqueName } from "../src/store";
 
 const VAULT = process.argv[2];
@@ -372,6 +373,160 @@ let deep = "{ type: heatmap, property: lift }";
 for (let i = 0; i < 10; i++) deep = `{ type: column, children: [${deep}] }`;
 
 rejects(`layout: ${deep}`, "excessive nesting rejected");
+
+console.log("\nserialisation round trip");
+
+{
+	const sources = [
+		// every leaf type, with the options each one carries
+		`folder: Daily
+layout:
+  type: grid
+  columns: 2
+  gap: 22
+  children:
+    - type: stats
+      span: 1
+      tiles:
+        - { label: Weight, property: weight, agg: latest, unit: lb }
+        - { label: Lifts, property: lift, agg: count, days: 7, target: 3 }
+    - type: line
+      title: Weight
+      property: weight
+      rolling: 7
+      unit: lb
+      months: 6
+    - type: heatmap
+      title: Lifting
+      property: lift
+      color: "#ef4444"
+      months: 6
+    - type: upcoming
+      days: 21
+      limit: 12
+      calendars: [Holidays, Work]
+    - type: calendar
+      month: "2026-02"
+      weekStart: 1
+      maxPerDay: 4`,
+		// nesting, flex sizing and an explicit range
+		`folder: Notes
+layout:
+  type: column
+  gap: 10
+  children:
+    - type: row
+      wrap: false
+      children:
+        - { type: line, property: weight, flex: 2 }
+        - { type: heatmap, property: lift, flex: 1 }
+    - type: grid
+      columns: 3
+      minWidth: 300
+      children:
+        - { type: heatmap, property: read, span: 2 }
+        - { type: heatmap, property: vitamins, from: "2025-01-01", to: "2025-12-31" }`,
+	];
+
+	for (const [i, src] of sources.entries()) {
+		const once = parseConfig(src);
+		const text = serializeConfig(once);
+		let twice;
+
+		try {
+			twice = parseConfig(text);
+		} catch (e) {
+			check(`config ${i + 1} re-parses`, false, (e as Error).message);
+
+			continue;
+		}
+
+		check(`config ${i + 1} re-parses`, true);
+		check(`config ${i + 1} is stable`, JSON.stringify(once) === JSON.stringify(twice),
+			JSON.stringify(once) === JSON.stringify(twice) ? "" : "tree changed on round trip");
+		check(`config ${i + 1} serialises identically twice`, serializeConfig(twice) === text);
+	}
+
+	// values that would break if written unquoted
+	const tricky = parseConfig(`
+folder: Daily
+layout:
+  type: column
+  children:
+    - { type: heatmap, property: lift, title: "12:30 check", color: "#ef4444" }
+    - { type: calendar, month: "2026-02" }
+`);
+
+	const out = serializeConfig(tricky);
+
+	check("a colon in a title survives", JSON.stringify(parseConfig(out)) === JSON.stringify(tricky),
+		out.split("\n").find((l) => l.includes("check")) ?? "");
+	check("a month stays a string, not a date",
+		(parseConfig(out).root.children[1] as { month?: string }).month === "2026-02");
+	check("a hex colour stays quoted", out.includes('"#ef4444"'));
+}
+
+console.log("\nvisual editor edits");
+
+{
+	// the editor mutates the tree and writes through the serialiser, so an edit
+	// is only correct if the result still parses back to what was intended
+	const base = () => parseConfig(`
+folder: Daily
+layout:
+  type: column
+  children:
+    - { type: heatmap, property: lift }
+    - { type: line, property: weight }
+`);
+
+	const cfg = base();
+	const root = cfg.root;
+
+	// drop a new panel between the two existing ones
+	root.children.splice(1, 0, { type: "upcoming" });
+	const afterInsert = parseConfig(serializeConfig(cfg));
+
+	check("an inserted panel survives the round trip",
+		afterInsert.root.children.map((c) => c.type).join() === "heatmap,upcoming,line",
+		afterInsert.root.children.map((c) => c.type).join());
+
+	// move the last child to the front, as a drag would
+	const moved = base();
+	const [last] = moved.root.children.splice(1, 1);
+
+	moved.root.children.splice(0, 0, last);
+	check("a moved panel survives",
+		parseConfig(serializeConfig(moved)).root.children.map((c) => c.type).join() === "line,heatmap");
+
+	// wrap two panels in a row divider
+	const nested = base();
+	const taken = nested.root.children.splice(0, 2);
+
+	nested.root.children.push({ type: "row", children: taken });
+	const afterWrap = parseConfig(serializeConfig(nested));
+	const wrapped = afterWrap.root.children[0];
+
+	check("a divider can wrap existing panels",
+		isContainer(wrapped) && wrapped.type === "row" && wrapped.children.length === 2);
+
+	// a freshly dropped panel is incomplete until configured
+	const bare = base();
+
+	bare.root.children.push({ type: "heatmap", property: "" });
+	let rejected = false;
+
+	try { parseConfig(serializeConfig(bare)); } catch { rejected = true; }
+
+	check("an unconfigured panel is caught by the parser", rejected);
+
+	// removing a panel
+	const pruned = base();
+
+	pruned.root.children.splice(0, 1);
+	check("a removed panel is gone",
+		parseConfig(serializeConfig(pruned)).root.children.length === 1);
+}
 
 console.log("\ncalendar panels");
 

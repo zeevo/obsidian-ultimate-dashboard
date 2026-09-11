@@ -6,6 +6,8 @@ import { CalendarService } from "./calendar";
 import { CalendarPanel } from "./config";
 import { fillCalendar, fillMonth, monthWindow } from "./render";
 import { EventModal, NameModal } from "./modal";
+import { VisualEditor } from "./editor";
+import { serializeConfig } from "./serialize";
 import { CalendarSource, DashboardSettings, activeDashboard, makeDashboard, uniqueName } from "./store";
 
 export const VIEW_TYPE_DASHBOARD = "ultimate-dashboard-view";
@@ -31,6 +33,8 @@ export interface ViewHost {
 export class DashboardView extends ItemView {
 	/** Per-tab, deliberately not persisted: reopening starts on the chart side. */
 	private mode: "dashboard" | "edit" = "dashboard";
+	/** Which editor the edit mode shows. */
+	private editorTab: "visual" | "yaml" = "visual";
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -248,8 +252,73 @@ export class DashboardView extends ItemView {
 		});
 	}
 
-	/** Edit mode: the raw YAML, validated as you type. */
+	/** Edit mode: a visual canvas, or the raw YAML behind it. */
 	private renderEditor(root: HTMLElement, current: { config: string }): void {
+		const tabs = root.createDiv({ cls: "udash-editor-tabs" });
+
+		for (const tab of ["visual", "yaml"] as const) {
+			const button = tabs.createEl("button", {
+				cls: "udash-editor-tab",
+				text: tab === "visual" ? "Visual" : "YAML",
+			});
+
+			button.toggleClass("is-active", this.editorTab === tab);
+			button.addEventListener("click", () => {
+				this.editorTab = tab;
+				this.render();
+			});
+		}
+
+		if (this.editorTab === "yaml") {
+			this.renderYamlEditor(root, current);
+
+			return;
+		}
+
+		let parsed;
+
+		try {
+			parsed = parseConfig(current.config);
+		} catch (e) {
+			this.error(
+				root,
+				`${e instanceof ConfigError ? e.message : String(e)} \u2014 fix it in the YAML tab.`,
+			);
+
+			return;
+		}
+
+		const editor = new VisualEditor(
+			this.app,
+			parsed,
+			{
+				properties: this.knownProperties(parsed.folder),
+				calendars: this.host.settings.calendars.map((c) => c.name),
+			},
+			(next) => {
+				current.config = serializeConfig(next);
+				void this.host.saveSettings();
+				this.render();
+			},
+		);
+
+		editor.render(root.createDiv());
+	}
+
+	/** Frontmatter keys actually present, to offer while configuring a panel. */
+	private knownProperties(folder: string): string[] {
+		const seen = new Set<string>();
+
+		for (const day of readDays(this.app, folder)) {
+			for (const key of Object.keys(day.props)) seen.add(key);
+		}
+
+		seen.delete("created");
+
+		return [...seen].sort();
+	}
+
+	private renderYamlEditor(root: HTMLElement, current: { config: string }): void {
 		const editor = root.createEl("textarea", { cls: "udash-config-editor" });
 		editor.value = current.config;
 		editor.spellcheck = false;
