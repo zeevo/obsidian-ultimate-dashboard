@@ -420,13 +420,13 @@
 	align-items: flex-start;
 }
 
-.udash-palette {
+.udash-editor .udash-palette {
 	flex: 0 0 190px;
 	position: sticky;
 	top: 0;
 }
 
-.udash-palette-label {
+.udash-editor .udash-palette-label {
 	font-size: 0.72em;
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
@@ -434,13 +434,13 @@
 	margin: 10px 0 4px;
 }
 
-.udash-palette-row {
+.udash-editor .udash-palette-row {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 6px;
 }
 
-.udash-chip {
+.udash-editor .udash-chip {
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 6px;
 	padding: 4px 9px;
@@ -450,50 +450,50 @@
 	user-select: none;
 }
 
-.udash-chip:active {
+.udash-editor .udash-chip:active {
 	cursor: grabbing;
 }
 
-.udash-palette-hint {
+.udash-editor .udash-palette-hint {
 	font-size: 0.72em;
 	color: var(--text-muted);
 	margin-top: 10px;
 	line-height: 1.4;
 }
 
-.udash-canvas {
+.udash-editor .udash-canvas {
 	flex: 1;
 	min-width: 0;
 }
 
-.udash-node {
+.udash-editor .udash-node {
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 8px;
 	background: var(--background-primary);
 }
 
-.udash-node-leaf {
+.udash-editor .udash-node-leaf {
 	cursor: grab;
 	background: var(--background-secondary);
 }
 
-.udash-node-leaf:active {
+.udash-editor .udash-node-leaf:active {
 	cursor: grabbing;
 }
 
-.udash-node-head {
+.udash-editor .udash-node-head {
 	display: flex;
 	align-items: center;
 	gap: 8px;
 	padding: 5px 8px;
 }
 
-.udash-node-kind {
+.udash-editor .udash-node-kind {
 	font-weight: 600;
 	font-size: 0.84em;
 }
 
-.udash-node-meta {
+.udash-editor .udash-node-meta {
 	font-size: 0.76em;
 	color: var(--text-muted);
 	overflow: hidden;
@@ -501,13 +501,13 @@
 	white-space: nowrap;
 }
 
-.udash-node-actions {
+.udash-editor .udash-node-actions {
 	margin-left: auto;
 	display: flex;
 	gap: 2px;
 }
 
-.udash-icon-button {
+.udash-editor .udash-icon-button {
 	background: none;
 	border: none;
 	padding: 2px 4px;
@@ -516,46 +516,46 @@
 	box-shadow: none;
 }
 
-.udash-icon-button:hover {
+.udash-editor .udash-icon-button:hover {
 	color: var(--text-normal);
 }
 
-.udash-node-body {
+.udash-editor .udash-node-body {
 	padding: 0 8px 6px;
 }
 
 /* a row lays its children out side by side, mirroring what it renders */
-.udash-node-row > .udash-node-body {
+.udash-editor .udash-node-row > .udash-node-body {
 	display: flex;
 	align-items: flex-start;
 	gap: 4px;
 }
 
-.udash-node-row > .udash-node-body > .udash-node {
+.udash-editor .udash-node-row > .udash-node-body > .udash-node {
 	flex: 1;
 	min-width: 0;
 }
 
-.udash-dropzone {
+.udash-editor .udash-dropzone {
 	min-height: 10px;
 	border-radius: 4px;
 	transition: background 80ms ease;
 }
 
-.udash-node-row > .udash-node-body > .udash-dropzone {
+.udash-editor .udash-node-row > .udash-node-body > .udash-dropzone {
 	min-height: 40px;
 	min-width: 10px;
 	flex: 0 0 10px;
 }
 
-.udash-dropzone.is-over {
+.udash-editor .udash-dropzone.is-over {
 	background: color-mix(in srgb, var(--interactive-accent) 45%, transparent);
 	min-height: 14px;
 }
 
 /* An empty container is entirely a drop target, so a divider you just added is
    as easy to hit as the gap between two existing panels. */
-.udash-dropzone-empty {
+.udash-editor .udash-dropzone-empty {
 	min-height: 54px;
 	display: flex;
 	align-items: center;
