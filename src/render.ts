@@ -1,4 +1,4 @@
-import { Agg, CalendarPanel, HeatmapPanel, LinePanel, NotePanel, StatPanel, UpcomingPanel } from "./panels";
+import { Agg, BlankPanel, CalendarPanel, HeatmapPanel, LinePanel, NotePanel, StatPanel, UpcomingPanel } from "./panels";
 import { assertNever } from "./kinds";
 import { DayRecord, daysBetween, num, shiftDate, shiftMonths, toISO, today, truthy } from "./data";
 
@@ -578,4 +578,21 @@ export function renderNote(el: HTMLElement, panel: NotePanel): HTMLElement {
 	body.createDiv({ cls: "udash-empty", text: "Loading\u2026" });
 
 	return body;
+}
+
+/* ------------------------------------------------------------------ blank */
+
+/** Height a placeholder stands at when it does not name its own. */
+const DEFAULT_BLANK_HEIGHT = 120;
+
+/**
+ * A placeholder that holds space and draws nothing. Useful for trying a layout
+ * out before deciding what goes in each slot: it is visible, so you can see the
+ * region it claims, but carries no data of its own.
+ */
+export function renderBlank(el: HTMLElement, panel: BlankPanel): void {
+	const box = el.createDiv({ cls: "udash-blank" });
+	box.style.minHeight = `${panel.height ?? DEFAULT_BLANK_HEIGHT}px`;
+
+	if (panel.label) box.createSpan({ cls: "udash-blank-label", text: panel.label });
 }

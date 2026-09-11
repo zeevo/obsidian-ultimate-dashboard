@@ -23,7 +23,7 @@ const DIVIDERS = [
  * of `if`s ending in a bare `return calendar`, which meant a type nobody had
  * added a branch for came out as a Month panel with no error at all.
  */
-export function blank(type: PanelKind | ContainerKind): LayoutNode {
+export function newNode(type: PanelKind | ContainerKind): LayoutNode {
 	const id = nextId();
 	const container = toContainerKind(type);
 
@@ -31,7 +31,7 @@ export function blank(type: PanelKind | ContainerKind): LayoutNode {
 
 	const panel = toPanelKind(type);
 
-	if (panel === null) throw new Error(`blank: \`${type}\` is neither a container nor a panel`);
+	if (panel === null) throw new Error(`newNode: \`${type}\` is neither a container nor a panel`);
 
 	return { id, ...specFor(panel).blank() };
 }
@@ -298,7 +298,7 @@ export class VisualEditor {
 		if (!payload) return;
 
 		if (payload.kind === "new") {
-			const node = blank(payload.type);
+			const node = newNode(payload.type);
 
 			target.parent.children.splice(target.index, 0, node);
 

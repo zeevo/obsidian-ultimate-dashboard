@@ -104,13 +104,22 @@ export interface NotePanel extends NodeBase {
 	height?: number;
 }
 
+export interface BlankPanel extends NodeBase {
+	type: typeof PanelKind.Blank;
+	/** Optional caption, so placeholders in a draft layout stay distinguishable. */
+	label?: string;
+	/** How tall the placeholder stands, in pixels. */
+	height?: number;
+}
+
 export type Panel =
 	| StatPanel
 	| LinePanel
 	| HeatmapPanel
 	| UpcomingPanel
 	| CalendarPanel
-	| NotePanel;
+	| NotePanel
+	| BlankPanel;
 
 /* ------------------------------------------------------------ field groups */
 
@@ -286,6 +295,18 @@ const note: PanelSpec<NotePanel> = {
 	summary: (p) => p.path || "not configured",
 };
 
+const blankPanel: PanelSpec<BlankPanel> = {
+	type: PanelKind.Blank,
+	label: "Blank",
+	hint: "A placeholder that holds space",
+	fields: [
+		{ key: "label", kind: FieldKind.Text, label: "Caption" },
+		{ key: "height", kind: FieldKind.Number, label: "Height (px)" },
+	],
+	blank: () => ({ type: PanelKind.Blank }),
+	summary: (p) => p.label ?? "placeholder",
+};
+
 /** Every panel type, keyed by its discriminant. */
 export const PANELS: { readonly [K in PanelKind]: PanelSpec } = {
 	[PanelKind.Stat]: stat as PanelSpec,
@@ -294,6 +315,7 @@ export const PANELS: { readonly [K in PanelKind]: PanelSpec } = {
 	[PanelKind.Upcoming]: upcoming as PanelSpec,
 	[PanelKind.Calendar]: calendar as PanelSpec,
 	[PanelKind.Note]: note as PanelSpec,
+	[PanelKind.Blank]: blankPanel as PanelSpec,
 };
 
 export function specFor(type: PanelKind): PanelSpec {

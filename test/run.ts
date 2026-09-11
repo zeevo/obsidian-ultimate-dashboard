@@ -6,11 +6,11 @@ import { join } from "node:path";
 import { load } from "js-yaml";
 import { ConfigError, ContainerNode, countPanels, isContainer, needsSetup, parseDashboard } from "../src/layout-tree";
 import { DayRecord, stripFrontmatter } from "../src/data";
-import { fillMonth, monthWindow, renderHeatmap, renderLine, renderMonth, renderNote, renderStat } from "../src/render";
+import { fillMonth, monthWindow, renderBlank, renderHeatmap, renderLine, renderMonth, renderNote, renderStat } from "../src/render";
 import { renderNode } from "../src/layout";
 import { parseICS } from "../src/ics";
 import { serializeDashboard } from "../src/serialize";
-import { blank } from "../src/editor";
+import { newNode } from "../src/editor";
 import { CONTAINER_KINDS, PANEL_KINDS } from "../src/kinds";
 import { specFor } from "../src/panels";
 import { DEFAULT_CONFIG, activeDashboard, defaultSettings, findAccount, makeDashboard, migrate, uniqueName } from "../src/store";
@@ -413,7 +413,10 @@ layout:
     - type: note
       title: Plan
       path: 0 All/Health.md
-      height: 240`,
+      height: 240
+    - type: blank
+      label: TBD
+      height: 80`,
 		// nesting, flex sizing and an explicit range
 		`folder: Notes
 layout:
@@ -1031,11 +1034,11 @@ console.log("\nblank nodes from the palette");
 	// that kind. This used to fall through to a Month panel for anything the
 	// factory had no branch for, silently.
 	for (const kind of PANEL_KINDS) {
-		check(`dropping ${kind} creates a ${kind}`, blank(kind).type === kind, blank(kind).type);
+		check(`dropping ${kind} creates a ${kind}`, newNode(kind).type === kind, newNode(kind).type);
 	}
 
 	for (const kind of CONTAINER_KINDS) {
-		const node = blank(kind);
+		const node = newNode(kind);
 
 		check(`dropping ${kind} creates an empty ${kind}`,
 			node.type === kind && isContainer(node) && node.children.length === 0);
@@ -1047,8 +1050,30 @@ console.log("\nblank nodes from the palette");
 		const wants = specFor(kind).fields.some((f) => f.required);
 
 		check(`a new ${kind} ${wants ? "opens its form" : "needs no setup"}`,
-			needsSetup(blank(kind)) === wants);
+			needsSetup(newNode(kind)) === wants);
 	}
+}
+
+console.log("\nblank panel");
+
+{
+	const host = new El();
+	renderBlank(host, { id: "t", type: "blank", label: "TBD", height: 80 });
+
+	const box = host.byClass("udash-blank")[0];
+
+	check("a box is drawn", !!box);
+	check("it stands at the declared height", box?.style.minHeight === "80px", box?.style.minHeight);
+	check("the caption shows", host.all.some((e) => e.text === "TBD"));
+
+	const bare = new El();
+	renderBlank(bare, { id: "t", type: "blank" });
+
+	check("height defaults rather than collapsing", bare.byClass("udash-blank")[0]?.style.minHeight === "120px");
+	check("no caption means no label element", bare.byClass("udash-blank-label").length === 0);
+
+	// it holds space and nothing else, so it must never ask to be configured
+	check("a blank never needs setup", !needsSetup(newNode("blank")));
 }
 
 console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED"}`);

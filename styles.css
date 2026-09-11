@@ -617,3 +617,20 @@
 .udash-note-body > :last-child {
 	margin-bottom: 0;
 }
+
+/* ----------------------------------------------------------------- blank */
+
+.udash-blank {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	border: 1px dashed var(--background-modifier-border);
+	border-radius: 8px;
+	background: var(--background-primary-alt);
+}
+
+.udash-blank-label {
+	font-size: 0.8em;
+	color: var(--text-faint);
+}

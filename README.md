@@ -394,6 +394,28 @@ back to the top while you typed somewhere else.
 
 A note tile refreshes on its own when the note it shows is edited.
 
+### `type: blank`
+
+A placeholder that holds space and shows nothing. It reads no frontmatter and
+needs no configuration, so it is there to try a layout with before deciding what
+belongs in each slot.
+
+| Key | Meaning |
+|-----|---------|
+| `height` | How tall it stands, in pixels. Defaults to 120 |
+| `label` | Optional caption, to tell placeholders apart |
+
+```yaml
+- type: row
+  children:
+    - { type: blank, label: chart goes here, flex: 2 }
+    - { type: blank, label: sidebar, flex: 1 }
+```
+
+It draws a dashed outline rather than nothing at all, since a layout you cannot
+see is not one you can judge. Use `flex` to try column widths and `height` to
+try row heights.
+
 ## Development
 
 ```sh

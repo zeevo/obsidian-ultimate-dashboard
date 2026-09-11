@@ -20,6 +20,7 @@ export const PanelKind = {
 	Upcoming: "upcoming",
 	Calendar: "calendar",
 	Note: "note",
+	Blank: "blank",
 } as const;
 
 export type PanelKind = (typeof PanelKind)[keyof typeof PanelKind];

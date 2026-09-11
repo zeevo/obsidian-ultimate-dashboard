@@ -2,7 +2,7 @@ import { ContainerNode, LayoutNode, isContainer } from "./layout-tree";
 import { CalendarPanel, NotePanel, UpcomingPanel } from "./panels";
 import { ContainerKind } from "./kinds";
 import { DayRecord } from "./data";
-import { fillCalendar, fillMonth, monthWindow, renderHeatmap, renderLine, renderMonth, renderNote, renderStat, renderUpcoming } from "./render";
+import { fillCalendar, fillMonth, monthWindow, renderBlank, renderHeatmap, renderLine, renderMonth, renderNote, renderStat, renderUpcoming } from "./render";
 
 const DEFAULT_GAP = 20;
 
@@ -67,7 +67,8 @@ export function renderNode(
 	el.addClass("udash-panel");
 
 	try {
-		if (node.type === "stat") renderStat(el, days, node);
+		if (node.type === "blank") renderBlank(el, node);
+		else if (node.type === "stat") renderStat(el, days, node);
 		else if (node.type === "heatmap") renderHeatmap(el, days, node);
 		else if (node.type === "line") renderLine(el, days, node);
 		else if (node.type === "note") {
