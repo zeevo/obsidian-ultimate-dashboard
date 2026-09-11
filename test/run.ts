@@ -603,6 +603,49 @@ layout:
 	check("the first has nothing above it", kids.indexOf(kids[0]) === 0);
 	check("the last has nothing below it", kids.indexOf(kids[2]) === kids.length - 1);
 
+	// the insertion index is computed from cursor position against child
+	// midpoints, and dropping a node back where it started must be a no-op
+	const idx = (positions: number[], cursor: number) => {
+		for (let i = 0; i < positions.length; i++) {
+			if (cursor < positions[i]) return i;
+		}
+
+		return positions.length;
+	};
+
+	const mids = [50, 150, 250];
+
+	check("above the first midpoint inserts at 0", idx(mids, 10) === 0);
+	check("between two midpoints inserts between", idx(mids, 100) === 1, String(idx(mids, 100)));
+	check("past the last midpoint appends", idx(mids, 999) === 3, String(idx(mids, 999)));
+
+	// dropping onto its own position leaves the order alone
+	const stable = parseConfig(`
+folder: Daily
+layout:
+  type: column
+  children:
+    - { type: heatmap, property: a }
+    - { type: heatmap, property: b }
+`);
+
+	const order = () =>
+		stable.root.children.map((c) => (c as { property?: string }).property).join();
+
+	const applyMove = (from: number, to: number) => {
+		let target = to;
+
+		if (from < target) target--;
+		const [n] = stable.root.children.splice(from, 1);
+
+		stable.root.children.splice(target, 0, n);
+	};
+
+	applyMove(0, 0);
+	check("dropping in place changes nothing", order() === "a,b", order());
+	applyMove(0, 2);
+	check("dropping past the end moves to last", order() === "b,a", order());
+
 	// removing a panel
 	const pruned = base();
 

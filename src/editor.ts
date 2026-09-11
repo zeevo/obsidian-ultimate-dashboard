@@ -114,10 +114,7 @@ export class VisualEditor {
 	private renderContainer(el: HTMLElement, node: ContainerNode, path: number[]): void {
 		const box = el.createDiv({ cls: `udash-node udash-node-${node.type}` });
 
-		if (path.length > 0) {
-			this.makeDraggable(box, path);
-			this.makeDropTarget(box, path);
-		}
+		if (path.length > 0) this.makeDraggable(box, path);
 
 		const head = box.createDiv({ cls: "udash-node-head" });
 
@@ -131,20 +128,19 @@ export class VisualEditor {
 
 		const body = box.createDiv({ cls: "udash-node-body" });
 
+		this.acceptDrops(body, node);
+
 		if (node.children.length === 0) {
-			this.dropZone(body, { parent: node, index: 0 }, "Drop a panel here");
+			body.createDiv({ cls: "udash-empty-hint", text: "Drop a panel here" });
 
 			return;
 		}
-
-		this.dropZone(body, { parent: node, index: 0 });
 
 		node.children.forEach((child, i) => {
 			const childPath = [...path, i];
 
 			if (isContainer(child)) this.renderContainer(body, child, childPath);
 			else this.renderLeaf(body, child, childPath);
-			this.dropZone(body, { parent: node, index: i + 1 });
 		});
 	}
 
@@ -152,51 +148,12 @@ export class VisualEditor {
 		const box = el.createDiv({ cls: `udash-node udash-node-leaf udash-node-${node.type}` });
 
 		this.makeDraggable(box, path);
-		this.makeDropTarget(box, path);
 
 		const head = box.createDiv({ cls: "udash-node-head" });
 
 		head.createSpan({ cls: "udash-node-kind", text: label(node.type) });
 		head.createSpan({ cls: "udash-node-meta", text: describe(node) });
 		this.controls(head, node, path);
-	}
-
-	/** Lets a card accept a drop, inserting before or after itself. */
-	private makeDropTarget(box: HTMLElement, path: number[]): void {
-		const parent = this.parentOf(path);
-
-		if (!parent) return;
-		const index = path[path.length - 1];
-
-		const after = (e: DragEvent) => {
-			const r = box.getBoundingClientRect();
-			const horizontal = r.width > r.height * 2;
-
-			return horizontal ? e.clientX > r.left + r.width / 2 : e.clientY > r.top + r.height / 2;
-		};
-
-		box.addEventListener("dragover", (e) => {
-			if (!this.dragging) return;
-			e.preventDefault();
-			e.stopPropagation();
-
-			if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-			box.toggleClass("is-over-after", after(e));
-			box.toggleClass("is-over-before", !after(e));
-		});
-		box.addEventListener("dragleave", () => {
-			box.removeClass("is-over-after");
-			box.removeClass("is-over-before");
-		});
-		box.addEventListener("drop", (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			const target = { parent, index: after(e) ? index + 1 : index };
-
-			box.removeClass("is-over-after");
-			box.removeClass("is-over-before");
-			this.drop(target);
-		});
 	}
 
 	private makeDraggable(box: HTMLElement, path: number[]): void {
@@ -208,8 +165,6 @@ export class VisualEditor {
 			if (e.dataTransfer) e.dataTransfer.effectAllowed = "copyMove";
 			e.stopPropagation();
 			this.setDragging(true);
-			// Deferred by a tick: the class turns off pointer events, and applying
-			// that synchronously inside dragstart cancels the drag in Chromium.
 			window.setTimeout(() => box.addClass("is-dragging-self"), 0);
 		});
 		box.addEventListener("dragend", () => {
@@ -295,34 +250,6 @@ export class VisualEditor {
 		this.commit();
 	}
 
-	/**
-	 * A strip that accepts a drop between two siblings. With a label it becomes
-	 * the whole body of an empty container, so a divider is easy to drop into.
-	 */
-	private dropZone(el: HTMLElement, target: Target, label?: string): void {
-		const zone = el.createDiv({
-			cls: label ? "udash-dropzone udash-dropzone-empty" : "udash-dropzone",
-		});
-
-		if (label) zone.setText(label);
-
-		zone.addEventListener("dragover", (e) => {
-			if (!this.dragging) return;
-			e.preventDefault();
-			e.stopPropagation();
-
-			if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-			zone.addClass("is-over");
-		});
-		zone.addEventListener("dragleave", () => zone.removeClass("is-over"));
-		zone.addEventListener("drop", (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			zone.removeClass("is-over");
-			this.drop(target);
-		});
-	}
-
 	private setDragging(on: boolean): void {
 		this.hostEl?.toggleClass("is-dragging", on);
 	}
@@ -330,6 +257,75 @@ export class VisualEditor {
 	private endDrag(): void {
 		this.dragging = null;
 		this.setDragging(false);
+
+		// Defensive: a re-render mid-drag can leave a detached card marked, and a
+		// stale mark means a permanently greyed out panel.
+		for (const el of Array.from(this.hostEl?.querySelectorAll(".is-dragging-self") ?? [])) {
+			el.removeClass("is-dragging-self");
+		}
+	}
+
+	/**
+	 * One drop target per container, rather than a strip between every pair of
+	 * children plus the children themselves. The insertion point comes from where
+	 * the cursor sits relative to each child's midpoint, which is how sortable
+	 * lists normally work: nothing thin to hit, and the card being dragged does
+	 * not have to hide from the pointer to stay out of the way.
+	 */
+	private acceptDrops(body: HTMLElement, node: ContainerNode): void {
+		const indexAt = (e: DragEvent): number => {
+			const cards = cardsIn(body);
+			const horizontal = node.type === "row";
+			const pos = horizontal ? e.clientX : e.clientY;
+
+			for (let i = 0; i < cards.length; i++) {
+				const r = cards[i].getBoundingClientRect();
+				const mid = horizontal ? r.left + r.width / 2 : r.top + r.height / 2;
+
+				if (pos < mid) return i;
+			}
+
+			return cards.length;
+		};
+
+		const mark = (index: number): void => {
+			const cards = cardsIn(body);
+
+			for (const c of cards) c.removeClass("is-insert-before");
+			body.removeClass("is-insert-end");
+
+			if (index < cards.length) cards[index].addClass("is-insert-before");
+			else body.addClass("is-insert-end");
+		};
+
+		const clear = (): void => {
+			for (const c of cardsIn(body)) c.removeClass("is-insert-before");
+			body.removeClass("is-insert-end");
+		};
+
+		body.addEventListener("dragover", (e) => {
+			if (!this.dragging) return;
+			e.preventDefault();
+			e.stopPropagation();
+
+			if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+			mark(indexAt(e));
+		});
+		body.addEventListener("dragleave", (e) => {
+			// SAFETY: relatedTarget is the element being entered, or null when the
+			// cursor leaves the window; contains() accepts both.
+			const entering = e.relatedTarget as globalThis.Node | null;
+
+			if (!body.contains(entering)) clear();
+		});
+		body.addEventListener("drop", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			const index = indexAt(e);
+
+			clear();
+			this.drop({ parent: node, index });
+		});
 	}
 
 	/* -------------------------------------------------------------- edits */
@@ -439,4 +435,15 @@ function describe(node: Panel): string {
 	if (node.type === "upcoming") return `${node.days ?? 14} days`;
 
 	return node.month ?? "this month";
+}
+
+/** The child cards of a container body, ignoring hints and indicators. */
+function cardsIn(body: HTMLElement): HTMLElement[] {
+	const out: HTMLElement[] = [];
+
+	for (const child of Array.from(body.children)) {
+		if (child instanceof HTMLElement && child.hasClass("udash-node")) out.push(child);
+	}
+
+	return out;
 }
