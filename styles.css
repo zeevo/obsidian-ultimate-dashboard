@@ -470,6 +470,11 @@
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 8px;
 	background: var(--background-primary);
+	/* Without this, mousedown on a card's label starts a text selection and the
+	   browser drags the text instead of the card. Only the palette chips had it,
+	   which is why they dragged and canvas cards did not. */
+	user-select: none;
+	-webkit-user-select: none;
 }
 
 .udash-editor .udash-node-leaf {
