@@ -28,6 +28,9 @@ export class PanelModal extends Modal {
 		super(app);
 	}
 
+	/** Runs on close however it happened, including Escape. */
+	onDismiss: (() => void) | null = null;
+
 	/** Whether dropping this type should prompt before it is usable. */
 	static needsSetup(node: Node): boolean {
 		if (node.type === "heatmap" || node.type === "line") return !node.property;
@@ -92,6 +95,7 @@ export class PanelModal extends Modal {
 
 	onClose(): void {
 		this.contentEl.empty();
+		this.onDismiss?.();
 	}
 
 	/* ------------------------------------------------------------- fields */

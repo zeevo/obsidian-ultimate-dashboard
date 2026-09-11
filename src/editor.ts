@@ -1,5 +1,6 @@
-import { App, setIcon, setTooltip } from "obsidian";
-import { ContainerNode, DashboardConfig, Node, Panel, isContainer } from "./config";
+import { App, Notice, setIcon, setTooltip } from "obsidian";
+import { ConfigError, ContainerNode, DashboardConfig, Node, Panel, isContainer, parseConfig } from "./config";
+import { serializeConfig } from "./serialize";
 import { PanelModal, label } from "./panel-modal";
 
 /**
@@ -53,13 +54,17 @@ export class VisualEditor {
 	private dragging: DragPayload | null = null;
 	/** The editor root, so a drag can widen every drop zone at once. */
 	private hostEl: HTMLElement | null = null;
+	/** The last layout that parsed, to fall back to if an edit produces one that does not. */
+	private lastGood: string;
 
 	constructor(
 		private app: App,
 		private config: DashboardConfig,
 		private context: { properties: string[]; calendars: string[] },
 		private onChange: (config: DashboardConfig) => void,
-	) {}
+	) {
+		this.lastGood = serializeConfig(config);
+	}
 
 	render(host: HTMLElement): void {
 		host.empty();
@@ -343,7 +348,17 @@ export class VisualEditor {
 			target.parent.children.splice(target.index, 0, node);
 
 			if (!isContainer(node) && PanelModal.needsSetup(node)) {
-				this.configure(node);
+				// Cancelling must not leave a half-made panel behind: it would be
+				// serialised without its required fields and fail to parse.
+				this.configure(node, () => {
+					if (PanelModal.needsSetup(node)) {
+						const at = target.parent.children.indexOf(node);
+
+						if (at >= 0) target.parent.children.splice(at, 1);
+					}
+
+					this.commit();
+				});
 
 				return;
 			}
@@ -372,8 +387,11 @@ export class VisualEditor {
 		this.commit();
 	}
 
-	private configure(node: Node): void {
-		new PanelModal(this.app, node, this.context, () => this.commit()).open();
+	private configure(node: Node, onDismiss?: () => void): void {
+		const modal = new PanelModal(this.app, node, this.context, () => this.commit());
+
+		if (onDismiss) modal.onDismiss = onDismiss;
+		modal.open();
 	}
 
 	private removeAt(path: number[]): void {
@@ -404,8 +422,35 @@ export class VisualEditor {
 		return parent && isContainer(parent) ? parent : null;
 	}
 
+	/**
+	 * Saves, but only a layout that can be read back. The editor must never write
+	 * a config it cannot itself load: that strands you with an error and no way
+	 * back to the canvas.
+	 */
 	private commit(): void {
+		const text = serializeConfig(this.config);
+
+		try {
+			parseConfig(text);
+		} catch (err) {
+			new Notice(
+				`That change would break the layout: ${
+					err instanceof ConfigError ? err.message : String(err)
+				}`,
+				8000,
+			);
+			this.config = parseConfig(this.lastGood);
+			this.rerender();
+
+			return;
+		}
+
+		this.lastGood = text;
 		this.onChange(this.config);
+	}
+
+	private rerender(): void {
+		if (this.hostEl) this.render(this.hostEl);
 	}
 }
 

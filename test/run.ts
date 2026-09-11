@@ -646,6 +646,34 @@ layout:
 	applyMove(0, 2);
 	check("dropping past the end moves to last", order() === "b,a", order());
 
+	// the editor must never save a layout it cannot read back
+	const guarded = parseConfig(`
+folder: Daily
+layout:
+  type: column
+  children:
+    - { type: heatmap, property: lift }
+`);
+
+	const good = serializeConfig(guarded);
+
+	// a panel dropped but never configured
+	guarded.root.children.push({ type: "heatmap", property: "" });
+	let broke = false;
+
+	try { parseConfig(serializeConfig(guarded)); } catch { broke = true; }
+
+	check("an unconfigured panel would break the layout", broke);
+
+	// dropping it, as the guard does, restores a readable layout
+	guarded.root.children.pop();
+	let recovered = true;
+
+	try { parseConfig(serializeConfig(guarded)); } catch { recovered = false; }
+
+	check("removing it recovers", recovered);
+	check("and matches the last good layout", serializeConfig(guarded) === good);
+
 	// removing a panel
 	const pruned = base();
 
