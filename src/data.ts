@@ -32,6 +32,16 @@ export function readDays(app: App, folder: string): DayRecord[] {
 	return days;
 }
 
+/**
+ * Drops a leading `---` block: an embedded note shows its text, not its
+ * properties, which Obsidian renders as a table nobody wants inside a tile.
+ */
+export function stripFrontmatter(source: string): string {
+	const match = /^---\r?\n[\s\S]*?\r?\n---[^\S\r\n]*(\r?\n|$)/.exec(source);
+
+	return match ? source.slice(match[0].length) : source;
+}
+
 /** Numeric value of a property, or null when absent or non-numeric. */
 export function num(day: DayRecord, key: string): number | null {
 	const v = day.props[key];

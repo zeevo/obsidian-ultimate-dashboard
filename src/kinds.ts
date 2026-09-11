@@ -19,6 +19,7 @@ export const PanelKind = {
 	Heatmap: "heatmap",
 	Upcoming: "upcoming",
 	Calendar: "calendar",
+	Note: "note",
 } as const;
 
 export type PanelKind = (typeof PanelKind)[keyof typeof PanelKind];

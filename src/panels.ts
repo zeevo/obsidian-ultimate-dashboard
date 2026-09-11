@@ -94,7 +94,23 @@ export interface CalendarPanel extends NodeBase {
 	weekStart?: number;
 }
 
-export type Panel = StatPanel | LinePanel | HeatmapPanel | UpcomingPanel | CalendarPanel;
+export interface NotePanel extends NodeBase {
+	type: typeof PanelKind.Note;
+	/** Caption. Defaults to the note's own path. */
+	title?: string;
+	/** A link path, written the way you would inside `[[ ]]`. */
+	path: string;
+	/** Visible height before the tile scrolls, in pixels. */
+	height?: number;
+}
+
+export type Panel =
+	| StatPanel
+	| LinePanel
+	| HeatmapPanel
+	| UpcomingPanel
+	| CalendarPanel
+	| NotePanel;
 
 /* ------------------------------------------------------------ field groups */
 
@@ -234,6 +250,24 @@ const calendar: PanelSpec<CalendarPanel> = {
 	summary: (p) => p.month ?? "this month",
 };
 
+const note: PanelSpec<NotePanel> = {
+	type: PanelKind.Note,
+	label: "Note",
+	hint: "Another note, embedded",
+	fields: [
+		{ key: "title", kind: FieldKind.Text, label: "Title" },
+		{
+			key: "path",
+			kind: FieldKind.Note,
+			label: "Note",
+			required: true,
+			placeholder: "0 All/Health.md",
+		},
+		{ key: "height", kind: FieldKind.Number, label: "Height (px)", min: 60 },
+	],
+	summary: (p) => p.path || "not configured",
+};
+
 /** Every panel type, keyed by its discriminant. */
 export const PANELS: { readonly [K in PanelKind]: PanelSpec } = {
 	[PanelKind.Stat]: stat as PanelSpec,
@@ -241,6 +275,7 @@ export const PANELS: { readonly [K in PanelKind]: PanelSpec } = {
 	[PanelKind.Heatmap]: heatmap as PanelSpec,
 	[PanelKind.Upcoming]: upcoming as PanelSpec,
 	[PanelKind.Calendar]: calendar as PanelSpec,
+	[PanelKind.Note]: note as PanelSpec,
 };
 
 export function specFor(type: PanelKind): PanelSpec {

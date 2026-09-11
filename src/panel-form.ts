@@ -14,6 +14,7 @@ import { Field, FieldKind, FieldValue } from "./schema";
 export interface FormContext {
 	properties: string[];
 	calendars: string[];
+	notes: string[];
 }
 
 export class PanelForm extends Modal {
@@ -124,6 +125,16 @@ export class PanelForm extends Modal {
 						.setValue(String(get() ?? ""))
 						.onChange((v) => put(v.trim() || undefined));
 					this.suggest(t.inputEl, this.context.properties);
+				});
+
+				return;
+
+			case FieldKind.Note:
+				setting.addText((t) => {
+					t.setPlaceholder(field.placeholder ?? "")
+						.setValue(String(get() ?? ""))
+						.onChange((v) => put(v.trim() || undefined));
+					this.suggest(t.inputEl, this.context.notes);
 				});
 
 				return;

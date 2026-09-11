@@ -3,7 +3,7 @@ import { ConfigError, ContainerNode, Dashboard, LayoutNode, isContainer, needsSe
 import { Panel, PANELS, specFor } from "./panels";
 import { ContainerKind, PanelKind, toPanelKind } from "./kinds";
 import { serializeDashboard } from "./serialize";
-import { PanelForm } from "./panel-form";
+import { FormContext, PanelForm } from "./panel-form";
 
 /**
  * The visual editor: a palette you drag from, and a canvas of drop zones that
@@ -65,7 +65,7 @@ export class VisualEditor {
 	constructor(
 		private app: App,
 		private config: Dashboard,
-		private context: { properties: string[]; calendars: string[] },
+		private context: FormContext,
 		private onChange: (config: Dashboard) => void,
 	) {
 		this.lastGood = serializeDashboard(config);

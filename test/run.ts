@@ -5,8 +5,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { load } from "js-yaml";
 import { ConfigError, ContainerNode, countPanels, isContainer, needsSetup, parseDashboard } from "../src/layout-tree";
-import { DayRecord } from "../src/data";
-import { fillMonth, monthWindow, renderHeatmap, renderLine, renderMonth, renderStat } from "../src/render";
+import { DayRecord, stripFrontmatter } from "../src/data";
+import { fillMonth, monthWindow, renderHeatmap, renderLine, renderMonth, renderNote, renderStat } from "../src/render";
 import { renderNode } from "../src/layout";
 import { parseICS } from "../src/ics";
 import { serializeDashboard } from "../src/serialize";
@@ -406,7 +406,11 @@ layout:
     - type: calendar
       month: "2026-02"
       weekStart: 1
-      maxPerDay: 4`,
+      maxPerDay: 4
+    - type: note
+      title: Plan
+      path: 0 All/Health.md
+      height: 240`,
 		// nesting, flex sizing and an explicit range
 		`folder: Notes
 layout:
@@ -986,6 +990,36 @@ const sparse = new El();
 renderLine(sparse, [days[0]], { id: "t", type: "line", property: "weight" });
 
 check("single reading degrades gracefully", sparse.byClass("udash-empty").length === 1);
+
+console.log("\nnote panel");
+
+{
+	const shell = new El();
+	const body = renderNote(shell, { id: "t", type: "note", path: "0 All/Health.md", height: 240 });
+
+	check("body scrolls within the declared height", body.style.maxHeight === "240px", body.style.maxHeight);
+	check("body starts with a placeholder", body.byClass("udash-empty").length === 1);
+	check("header falls back to the path", shell.all.some((e) => e.text === "0 All/Health.md"));
+
+	const titled = new El();
+	renderNote(titled, { id: "t", type: "note", path: "0 All/Health.md", title: "Plan" });
+
+	check("a title wins over the path", titled.all.some((e) => e.text === "Plan"));
+
+	const unsized = new El();
+	const unsizedBody = renderNote(unsized, { id: "t", type: "note", path: "x.md" });
+
+	check("height defaults rather than growing unbounded", unsizedBody.style.maxHeight === "320px", unsizedBody.style.maxHeight);
+
+	check("a note with no path needs setup", needsSetup({ id: "t", type: "note", path: "" } as never));
+
+	// frontmatter is stripped so a tile shows prose, not a property table
+	check("frontmatter is dropped", stripFrontmatter("---\nweight: 180\n---\nBody text") === "Body text");
+	check("crlf frontmatter is dropped", stripFrontmatter("---\r\nweight: 180\r\n---\r\nBody") === "Body");
+	check("a note without frontmatter is untouched", stripFrontmatter("# Title\n\nBody") === "# Title\n\nBody");
+	check("a horizontal rule mid-note survives", stripFrontmatter("Intro\n\n---\n\nMore") === "Intro\n\n---\n\nMore");
+	check("only the first block goes", stripFrontmatter("---\na: 1\n---\ntext\n---\nmore") === "text\n---\nmore");
+}
 
 console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED"}`);
 

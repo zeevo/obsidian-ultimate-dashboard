@@ -1,9 +1,9 @@
-import { ItemView, WorkspaceLeaf, setIcon, setTooltip } from "obsidian";
+import { Component, ItemView, MarkdownRenderer, WorkspaceLeaf, setIcon, setTooltip } from "obsidian";
 import { ConfigError, countPanels, parseDashboard } from "./layout-tree";
-import { readDays } from "./data";
-import { CalendarFiller, DEFAULT_GAP, renderNode } from "./layout";
+import { readDays, stripFrontmatter } from "./data";
+import { CalendarFiller, DEFAULT_GAP, NoteFiller, renderNode } from "./layout";
 import { CalendarService } from "./calendar";
-import { CalendarPanel, UpcomingPanel } from "./panels";
+import { CalendarPanel, NotePanel, UpcomingPanel } from "./panels";
 import { fillCalendar, fillMonth, monthWindow } from "./render";
 import { EventModal, NameModal } from "./modal";
 import { VisualEditor } from "./editor";
@@ -35,6 +35,14 @@ export class DashboardView extends ItemView {
 	private mode: "dashboard" | "edit" = "dashboard";
 	/** Which editor the edit mode shows. */
 	private editorTab: "visual" | "yaml" = "visual";
+	/** Lifecycle owners for the markdown each note tile renders, dropped on redraw. */
+	private embeds: Component[] = [];
+	/**
+	 * How far each embedded note is scrolled, by path. The whole view is rebuilt
+	 * whenever any note in the vault changes, so without this a tile you had
+	 * scrolled would jump back to the top as you typed elsewhere.
+	 */
+	private scrolled = new Map<string, number>();
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -70,6 +78,12 @@ export class DashboardView extends ItemView {
 
 	render(): void {
 		const host = this.contentEl;
+
+		// the markdown children own event handlers and child components of their
+		// own; emptying the DOM under them is not enough to release those
+		for (const embed of this.embeds) this.removeChild(embed);
+		this.embeds = [];
+
 		host.empty();
 		host.addClass("udash-view");
 
@@ -118,6 +132,7 @@ export class DashboardView extends ItemView {
 			DEFAULT_GAP,
 			(target, message) => this.error(target, message),
 			this.makeCalendarFiller(),
+			this.makeNoteFiller(),
 		);
 	}
 
@@ -235,6 +250,41 @@ export class DashboardView extends ItemView {
 		};
 	}
 
+	/**
+	 * Renders an embedded note through Obsidian's own markdown pipeline, so
+	 * wikilinks, embeds, tasks and other plugins' code blocks all behave as they
+	 * do in a normal note. The scroll offset is restored afterwards.
+	 */
+	private makeNoteFiller(): NoteFiller {
+		return (body: HTMLElement, panel: NotePanel) => {
+			const file = this.app.metadataCache.getFirstLinkpathDest(panel.path, "");
+
+			if (!file) {
+				body.empty();
+				this.error(body, `No note called "${panel.path}"`);
+
+				return;
+			}
+
+			const owner = new Component();
+			this.addChild(owner);
+			this.embeds.push(owner);
+
+			void this.app.vault.cachedRead(file).then(async (raw) => {
+				// the view may have redrawn while the read was in flight
+				if (!body.isConnected) return;
+				body.empty();
+				await MarkdownRenderer.render(this.app, stripFrontmatter(raw), body, file.path, owner);
+
+				if (!body.isConnected) return;
+				body.scrollTop = this.scrolled.get(panel.path) ?? 0;
+				owner.registerDomEvent(body, "scroll", () =>
+					this.scrolled.set(panel.path, body.scrollTop),
+				);
+			});
+		};
+	}
+
 	/** Only Google calendars marked writable can take a new event. */
 	private writableTargets(sources: CalendarSource[]): { id: string; accountId: string; name: string }[] {
 		const targets: { id: string; accountId: string; name: string }[] = [];
@@ -321,6 +371,7 @@ export class DashboardView extends ItemView {
 			{
 				properties: this.knownProperties(parsed.folder),
 				calendars: this.host.settings.calendars.map((c) => c.name),
+				notes: this.app.vault.getMarkdownFiles().map((f) => f.path).sort(),
 			},
 			(next) => {
 				current.config = serializeDashboard(next);

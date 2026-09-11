@@ -594,3 +594,26 @@
 .udash-month-cell.is-clickable:hover {
 	background: var(--background-modifier-hover);
 }
+
+/* ------------------------------------------------------------------- note */
+
+.udash-note {
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	padding: 10px 12px;
+	background: var(--background-secondary);
+}
+
+.udash-note-body {
+	overflow-y: auto;
+	font-size: 0.88em;
+}
+
+/* the first and last blocks would otherwise push against the tile's padding */
+.udash-note-body > :first-child {
+	margin-top: 0;
+}
+
+.udash-note-body > :last-child {
+	margin-bottom: 0;
+}

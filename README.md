@@ -366,6 +366,34 @@ The rolling average uses a **calendar** window, not a count of readings, so gaps
 in logging do not distort it. Dots are individual readings; the line is the
 average.
 
+### `type: note`
+
+Embeds another note, rendered through Obsidian's own markdown pipeline, so
+wikilinks, embeds, callouts, tasks and other plugins' code blocks behave exactly
+as they do in a normal note.
+
+| Key | Meaning |
+|-----|---------|
+| `path` | The note to show, written as you would inside `[[ ]]` |
+| `height` | Visible height in pixels before the tile scrolls. Defaults to 320 |
+| `title` | Caption. Defaults to the note's own path |
+
+```yaml
+- type: note
+  title: This week
+  path: 0 All/Health.md
+  height: 280
+```
+
+Frontmatter is stripped: a tile shows the note's prose, not a property table.
+
+The tile scrolls internally rather than growing, and **remembers where it was
+scrolled to**. That matters more than it sounds: the dashboard redraws whenever
+any note in the vault changes, so without it a tile you had scrolled would jump
+back to the top while you typed somewhere else.
+
+A note tile refreshes on its own when the note it shows is edited.
+
 ## Development
 
 ```sh

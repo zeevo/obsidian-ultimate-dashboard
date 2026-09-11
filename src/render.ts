@@ -1,4 +1,4 @@
-import { Agg, CalendarPanel, HeatmapPanel, LinePanel, StatPanel, UpcomingPanel } from "./panels";
+import { Agg, CalendarPanel, HeatmapPanel, LinePanel, NotePanel, StatPanel, UpcomingPanel } from "./panels";
 import { assertNever } from "./kinds";
 import { DayRecord, daysBetween, num, shiftDate, shiftMonths, toISO, today, truthy } from "./data";
 
@@ -554,4 +554,28 @@ export function fillMonth(
 			});
 		}
 	}
+}
+
+/* ------------------------------------------------------------------- note */
+
+/** Height a note tile scrolls within when it does not name its own. */
+const DEFAULT_NOTE_HEIGHT = 320;
+
+/**
+ * The shell for an embedded note, returning the body to fill.
+ *
+ * The markdown itself is rendered by the view: Obsidian's renderer needs the
+ * app and a component to own whatever it creates, neither of which belongs in
+ * a module that is otherwise pure DOM.
+ */
+export function renderNote(el: HTMLElement, panel: NotePanel): HTMLElement {
+	const wrap = el.createDiv({ cls: "udash-note" });
+	const head = wrap.createDiv({ cls: "udash-heatmap-head" });
+	head.createSpan({ text: panel.title ?? panel.path });
+
+	const body = wrap.createDiv({ cls: "udash-note-body" });
+	body.style.maxHeight = `${panel.height ?? DEFAULT_NOTE_HEIGHT}px`;
+	body.createDiv({ cls: "udash-empty", text: "Loading\u2026" });
+
+	return body;
 }

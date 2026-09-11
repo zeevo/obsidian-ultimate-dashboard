@@ -1,8 +1,8 @@
 import { ContainerNode, LayoutNode, isContainer } from "./layout-tree";
-import { CalendarPanel, UpcomingPanel } from "./panels";
+import { CalendarPanel, NotePanel, UpcomingPanel } from "./panels";
 import { ContainerKind } from "./kinds";
 import { DayRecord } from "./data";
-import { fillCalendar, fillMonth, monthWindow, renderHeatmap, renderLine, renderMonth, renderStat, renderUpcoming } from "./render";
+import { fillCalendar, fillMonth, monthWindow, renderHeatmap, renderLine, renderMonth, renderNote, renderStat, renderUpcoming } from "./render";
 
 const DEFAULT_GAP = 20;
 
@@ -39,6 +39,9 @@ function applyContainer(el: HTMLElement, node: ContainerNode, inheritedGap: numb
 /** Supplies calendar events; omitted when no feeds are configured. */
 export type CalendarFiller = (el: HTMLElement, panel: CalendarPanel | UpcomingPanel) => void;
 
+/** Renders an embedded note into the body a note tile made for it. */
+export type NoteFiller = (body: HTMLElement, panel: NotePanel) => void;
+
 export function renderNode(
 	parent: HTMLElement,
 	node: LayoutNode,
@@ -46,6 +49,7 @@ export function renderNode(
 	inheritedGap: number,
 	onError: (el: HTMLElement, message: string) => void,
 	fillCalendarPanel?: CalendarFiller,
+	fillNotePanel?: NoteFiller,
 ): void {
 	const el = parent.createDiv({ cls: `udash-node udash-${node.type}` });
 	applySizing(el, node);
@@ -54,7 +58,7 @@ export function renderNode(
 		const gap = applyContainer(el, node, inheritedGap);
 
 		for (const child of node.children) {
-			renderNode(el, child, days, gap, onError, fillCalendarPanel);
+			renderNode(el, child, days, gap, onError, fillCalendarPanel, fillNotePanel);
 		}
 
 		return;
@@ -66,7 +70,12 @@ export function renderNode(
 		if (node.type === "stat") renderStat(el, days, node);
 		else if (node.type === "heatmap") renderHeatmap(el, days, node);
 		else if (node.type === "line") renderLine(el, days, node);
-		else if (node.type === "upcoming") {
+		else if (node.type === "note") {
+			const body = renderNote(el, node);
+
+			// left showing its placeholder when no renderer is available, as in tests
+			if (fillNotePanel) fillNotePanel(body, node);
+		} else if (node.type === "upcoming") {
 			const shell = renderUpcoming(el, node);
 
 			if (fillCalendarPanel) fillCalendarPanel(shell, node);
