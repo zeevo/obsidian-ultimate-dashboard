@@ -73,7 +73,7 @@ export class CalendarService {
 	/**
 	 * Events from the named sources between two dates. A source that fails to
 	 * load is reported rather than throwing, so one broken feed cannot blank a
-	 * panel that also draws working ones.
+	 * widget that also draws working ones.
 	 */
 	async events(
 		sources: CalendarSource[],

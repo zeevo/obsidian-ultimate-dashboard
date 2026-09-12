@@ -4,7 +4,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { load } from "js-yaml";
 import { DayRecord } from "../src/data";
-import { LayoutNode, countPanels, isContainer, parseDashboard } from "../src/layout-tree";
+import { LayoutNode, countWidgets, isContainer, parseDashboard } from "../src/layout-tree";
 import { DEFAULT_GAP, renderNode } from "../src/layout";
 
 const VAULT = process.argv[2];
@@ -92,10 +92,10 @@ for (const dash of data.dashboards) {
     const host = new El();
     let errors = 0;
     renderNode(host as never, cfg.root, days, DEFAULT_GAP, () => errors++);
-    const panels = host.all.filter((e) => e.classes.has("udash-panel")).length;
-    console.log(`  rendered ${panels}/${countPanels(cfg.root)} panels, ${errors} errors`);
+    const widgets = host.all.filter((e) => e.classes.has("udash-widget")).length;
+    console.log(`  rendered ${widgets}/${countWidgets(cfg.root)} widgets, ${errors} errors`);
 
-    if (errors || panels !== countPanels(cfg.root)) bad++;
+    if (errors || widgets !== countWidgets(cfg.root)) bad++;
   } catch (e) {
     console.log(`  BROKEN -> ${(e as Error).message}`);
     bad++;

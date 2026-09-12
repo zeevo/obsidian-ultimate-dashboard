@@ -1,18 +1,18 @@
 /* Harness: runs the real renderers against the real vault, under node, with a
-   minimal DOM. Verifies the panels actually produce the elements and numbers
+   minimal DOM. Verifies the widgets actually produce the elements and numbers
    they should rather than merely compiling. */
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { load } from "js-yaml";
-import { ConfigError, ContainerNode, countPanels, isContainer, needsSetup, parseDashboard } from "../src/layout-tree";
+import { ConfigError, ContainerNode, countWidgets, isContainer, needsSetup, parseDashboard } from "../src/layout-tree";
 import { DayRecord, stripFrontmatter } from "../src/data";
 import { fillMonth, monthWindow, renderBlank, renderHeatmap, renderLine, renderMonth, renderNote, renderStat } from "../src/render";
 import { renderNode } from "../src/layout";
 import { parseICS } from "../src/ics";
 import { serializeDashboard } from "../src/serialize";
 import { newNode } from "../src/editor";
-import { CONTAINER_KINDS, PANEL_KINDS } from "../src/kinds";
-import { specFor } from "../src/panels";
+import { CONTAINER_KINDS, WIDGET_KINDS } from "../src/kinds";
+import { specFor } from "../src/widgets";
 import { DEFAULT_CONFIG, activeDashboard, defaultSettings, findAccount, makeDashboard, migrate, uniqueName } from "../src/store";
 
 const VAULT = process.argv[2];
@@ -115,7 +115,7 @@ const rejects = (src: string, name: string) => {
 
 rejects("layout: {}", "a root with no type rejected");
 
-rejects("layout:\n  type: column\n  children: [{ type: bogus }]", "unknown panel type rejected");
+rejects("layout:\n  type: column\n  children: [{ type: bogus }]", "unknown widget type rejected");
 
 check("a stat with no property needs setup", needsSetup({ id: "t", type: "stat", property: "" } as never));
 
@@ -303,10 +303,10 @@ console.log("\nshipped default config");
 	let errs = 0;
 	renderNode(host as never, def.root, days, 20, () => errs++);
 	check("default config renders without error", errs === 0, `${errs} errors`);
-	const drawn = host.all.filter((e) => e.classes.has("udash-panel")).length;
+	const drawn = host.all.filter((e) => e.classes.has("udash-widget")).length;
 
-	check("default config draws every panel it declares", drawn === countPanels(def.root),
-		`${drawn} drawn, ${countPanels(def.root)} declared`);
+	check("default config draws every widget it declares", drawn === countWidgets(def.root),
+		`${drawn} drawn, ${countWidgets(def.root)} declared`);
 }
 
 console.log("\nlayout tree");
@@ -338,7 +338,7 @@ const row = tree.root.children[0] as ContainerNode;
 
 const inner = tree.root.children[1] as ContainerNode;
 
-check("row nests two panels", isContainer(row) && row.type === "row" && row.children.length === 3 - 1);
+check("row nests two widgets", isContainer(row) && row.type === "row" && row.children.length === 3 - 1);
 
 check("flex parsed inside a row", (row.children[0] as { flex?: number }).flex === 2);
 
@@ -352,7 +352,7 @@ check("a stat carries no implicit sizing", (inner.children[0] as { flex?: number
 
 
 
-rejects("layout:\n  type: line\n  property: weight", "panel as root rejected");
+rejects("layout:\n  type: line\n  property: weight", "widget as root rejected");
 
 rejects("layout:\n  type: row", "container with no children key rejected");
 
@@ -362,7 +362,7 @@ check("an empty container is allowed", (() => {
 		return isContainer(c.root) && c.root.children.length === 0;
 	})());
 
-rejects("layout:\n  type: line\n  property: w\n  children: [{ type: heatmap, property: lift }]", "panel with children rejected");
+rejects("layout:\n  type: line\n  property: w\n  children: [{ type: heatmap, property: lift }]", "widget with children rejected");
 
 rejects("layout:\n  type: row\n  children: [{ type: heatmap, property: lift, span: 2 }]", "span is rejected outright");
 
@@ -488,11 +488,11 @@ layout:
 	const cfg = base();
 	const root = cfg.root;
 
-	// drop a new panel between the two existing ones
+	// drop a new widget between the two existing ones
 	root.children.splice(1, 0, { id: "t", type: "upcoming" });
 	const afterInsert = parseDashboard(serializeDashboard(cfg));
 
-	check("an inserted panel survives the round trip",
+	check("an inserted widget survives the round trip",
 		afterInsert.root.children.map((c) => c.type).join() === "heatmap,upcoming,line",
 		afterInsert.root.children.map((c) => c.type).join());
 
@@ -501,10 +501,10 @@ layout:
 	const [last] = moved.root.children.splice(1, 1);
 
 	moved.root.children.splice(0, 0, last);
-	check("a moved panel survives",
+	check("a moved widget survives",
 		parseDashboard(serializeDashboard(moved)).root.children.map((c) => c.type).join() === "line,heatmap");
 
-	// wrap two panels in a row divider
+	// wrap two widgets in a row divider
 	const nested = base();
 	const taken = nested.root.children.splice(0, 2);
 
@@ -512,10 +512,10 @@ layout:
 	const afterWrap = parseDashboard(serializeDashboard(nested));
 	const wrapped = afterWrap.root.children[0];
 
-	check("a divider can wrap existing panels",
+	check("a divider can wrap existing widgets",
 		isContainer(wrapped) && wrapped.type === "row" && wrapped.children.length === 2);
 
-	// a freshly dropped panel is incomplete until configured
+	// a freshly dropped widget is incomplete until configured
 	const bare = base();
 
 	bare.root.children.push({ id: "t", type: "heatmap", property: "" });
@@ -523,7 +523,7 @@ layout:
 
 	try { parseDashboard(serializeDashboard(bare)); } catch { rejected = true; }
 
-	check("an unconfigured panel is caught by the parser", rejected);
+	check("an unconfigured widget is caught by the parser", rejected);
 
 	// dropping a divider makes an empty container, which must survive a save
 	const withDivider = base();
@@ -551,7 +551,7 @@ layout:
 
 	check("a nested empty divider re-parses", deepOk);
 
-	// moving an existing panel into a divider, which is the whole point of one
+	// moving an existing widget into a divider, which is the whole point of one
 	const intoDivider = base();
 
 	intoDivider.root.children.push({ id: "t", type: "row", children: [] });
@@ -563,11 +563,11 @@ layout:
 	const moved2 = parseDashboard(serializeDashboard(intoDivider));
 	const target = moved2.root.children.find((c) => isContainer(c));
 
-	check("a panel can move into a divider",
+	check("a widget can move into a divider",
 		!!target && isContainer(target) && target.children.length === 1 &&
 			target.children[0].type === "heatmap",
 		target && isContainer(target) ? target.children.map((c) => c.type).join() : "no divider");
-	check("the panel left its old parent", moved2.root.children.length === 2,
+	check("the widget left its old parent", moved2.root.children.length === 2,
 		`${moved2.root.children.length} top level children`);
 
 	// reordering within a parent, which is what the up/down buttons do
@@ -658,13 +658,13 @@ layout:
 
 	const good = serializeDashboard(guarded);
 
-	// a panel dropped but never configured
+	// a widget dropped but never configured
 	guarded.root.children.push({ id: "t", type: "heatmap", property: "" });
 	let broke = false;
 
 	try { parseDashboard(serializeDashboard(guarded)); } catch { broke = true; }
 
-	check("an unconfigured panel would break the layout", broke);
+	check("an unconfigured widget would break the layout", broke);
 
 	// dropping it, as the guard does, restores a readable layout
 	guarded.root.children.pop();
@@ -718,15 +718,15 @@ layout:
 
 	check("a new dashboard starts as a column", fresh.root.type === "column", fresh.root.type);
 
-	// removing a panel
+	// removing a widget
 	const pruned = base();
 
 	pruned.root.children.splice(0, 1);
-	check("a removed panel is gone",
+	check("a removed widget is gone",
 		parseDashboard(serializeDashboard(pruned)).root.children.length === 1);
 }
 
-console.log("\ncalendar panels");
+console.log("\ncalendar widgets");
 
 {
 	const cfg = parseDashboard(`
@@ -782,9 +782,9 @@ layout:
 console.log("\nline ranges");
 
 {
-	const dotsOf = (panel: Parameters<typeof renderLine>[2]) => {
+	const dotsOf = (widget: Parameters<typeof renderLine>[2]) => {
 		const e = new El();
-		renderLine(e, days, panel);
+		renderLine(e, days, widget);
 		const svg = e.all.find((x) => x.tag === "svg");
 
 		return {
@@ -846,20 +846,20 @@ console.log("\ntree rendering");
 	check("flex child inside it is sized", nestedEl.children[1].style["flex"] === "2 1 0");
 	check("an unsized child gets no inline flex", !nestedEl.children[0].style["flex"]);
 
-	const panels = host.all.filter((e) => e.classes.has("udash-panel"));
-	check("every leaf rendered a panel", panels.length === 5, `${panels.length}`);
+	const widgets = host.all.filter((e) => e.classes.has("udash-widget"));
+	check("every leaf rendered a widget", widgets.length === 5, `${widgets.length}`);
 	check("no error nodes", host.all.filter((e) => e.classes.has("udash-error")).length === 0);
 	check("heatmaps drawn inside the tree", host.byClass("udash-box").length > 0);
 	check("line chart drawn inside the tree", !!host.all.find((e) => e.tag === "svg"));
 }
 
-console.log("\nstats panel");
+console.log("\nstats widget");
 
 const stats = new El();
 
-/** The old stats panel is now a row of stat panels, so render them as one. */
-const renderStatRow = (host: El, d: typeof days, panels: never) => {
-	for (const p of panels as unknown as Parameters<typeof renderStat>[2][]) {
+/** The old stats widget is now a row of stat widgets, so render them as one. */
+const renderStatRow = (host: El, d: typeof days, widgets: never) => {
+	for (const p of widgets as unknown as Parameters<typeof renderStat>[2][]) {
 		renderStat(host as never, d, p);
 	}
 };
@@ -891,7 +891,7 @@ check("target rendered", stats.byClass("udash-tile-target").length === 1);
 
 console.log(`         values: ${JSON.stringify(values)}`);
 
-console.log("\nheatmap panel");
+console.log("\nheatmap widget");
 
 const hm = new El();
 
@@ -920,9 +920,9 @@ check("intensity produces varied shading", shades.size > 1, `${shades.size} dist
 console.log("\nheatmap ranges");
 
 {
-	const boxesOf = (panel: Parameters<typeof renderHeatmap>[2]) => {
+	const boxesOf = (widget: Parameters<typeof renderHeatmap>[2]) => {
 		const e = new El();
-		renderHeatmap(e, days, panel);
+		renderHeatmap(e, days, widget);
 		const all = e.byClass("udash-box");
 
 		return { total: all.length, pads: e.byClass("udash-box-pad").length, el: e };
@@ -970,7 +970,7 @@ rejects('layout:\n  type: column\n  children: [{ type: heatmap, property: lift, 
 
 rejects('layout:\n  type: column\n  children: [{ type: heatmap, property: lift, from: "2026-06-01", to: "2026-01-01" }]', "reversed window rejected");
 
-console.log("\nline panel");
+console.log("\nline widget");
 
 const line = new El();
 
@@ -996,7 +996,7 @@ renderLine(sparse, [days[0]], { id: "t", type: "line", property: "weight" });
 
 check("single reading degrades gracefully", sparse.byClass("udash-empty").length === 1);
 
-console.log("\nnote panel");
+console.log("\nnote widget");
 
 {
 	const shell = new El();
@@ -1030,9 +1030,9 @@ console.log("\nblank nodes from the palette");
 
 {
 	// the palette offers every registered kind, so dropping one has to create
-	// that kind. This used to fall through to a Month panel for anything the
+	// that kind. This used to fall through to a Month widget for anything the
 	// factory had no branch for, silently.
-	for (const kind of PANEL_KINDS) {
+	for (const kind of WIDGET_KINDS) {
 		check(`dropping ${kind} creates a ${kind}`, newNode(kind).type === kind, newNode(kind).type);
 	}
 
@@ -1043,9 +1043,9 @@ console.log("\nblank nodes from the palette");
 			node.type === kind && isContainer(node) && node.children.length === 0);
 	}
 
-	// a fresh panel with required fields must read as incomplete, so the editor
-	// opens its form instead of saving a panel that cannot render
-	for (const kind of PANEL_KINDS) {
+	// a fresh widget with required fields must read as incomplete, so the editor
+	// opens its form instead of saving a widget that cannot render
+	for (const kind of WIDGET_KINDS) {
 		const wants = specFor(kind).fields.some((f) => f.required);
 
 		check(`a new ${kind} ${wants ? "opens its form" : "needs no setup"}`,
@@ -1053,7 +1053,7 @@ console.log("\nblank nodes from the palette");
 	}
 }
 
-console.log("\nblank panel");
+console.log("\nblank widget");
 
 {
 	const host = new El();

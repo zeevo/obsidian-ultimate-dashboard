@@ -1,13 +1,13 @@
 import { App, Modal, Setting } from "obsidian";
 import { LayoutNode, isContainer } from "./layout-tree";
 import { ContainerKind, assertNever } from "./kinds";
-import { specFor } from "./panels";
+import { specFor } from "./widgets";
 import { Field, FieldKind, FieldValue } from "./schema";
 
 /**
- * The configuration form, generated from a panel's declared fields.
+ * The configuration form, generated from a widget's declared fields.
  *
- * There is no per-type branching here: a new panel type gets a form for free by
+ * There is no per-type branching here: a new widget type gets a form for free by
  * declaring its fields in the registry.
  */
 
@@ -17,7 +17,7 @@ export interface FormContext {
 	notes: string[];
 }
 
-export class PanelForm extends Modal {
+export class WidgetForm extends Modal {
 	onDismiss: (() => void) | null = null;
 
 	constructor(
@@ -39,7 +39,7 @@ export class PanelForm extends Modal {
 		} else {
 			const spec = specFor(node.type);
 
-			contentEl.createEl("h3", { text: `${spec.label} panel` });
+			contentEl.createEl("h3", { text: `${spec.label} widget` });
 
 			for (const field of spec.fields) this.field(field, node);
 
@@ -94,7 +94,7 @@ export class PanelForm extends Modal {
 
 	/** One control, chosen by the field's declared kind. */
 	private field<P>(field: Field<P>, node: LayoutNode): void {
-		// SAFETY: as in the serialiser, the keys come from this panel's own spec.
+		// SAFETY: as in the serialiser, the keys come from this widget's own spec.
 		const bag = node as unknown as Record<string, FieldValue | undefined>;
 		const get = () => bag[field.key];
 
@@ -197,7 +197,7 @@ export class PanelForm extends Modal {
 			}
 
 			default:
-				assertNever(field, "PanelForm.field");
+				assertNever(field, "WidgetForm.field");
 		}
 	}
 

@@ -13,7 +13,7 @@ export const ContainerKind = {
 
 export type ContainerKind = (typeof ContainerKind)[keyof typeof ContainerKind];
 
-export const PanelKind = {
+export const WidgetKind = {
 	Stat: "stat",
 	Line: "line",
 	Heatmap: "heatmap",
@@ -23,18 +23,18 @@ export const PanelKind = {
 	Blank: "blank",
 } as const;
 
-export type PanelKind = (typeof PanelKind)[keyof typeof PanelKind];
+export type WidgetKind = (typeof WidgetKind)[keyof typeof WidgetKind];
 
 export const CONTAINER_KINDS = Object.values(ContainerKind);
 
-export const PANEL_KINDS = Object.values(PanelKind);
+export const WIDGET_KINDS = Object.values(WidgetKind);
 
 export function toContainerKind(v: unknown): ContainerKind | null {
 	return CONTAINER_KINDS.find((k) => k === v) ?? null;
 }
 
-export function toPanelKind(v: unknown): PanelKind | null {
-	return PANEL_KINDS.find((k) => k === v) ?? null;
+export function toWidgetKind(v: unknown): WidgetKind | null {
+	return WIDGET_KINDS.find((k) => k === v) ?? null;
 }
 
 /**

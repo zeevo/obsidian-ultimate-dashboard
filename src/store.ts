@@ -39,7 +39,7 @@ export interface GoogleAccountRecord {
 /**
  * The OAuth client is one Google Cloud project and is shared, but any number of
  * accounts can be connected through it. Accounts are global: every dashboard
- * draws from the same pool of calendars, and a panel picks by name.
+ * draws from the same pool of calendars, and a widget picks by name.
  */
 export interface GoogleConfig {
 	clientId: string;

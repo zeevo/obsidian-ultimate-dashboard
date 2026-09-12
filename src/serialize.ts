@@ -1,13 +1,13 @@
 import { ContainerKind } from "./kinds";
 import { Dashboard, LayoutNode, isContainer } from "./layout-tree";
-import { specFor } from "./panels";
+import { specFor } from "./widgets";
 import { FieldValue } from "./schema";
 
 /**
  * The layout tree back to YAML.
  *
- * Fields come from each panel's declaration rather than a hand-written list per
- * type, so a field cannot be added to a panel and forgotten here. That failure
+ * Fields come from each widget's declaration rather than a hand-written list per
+ * type, so a field cannot be added to a widget and forgotten here. That failure
  * was silent: the option simply vanished the next time anyone edited.
  */
 
@@ -40,8 +40,8 @@ function optionsOf(node: LayoutNode): [string, string][] {
 
 		if (node.type === ContainerKind.Row) put("wrap", node.wrap);
 	} else {
-		// SAFETY: reading a panel by its own declared field keys is what the
-		// registry exists for; every key below comes from that panel's spec.
+		// SAFETY: reading a widget by its own declared field keys is what the
+		// registry exists for; every key below comes from that widget's spec.
 		const values = node as unknown as Record<string, FieldValue | undefined>;
 
 		for (const field of specFor(node.type).fields) {

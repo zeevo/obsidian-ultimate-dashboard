@@ -1,9 +1,9 @@
 import { Component, ItemView, MarkdownRenderer, WorkspaceLeaf, setIcon, setTooltip } from "obsidian";
-import { ConfigError, countPanels, parseDashboard } from "./layout-tree";
+import { ConfigError, countWidgets, parseDashboard } from "./layout-tree";
 import { readDays, stripFrontmatter } from "./data";
 import { CalendarFiller, DEFAULT_GAP, NoteFiller, renderNode } from "./layout";
 import { CalendarService } from "./calendar";
-import { CalendarPanel, NotePanel, UpcomingPanel } from "./panels";
+import { CalendarWidget, NoteWidget, UpcomingWidget } from "./widgets";
 import { fillCalendar, fillMonth, monthWindow } from "./render";
 import { EventModal, NameModal } from "./modal";
 import { VisualEditor } from "./editor";
@@ -185,22 +185,22 @@ export class DashboardView extends ItemView {
 		cog.addEventListener("click", () => this.openSettings());
 	}
 
-	/** Loads feeds in the background and fills each calendar panel when they land. */
+	/** Loads feeds in the background and fills each calendar widget when they land. */
 	private makeCalendarFiller(): CalendarFiller | undefined {
 		const sources = this.host.settings.calendars;
 
 		if (sources.length === 0) return undefined;
 
-		return (shell: HTMLElement, panel: CalendarPanel | UpcomingPanel) => {
-			const wanted = panel.calendars
-				? sources.filter((s) => panel.calendars!.includes(s.name))
+		return (shell: HTMLElement, widget: CalendarWidget | UpcomingWidget) => {
+			const wanted = widget.calendars
+				? sources.filter((s) => widget.calendars!.includes(s.name))
 				: sources;
 
 			if (wanted.length === 0) {
-				const missing = `No calendar named ${(panel.calendars ?? []).join(", ")}`;
+				const missing = `No calendar named ${(widget.calendars ?? []).join(", ")}`;
 
-				if (panel.type === "calendar") {
-					fillMonth(shell, panel, monthWindow(panel).first, [], [missing]);
+				if (widget.type === "calendar") {
+					fillMonth(shell, widget, monthWindow(widget).first, [], [missing]);
 				} else {
 					fillCalendar(shell, [], [missing], false);
 				}
@@ -208,8 +208,8 @@ export class DashboardView extends ItemView {
 				return;
 			}
 
-			if (panel.type === "calendar") {
-				const { first, from, to } = monthWindow(panel);
+			if (widget.type === "calendar") {
+				const { first, from, to } = monthWindow(widget);
 				const targets = this.writableTargets(wanted);
 
 				this.addEventButton(shell, wanted);
@@ -219,7 +219,7 @@ export class DashboardView extends ItemView {
 					if (!shell.isConnected) return;
 					fillMonth(
 						shell,
-						panel,
+						widget,
 						first,
 						events,
 						errors,
@@ -234,16 +234,16 @@ export class DashboardView extends ItemView {
 
 			const from = new Date();
 
-			if (!panel.past) from.setHours(0, 0, 0, 0);
-			const to = new Date(from.getTime() + (panel.ahead ?? 14) * 86400000);
+			if (!widget.past) from.setHours(0, 0, 0, 0);
+			const to = new Date(from.getTime() + (widget.ahead ?? 14) * 86400000);
 
 			void this.host.calendars.events(wanted, from, to).then(({ events, errors }) => {
 				if (!shell.isConnected) return;
 				const now = new Date();
 
 				const visible = events
-					.filter((e) => (panel.past ? true : e.end >= now))
-					.slice(0, panel.limit ?? 25);
+					.filter((e) => (widget.past ? true : e.end >= now))
+					.slice(0, widget.limit ?? 25);
 
 				fillCalendar(shell, visible, errors, wanted.length > 1);
 			});
@@ -256,12 +256,12 @@ export class DashboardView extends ItemView {
 	 * do in a normal note. The scroll offset is restored afterwards.
 	 */
 	private makeNoteFiller(): NoteFiller {
-		return (body: HTMLElement, panel: NotePanel) => {
-			const file = this.app.metadataCache.getFirstLinkpathDest(panel.path, "");
+		return (body: HTMLElement, widget: NoteWidget) => {
+			const file = this.app.metadataCache.getFirstLinkpathDest(widget.path, "");
 
 			if (!file) {
 				body.empty();
-				this.error(body, `No note called "${panel.path}"`);
+				this.error(body, `No note called "${widget.path}"`);
 
 				return;
 			}
@@ -277,9 +277,9 @@ export class DashboardView extends ItemView {
 				await MarkdownRenderer.render(this.app, stripFrontmatter(raw), body, file.path, owner);
 
 				if (!body.isConnected) return;
-				body.scrollTop = this.scrolled.get(panel.path) ?? 0;
+				body.scrollTop = this.scrolled.get(widget.path) ?? 0;
 				owner.registerDomEvent(body, "scroll", () =>
-					this.scrolled.set(panel.path, body.scrollTop),
+					this.scrolled.set(widget.path, body.scrollTop),
 				);
 			});
 		};
@@ -383,7 +383,7 @@ export class DashboardView extends ItemView {
 		editor.render(root.createDiv());
 	}
 
-	/** Frontmatter keys actually present, to offer while configuring a panel. */
+	/** Frontmatter keys actually present, to offer while configuring a widget. */
 	private knownProperties(folder: string): string[] {
 		const seen = new Set<string>();
 
@@ -408,10 +408,10 @@ export class DashboardView extends ItemView {
 
 			try {
 				const parsed = parseDashboard(source);
-				const n = countPanels(parsed.root);
+				const n = countWidgets(parsed.root);
 				status.removeClass("is-error");
 				status.addClass("is-valid");
-				status.setText(`Valid: ${n} ${n === 1 ? "panel" : "panels"}.`);
+				status.setText(`Valid: ${n} ${n === 1 ? "widget" : "widgets"}.`);
 
 				return true;
 			} catch (e) {

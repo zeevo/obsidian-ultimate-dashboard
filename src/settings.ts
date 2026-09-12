@@ -1,6 +1,8 @@
 import { App, Plugin, PluginSettingTab, Setting } from "obsidian";
 import { AddCalendarModal } from "./add-calendar";
-import { ConfigError, countPanels, parseDashboard } from "./layout-tree";
+import { CONTAINER_KINDS, WIDGET_KINDS } from "./kinds";
+import { ConfigError, countWidgets, parseDashboard } from "./layout-tree";
+import { RANGE_KEYS } from "./widgets";
 import { ConfirmModal, NameModal } from "./modal";
 import {
 	DEFAULT_CONFIG,
@@ -123,7 +125,7 @@ export class DashboardSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Layout")
-			.setDesc("YAML describing the panels. Saved as you type. The dashboard tab has the same editor behind its pencil button.")
+			.setDesc("YAML describing the widgets. Saved as you type. The dashboard tab has the same editor behind its pencil button.")
 			.addExtraButton((b) =>
 				b
 					.setIcon("rotate-ccw")
@@ -154,8 +156,8 @@ export class DashboardSettingTab extends PluginSettingTab {
 		});
 
 		new Setting(containerEl).setName("Reference").setDesc(
-			"Panels: stats, heatmap, line, calendar. Containers: row, column, grid. " +
-				"Ranges: year, months, days, or from/to. See the plugin README for the full list.",
+			`Widgets: ${WIDGET_KINDS.join(", ")}. Containers: ${CONTAINER_KINDS.join(", ")}. ` +
+				`Ranges: ${RANGE_KEYS.join(", ")}. See the plugin README for the full list.`,
 		);
 
 		this.displayCalendars(containerEl);
@@ -204,7 +206,7 @@ export class DashboardSettingTab extends PluginSettingTab {
 			cls: "setting-item-description",
 			text:
 				"Google accounts and ICS feeds share one pool. Every dashboard draws from it, " +
-				"and a calendar panel picks which to show by name.",
+				"and a calendar widget picks which to show by name.",
 		});
 
 		for (const cal of settings.calendars) {
@@ -290,10 +292,10 @@ export class DashboardSettingTab extends PluginSettingTab {
 
 		try {
 			const config = parseDashboard(source);
-			const count = countPanels(config.root);
+			const count = countWidgets(config.root);
 			this.status.addClass("is-valid");
 			this.status.removeClass("is-error");
-			this.status.setText(`Valid: ${count} ${count === 1 ? "panel" : "panels"}.`);
+			this.status.setText(`Valid: ${count} ${count === 1 ? "widget" : "widgets"}.`);
 
 			return true;
 		} catch (e) {

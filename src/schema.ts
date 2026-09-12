@@ -1,7 +1,7 @@
 /**
  * Field schemas.
  *
- * A panel declares its fields once. Parsing, serialising and the configuration
+ * A widget declares its fields once. Parsing, serialising and the configuration
  * form are all derived from that declaration, so adding a field is a one line
  * change instead of three edits that have to stay in lockstep. Forgetting to
  * write a field back was the failure this removes: it is silent, and it loses
@@ -36,7 +36,7 @@ export type FieldValue = string | number | boolean | readonly string[];
 export class FieldError extends Error {}
 
 interface Common<P> {
-	/** Typed against the panel it belongs to, so a rename cannot drift. */
+	/** Typed against the widget it belongs to, so a rename cannot drift. */
 	readonly key: Extract<keyof P, string>;
 	readonly label: string;
 	readonly hint?: string;

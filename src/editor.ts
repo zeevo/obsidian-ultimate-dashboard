@@ -1,9 +1,9 @@
 import { App, Notice, setIcon, setTooltip } from "obsidian";
 import { ConfigError, ContainerNode, Dashboard, LayoutNode, isContainer, needsSetup, nextId, parseDashboard } from "./layout-tree";
-import { Panel, PANELS, specFor } from "./panels";
-import { ContainerKind, PanelKind, toContainerKind, toPanelKind } from "./kinds";
+import { Widget, WIDGETS, specFor } from "./widgets";
+import { ContainerKind, WidgetKind, toContainerKind, toWidgetKind } from "./kinds";
 import { serializeDashboard } from "./serialize";
-import { FormContext, PanelForm } from "./panel-form";
+import { FormContext, WidgetForm } from "./widget-form";
 
 /**
  * The visual editor: a palette you drag from, and a canvas of drop zones that
@@ -19,31 +19,31 @@ const DIVIDERS = [
 /**
  * A fresh node of the given type, carrying only what the parser demands.
  *
- * Each panel declares its own starter in the registry. This used to be a chain
+ * Each widget declares its own starter in the registry. This used to be a chain
  * of `if`s ending in a bare `return calendar`, which meant a type nobody had
- * added a branch for came out as a Month panel with no error at all.
+ * added a branch for came out as a Month widget with no error at all.
  */
-export function newNode(type: PanelKind | ContainerKind): LayoutNode {
+export function newNode(type: WidgetKind | ContainerKind): LayoutNode {
 	const id = nextId();
 	const container = toContainerKind(type);
 
 	if (container !== null) return { id, type: container, children: [] };
 
-	const panel = toPanelKind(type);
+	const widget = toWidgetKind(type);
 
-	if (panel === null) throw new Error(`newNode: \`${type}\` is neither a container nor a panel`);
+	if (widget === null) throw new Error(`newNode: \`${type}\` is neither a container nor a widget`);
 
-	return { id, ...specFor(panel).blank() };
+	return { id, ...specFor(widget).blank() };
 }
 
 /** The label shown on a card and in the palette. */
-function label(type: PanelKind | ContainerKind): string {
+function label(type: WidgetKind | ContainerKind): string {
 	const divider = DIVIDERS.find((d) => d.type === type);
 
 	if (divider) return divider.label;
-	const panel = toPanelKind(type);
+	const widget = toWidgetKind(type);
 
-	return panel ? specFor(panel).label : type;
+	return widget ? specFor(widget).label : type;
 }
 
 /** Where a dragged item is headed: into `parent` at `index`. */
@@ -87,11 +87,11 @@ export class VisualEditor {
 	/* ------------------------------------------------------------ palette */
 
 	private renderPalette(el: HTMLElement): void {
-		el.createDiv({ cls: "udash-palette-label", text: "Panels" });
+		el.createDiv({ cls: "udash-palette-label", text: "Widgets" });
 
-		const panels = el.createDiv({ cls: "udash-palette-row" });
+		const widgets = el.createDiv({ cls: "udash-palette-row" });
 
-		for (const spec of Object.values(PANELS)) this.chip(panels, spec.type, spec.hint);
+		for (const spec of Object.values(WIDGETS)) this.chip(widgets, spec.type, spec.hint);
 
 		el.createDiv({ cls: "udash-palette-label", text: "Dividers" });
 
@@ -101,11 +101,11 @@ export class VisualEditor {
 
 		el.createDiv({
 			cls: "udash-palette-hint",
-			text: "Drag onto the canvas. Drag a panel already there to move it.",
+			text: "Drag onto the canvas. Drag a widget already there to move it.",
 		});
 	}
 
-	private chip(parent: HTMLElement, type: PanelKind | ContainerKind, hint: string): void {
+	private chip(parent: HTMLElement, type: WidgetKind | ContainerKind, hint: string): void {
 		const chip = parent.createDiv({ cls: "udash-chip", text: label(type) });
 
 		setTooltip(chip, hint);
@@ -139,7 +139,7 @@ export class VisualEditor {
 		this.acceptDrops(body, node);
 
 		if (node.children.length === 0) {
-			body.createDiv({ cls: "udash-empty-hint", text: "Drop a panel here" });
+			body.createDiv({ cls: "udash-empty-hint", text: "Drop a widget here" });
 
 			return;
 		}
@@ -152,7 +152,7 @@ export class VisualEditor {
 		});
 	}
 
-	private renderLeaf(el: HTMLElement, node: Panel, path: number[]): void {
+	private renderLeaf(el: HTMLElement, node: Widget, path: number[]): void {
 		const box = el.createDiv({ cls: `udash-node udash-node-leaf udash-node-${node.type}` });
 
 		this.makeDraggable(box, path);
@@ -219,7 +219,7 @@ export class VisualEditor {
 		this.setDragging(false);
 
 		// Defensive: a re-render mid-drag can leave a detached card marked, and a
-		// stale mark means a permanently greyed out panel.
+		// stale mark means a permanently greyed out widget.
 		for (const el of Array.from(this.hostEl?.querySelectorAll(".is-dragging-self") ?? [])) {
 			el.removeClass("is-dragging-self");
 		}
@@ -303,7 +303,7 @@ export class VisualEditor {
 			target.parent.children.splice(target.index, 0, node);
 
 			if (!isContainer(node) && needsSetup(node)) {
-				// Cancelling must not leave a half-made panel behind: it would be
+				// Cancelling must not leave a half-made widget behind: it would be
 				// serialised without its required fields and fail to parse.
 				this.configure(node, () => {
 					if (needsSetup(node)) {
@@ -343,7 +343,7 @@ export class VisualEditor {
 	}
 
 	private configure(node: LayoutNode, onDismiss?: () => void): void {
-		const modal = new PanelForm(this.app, node, this.context, () => this.commit());
+		const modal = new WidgetForm(this.app, node, this.context, () => this.commit());
 
 		if (onDismiss) modal.onDismiss = onDismiss;
 		modal.open();

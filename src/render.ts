@@ -1,4 +1,4 @@
-import { Agg, BlankPanel, CalendarPanel, HeatmapPanel, LinePanel, NotePanel, StatPanel, UpcomingPanel } from "./panels";
+import { Agg, BlankWidget, CalendarWidget, HeatmapWidget, LineWidget, NoteWidget, StatWidget, UpcomingWidget } from "./widgets";
 import { assertNever } from "./kinds";
 import { DayRecord, daysBetween, num, shiftDate, shiftMonths, toISO, today, truthy } from "./data";
 
@@ -15,17 +15,17 @@ function shade(hex: string, alpha: number): string {
 
 /* ------------------------------------------------------------------- stat */
 
-function aggregate(days: DayRecord[], panel: StatPanel): number | null {
-	const from = panel.back ? shiftDate(today(), -(panel.back - 1)) : null;
+function aggregate(days: DayRecord[], widget: StatWidget): number | null {
+	const from = widget.back ? shiftDate(today(), -(widget.back - 1)) : null;
 	const scope = from ? days.filter((d) => d.date >= from) : days;
-	const agg = panel.agg ?? Agg.Latest;
+	const agg = widget.agg ?? Agg.Latest;
 
-	if (agg === Agg.Count) return scope.filter((d) => truthy(d, panel.property)).length;
+	if (agg === Agg.Count) return scope.filter((d) => truthy(d, widget.property)).length;
 
 	const vals: number[] = [];
 
 	for (const day of scope) {
-		const v = num(day, panel.property);
+		const v = num(day, widget.property);
 
 		if (v !== null) vals.push(v);
 	}
@@ -47,13 +47,13 @@ function aggregate(days: DayRecord[], panel: StatPanel): number | null {
 }
 
 /** One number. Arrange several with rows and columns. */
-export function renderStat(el: HTMLElement, days: DayRecord[], panel: StatPanel): void {
-	const agg = panel.agg ?? Agg.Latest;
-	const value = aggregate(days, panel);
-	const precision = panel.precision ?? (agg === Agg.Count ? 0 : 1);
+export function renderStat(el: HTMLElement, days: DayRecord[], widget: StatWidget): void {
+	const agg = widget.agg ?? Agg.Latest;
+	const value = aggregate(days, widget);
+	const precision = widget.precision ?? (agg === Agg.Count ? 0 : 1);
 	const card = el.createDiv({ cls: "udash-tile" });
 
-	card.createDiv({ cls: "udash-tile-label", text: panel.label ?? panel.property });
+	card.createDiv({ cls: "udash-tile-label", text: widget.label ?? widget.property });
 
 	const valueEl = card.createDiv({ cls: "udash-tile-value" });
 
@@ -65,20 +65,20 @@ export function renderStat(el: HTMLElement, days: DayRecord[], panel: StatPanel)
 
 		valueEl.setText(shown);
 
-		if (panel.target !== undefined) {
-			valueEl.createSpan({ cls: "udash-tile-target", text: ` / ${panel.target}` });
+		if (widget.target !== undefined) {
+			valueEl.createSpan({ cls: "udash-tile-target", text: ` / ${widget.target}` });
 		}
 
-		if (panel.unit) valueEl.createSpan({ cls: "udash-tile-unit", text: ` ${panel.unit}` });
+		if (widget.unit) valueEl.createSpan({ cls: "udash-tile-unit", text: ` ${widget.unit}` });
 	}
 
-	card.createDiv({ cls: "udash-tile-sub", text: panel.back ? `last ${panel.back} days` : agg });
+	card.createDiv({ cls: "udash-tile-sub", text: widget.back ? `last ${widget.back} days` : agg });
 }
 
 /* ---------------------------------------------------------------- heatmap */
 
 /**
- * The date window a panel covers. `fallback` decides what an unset range means:
+ * The date window a widget covers. `fallback` decides what an unset range means:
  * a heatmap needs a concrete year to draw, a line chart just plots everything.
  */
 export interface DateWindow {
@@ -126,20 +126,20 @@ export function resolveWindow(
 
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-export function renderHeatmap(el: HTMLElement, days: DayRecord[], panel: HeatmapPanel): void {
-	const color = panel.color ?? DEFAULT_COLOR;
-	const { start, end } = resolveWindow(panel, days, "year");
+export function renderHeatmap(el: HTMLElement, days: DayRecord[], widget: HeatmapWidget): void {
+	const color = widget.color ?? DEFAULT_COLOR;
+	const { start, end } = resolveWindow(widget, days, "year");
 
 	const values = new Map<string, number>();
 
 	for (const day of days) {
 		if (day.date < start || day.date > end) continue;
 
-		if (!truthy(day, panel.property) && !(panel.intensity && num(day, panel.intensity) !== null)) {
+		if (!truthy(day, widget.property) && !(widget.intensity && num(day, widget.intensity) !== null)) {
 			continue;
 		}
 
-		values.set(day.date, panel.intensity ? (num(day, panel.intensity) ?? 1) : 1);
+		values.set(day.date, widget.intensity ? (num(day, widget.intensity) ?? 1) : 1);
 	}
 
 	// Scale to the 90th percentile, not the max: one unusually long ride would
@@ -152,7 +152,7 @@ export function renderHeatmap(el: HTMLElement, days: DayRecord[], panel: Heatmap
 
 	const wrap = el.createDiv({ cls: "udash-heatmap" });
 	const head = wrap.createDiv({ cls: "udash-heatmap-head" });
-	head.createSpan({ text: panel.title ?? panel.property });
+	head.createSpan({ text: widget.title ?? widget.property });
 	head.createSpan({
 		cls: "udash-heatmap-count",
 		text: `${values.size} ${values.size === 1 ? "day" : "days"}`,
@@ -193,7 +193,7 @@ export function renderHeatmap(el: HTMLElement, days: DayRecord[], panel: Heatmap
 			const ratio = scale > 0 ? Math.min(1, v / scale) : 1;
 			const bucket = Math.max(1, Math.ceil(ratio * 5));
 			box.style.backgroundColor = shade(color, 0.2 * bucket);
-			box.setAttr("aria-label", `${iso}: ${panel.intensity ? v : "yes"}`);
+			box.setAttr("aria-label", `${iso}: ${widget.intensity ? v : "yes"}`);
 		}
 
 		if (iso === todayISO) box.addClass("udash-box-today");
@@ -214,21 +214,21 @@ export function renderHeatmap(el: HTMLElement, days: DayRecord[], panel: Heatmap
 
 /* ------------------------------------------------------------------- line */
 
-export function renderLine(el: HTMLElement, days: DayRecord[], panel: LinePanel): void {
+export function renderLine(el: HTMLElement, days: DayRecord[], widget: LineWidget): void {
 	const all: { date: string; v: number }[] = [];
 
 	for (const day of days) {
-		const v = num(day, panel.property);
+		const v = num(day, widget.property);
 
 		if (v !== null) all.push({ date: day.date, v });
 	}
 
-	const { start, end } = resolveWindow(panel, days, "all");
+	const { start, end } = resolveWindow(widget, days, "all");
 	const points = all.filter((p) => p.date >= start && p.date <= end);
 
 	const wrap = el.createDiv({ cls: "udash-line" });
 	const head = wrap.createDiv({ cls: "udash-heatmap-head" });
-	head.createSpan({ text: panel.title ?? panel.property });
+	head.createSpan({ text: widget.title ?? widget.property });
 	head.createSpan({
 		cls: "udash-heatmap-count",
 		text: `${points.length} ${points.length === 1 ? "reading" : "readings"}`,
@@ -246,9 +246,9 @@ export function renderLine(el: HTMLElement, days: DayRecord[], panel: LinePanel)
 	// Rolling average over a calendar window, so gaps in logging do not distort
 	// it. Averaged over `all`, not `points`, so readings just before the window
 	// still inform the leftmost values instead of the line starting cold.
-	const smoothed = panel.rolling
+	const smoothed = widget.rolling
 		? points.map((p) => {
-				const from = ms(p.date) - (panel.rolling! - 1) * DAY;
+				const from = ms(p.date) - (widget.rolling! - 1) * DAY;
 				const win = all.filter((o) => ms(o.date) >= from && ms(o.date) <= ms(p.date));
 
 				return { date: p.date, v: win.reduce((s, o) => s + o.v, 0) / win.length };
@@ -286,7 +286,7 @@ export function renderLine(el: HTMLElement, days: DayRecord[], panel: LinePanel)
 		const v = lo + ((hi - lo) * i) / 3;
 		const y = Y(v).toFixed(1);
 		add("line", { x1: String(ml), y1: y, x2: String(W - mr), y2: y, class: "udash-grid" });
-		add("text", { x: String(ml - 8), y, "text-anchor": "end", "dominant-baseline": "middle", class: "udash-axis" }, v.toFixed(1) + (panel.unit ? ` ${panel.unit}` : ""));
+		add("text", { x: String(ml - 8), y, "text-anchor": "end", "dominant-baseline": "middle", class: "udash-axis" }, v.toFixed(1) + (widget.unit ? ` ${widget.unit}` : ""));
 	}
 
 	let seen = "";
@@ -307,7 +307,7 @@ export function renderLine(el: HTMLElement, days: DayRecord[], panel: LinePanel)
 		.map((p, i) => `${i ? "L" : "M"}${X(p.date).toFixed(1)} ${Y(p.v).toFixed(1)}`)
 		.join(" ");
 
-	add("path", { d, fill: "none", "stroke-width": "2", "stroke-linejoin": "round", "stroke-linecap": "round", stroke: panel.color ?? "var(--interactive-accent)" });
+	add("path", { d, fill: "none", "stroke-width": "2", "stroke-linejoin": "round", "stroke-linecap": "round", stroke: widget.color ?? "var(--interactive-accent)" });
 
 	wrap.appendChild(svg);
 }
@@ -334,10 +334,10 @@ const hhmm = (d: Date) =>
  * The agenda shell. Events arrive asynchronously, so this draws the heading and
  * a loading line, and `fillCalendar` replaces the body once the feeds resolve.
  */
-export function renderUpcoming(el: HTMLElement, panel: UpcomingPanel): HTMLElement {
+export function renderUpcoming(el: HTMLElement, widget: UpcomingWidget): HTMLElement {
 	const wrap = el.createDiv({ cls: "udash-calendar" });
 	const head = wrap.createDiv({ cls: "udash-heatmap-head" });
-	head.createSpan({ text: panel.title ?? "Upcoming" });
+	head.createSpan({ text: widget.title ?? "Upcoming" });
 	const body = wrap.createDiv({ cls: "udash-calendar-body" });
 	body.createDiv({ cls: "udash-empty", text: "Loading calendars\u2026" });
 
@@ -423,15 +423,15 @@ export interface MonthWindow {
 	to: Date;
 }
 
-/** The month a panel opens on, and the window covering its whole grid. */
-export function monthWindow(panel: CalendarPanel): MonthWindow {
+/** The month a widget opens on, and the window covering its whole grid. */
+export function monthWindow(widget: CalendarWidget): MonthWindow {
 	const now = new Date();
 
-	const first = panel.month
-		? new Date(Number(panel.month.slice(0, 4)), Number(panel.month.slice(5, 7)) - 1, 1)
+	const first = widget.month
+		? new Date(Number(widget.month.slice(0, 4)), Number(widget.month.slice(5, 7)) - 1, 1)
 		: new Date(now.getFullYear(), now.getMonth(), 1);
 
-	const weekStart = panel.weekStart ?? 0;
+	const weekStart = widget.weekStart ?? 0;
 	const lead = (first.getDay() - weekStart + 7) % 7;
 	const from = new Date(first);
 
@@ -446,17 +446,17 @@ export function monthWindow(panel: CalendarPanel): MonthWindow {
 }
 
 /** The month shell: heading, weekday row, and 42 empty day cells. */
-export function renderMonth(el: HTMLElement, panel: CalendarPanel, first: Date): HTMLElement {
+export function renderMonth(el: HTMLElement, widget: CalendarWidget, first: Date): HTMLElement {
 	const wrap = el.createDiv({ cls: "udash-month" });
 	const head = wrap.createDiv({ cls: "udash-heatmap-head" });
 
 	head.createSpan({
 		cls: "udash-month-title",
-		text: panel.title ?? `${MONTH_NAMES[first.getMonth()]} ${first.getFullYear()}`,
+		text: widget.title ?? `${MONTH_NAMES[first.getMonth()]} ${first.getFullYear()}`,
 	});
 	head.createDiv({ cls: "udash-calendar-actions" });
 
-	const weekStart = panel.weekStart ?? 0;
+	const weekStart = widget.weekStart ?? 0;
 	const dows = wrap.createDiv({ cls: "udash-month-dows" });
 
 	for (let i = 0; i < 7; i++) {
@@ -481,7 +481,7 @@ const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 /** Fills a shell from `renderMonth`. */
 export function fillMonth(
 	wrap: HTMLElement,
-	panel: CalendarPanel,
+	widget: CalendarWidget,
 	first: Date,
 	events: MonthEvent[],
 	errors: string[],
@@ -502,9 +502,9 @@ export function fillMonth(
 		err.createSpan({ text: message });
 	}
 
-	const { from } = monthWindow(panel);
+	const { from } = monthWindow(widget);
 	const today = new Date();
-	const maxPerDay = panel.maxPerDay ?? 3;
+	const maxPerDay = widget.maxPerDay ?? 3;
 
 	for (let i = 0; i < 42; i++) {
 		const day = new Date(from);
@@ -568,13 +568,13 @@ const DEFAULT_NOTE_HEIGHT = 320;
  * app and a component to own whatever it creates, neither of which belongs in
  * a module that is otherwise pure DOM.
  */
-export function renderNote(el: HTMLElement, panel: NotePanel): HTMLElement {
+export function renderNote(el: HTMLElement, widget: NoteWidget): HTMLElement {
 	const wrap = el.createDiv({ cls: "udash-note" });
 	const head = wrap.createDiv({ cls: "udash-heatmap-head" });
-	head.createSpan({ text: panel.title ?? panel.path });
+	head.createSpan({ text: widget.title ?? widget.path });
 
 	const body = wrap.createDiv({ cls: "udash-note-body" });
-	body.style.maxHeight = `${panel.height ?? DEFAULT_NOTE_HEIGHT}px`;
+	body.style.maxHeight = `${widget.height ?? DEFAULT_NOTE_HEIGHT}px`;
 	body.createDiv({ cls: "udash-empty", text: "Loading\u2026" });
 
 	return body;
@@ -590,7 +590,7 @@ const DEFAULT_BLANK_HEIGHT = 120;
  * layout out before deciding what goes in each slot, and for padding a row so
  * its siblings sit where you want them.
  */
-export function renderBlank(el: HTMLElement, panel: BlankPanel): void {
+export function renderBlank(el: HTMLElement, widget: BlankWidget): void {
 	const box = el.createDiv({ cls: "udash-blank" });
-	box.style.minHeight = `${panel.height ?? DEFAULT_BLANK_HEIGHT}px`;
+	box.style.minHeight = `${widget.height ?? DEFAULT_BLANK_HEIGHT}px`;
 }

@@ -554,7 +554,7 @@
 
 /* A card is itself a drop target: the edge you are nearest shows where it lands. */
 /* Only a fade. `pointer-events: none` here also stops the card receiving
-   dragend, so the class was never cleared and panels stayed greyed out. */
+   dragend, so the class was never cleared and widgets stayed greyed out. */
 .udash-editor .udash-node.is-dragging-self {
 	opacity: 0.4;
 }

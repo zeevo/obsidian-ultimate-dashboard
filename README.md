@@ -4,7 +4,7 @@ An Obsidian plugin that renders stat tiles, year heatmaps and rolling-average
 line charts from daily note frontmatter, driven by a declarative YAML layout.
 
 No runtime dependencies. It reads frontmatter through Obsidian's own
-`metadataCache` and draws every panel itself, so it needs neither Dataview nor
+`metadataCache` and draws every widget itself, so it needs neither Dataview nor
 Heatmap Calendar.
 
 ## Using it
@@ -17,17 +17,17 @@ second one.
 
 The pencil opens edit mode, which has two tabs.
 
-**Visual** is a palette and a canvas. Drag a panel type onto a drop zone to add
+**Visual** is a palette and a canvas. Drag a widget type onto a drop zone to add
 it; drag one already on the canvas to move it anywhere, including into a
 divider. Dropping a type that needs settings, like a heatmap with no property
 yet, opens its configuration straight away.
 
 Each card carries a pencil to reconfigure and a bin to remove. Dropping is
 handled per container rather than per gap: the whole container is a target, and
-a line shows which side of a card the panel will land on.
+a line shows which side of a card the widget will land on.
 
 The palette's **dividers** are containers: *Columns* lays its children out side
-by side, *Rows* stacks them. Drop panels inside one to segment the dashboard,
+by side, *Rows* stacks them. Drop widgets inside one to segment the dashboard,
 and nest them for more involved layouts.
 
 Every container, the outermost one included, has a pencil. Its **Layout**
@@ -53,13 +53,13 @@ Community plugins → Ultimate Dashboard.
 
 Layouts are stored in the plugin's `data.json`, not in your notes.
 
-## Adding a panel type
+## Adding a widget type
 
-Panels are declared once, in `src/panels.ts`:
+Widgets are declared once, in `src/widgets.ts`:
 
 ```ts
-const heatmap: PanelSpec<HeatmapPanel> = {
-  type: PanelKind.Heatmap,
+const heatmap: WidgetSpec<HeatmapWidget> = {
+  type: WidgetKind.Heatmap,
   label: "Heatmap",
   hint: "A year of activity",
   fields: [
@@ -73,7 +73,7 @@ const heatmap: PanelSpec<HeatmapPanel> = {
 ```
 
 Parsing, validation, serialising, the configuration form and the editor palette
-are all derived from that declaration. `fields` keys are typed against the panel
+are all derived from that declaration. `fields` keys are typed against the widget
 interface, so a rename is a compile error rather than a field that silently
 stops loading. Cross-field rules that a per-field schema cannot see go in
 `validate`.
@@ -82,7 +82,7 @@ stops loading. Cross-field rules that a per-field schema cannot see go in
 
 ```yaml
 folder: Daily
-panels:
+widgets:
   - type: stats
     tiles:
       - { label: Weight, property: weight, agg: latest, unit: lb }
@@ -111,12 +111,12 @@ Notes are picked up when they live in `folder` and are named `YYYY-MM-DD`.
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `folder` | `Daily` | Folder holding the dated notes |
-| `gap` | `20` | Space between panels, in pixels |
-| `panels` | required | List of panels |
+| `gap` | `20` | Space between widgets, in pixels |
+| `widgets` | required | List of widgets |
 
 ### Layout
 
-Panels are leaves of a layout tree. Three container types hold `children`:
+Widgets are leaves of a layout tree. Three container types hold `children`:
 
 | Container | Behaviour |
 |-----------|-----------|
@@ -146,8 +146,8 @@ layout:
         - { type: heatmap, property: read }
 ```
 
-Containers nest to 8 levels. The root must be a container, and a panel cannot
-take `children`: wrap panels in a `row` or `column` instead.
+Containers nest to 8 levels. The root must be a container, and a widget cannot
+take `children`: wrap widgets in a `row` or `column` instead.
 
 **Container options**
 
@@ -196,7 +196,7 @@ two is an error rather than a silent precedence rule.
   months: 6
 ```
 
-The default differs by panel, because the panels differ: a heatmap must draw a
+The default differs by widget, because the widgets differ: a heatmap must draw a
 concrete calendar so it falls back to the current year, while a line chart has
 no such constraint and plots everything it has.
 
@@ -226,7 +226,7 @@ A `+` appears in the header when any of its calendars can take new events.
 
 ### `type: calendar`
 
-A month grid, like a wall calendar. Always six rows, so the panel does not
+A month grid, like a wall calendar. Always six rows, so the widget does not
 change height from month to month.
 
 | Key | Meaning |
@@ -244,12 +244,12 @@ change height from month to month.
   maxPerDay: 4
 ```
 
-An event spanning several days appears in every cell it covers. Both panels
+An event spanning several days appears in every cell it covers. Both widgets
 refer to calendars by name, from the one pool configured in settings.
 
 ### Creating events
 
-A panel showing at least one writable Google calendar gets a `+` in its header.
+A widget showing at least one writable Google calendar gets a `+` in its header.
 On a month grid you can also **click any day** to open the form with that date
 already filled in; days are only clickable when a writable calendar is in scope,
 so a read-only dashboard stays inert.
@@ -267,7 +267,7 @@ Treat that URL as a password. No account, no auth, works on mobile.
 **Google, read and write.** Needed to create events. One OAuth client you
 create, through which you can connect **any number of accounts**: press Add
 account again for a second one. Calendars from every account and every ICS feed
-land in a single pool, and a panel picks from it by name, so one dashboard can
+land in a single pool, and a widget picks from it by name, so one dashboard can
 mix work and personal calendars while another shows neither.
 
 Setting up the OAuth client:
@@ -294,7 +294,7 @@ allow it, and cached for ten minutes. **Ultimate Dashboard: Refresh calendars**
 clears the cache.
 
 The form asks for a title, date, times or all-day, and location, then writes
-straight to Google. ICS panels have no button: the format has no write verb.
+straight to Google. ICS widgets have no button: the format has no write verb.
 
 The ICS reader handles folded lines, escaped text, all-day and timed events,
 `EXDATE`, and `RRULE` for daily, weekly (including `BYDAY`), monthly and yearly
@@ -305,7 +305,7 @@ needs a timezone database.
 ### Removed
 
 
-`panels`, `grid`, `span`, `columns` and `minWidth` are gone. A layout is one
+`widgets`, `grid`, `span`, `columns` and `minWidth` are gone. A layout is one
 tree of rows and columns, sized with `flex`. The parser rejects each removed key
 with a message naming its replacement.
 
@@ -314,7 +314,7 @@ a forward window on an agenda. It is now `back` and `ahead`.
 
 ### `type: stat`
 
-One number. Arrange several with rows and columns, like any other panel.
+One number. Arrange several with rows and columns, like any other widget.
 
 | Key | Meaning |
 |-----|---------|
@@ -421,7 +421,7 @@ try row heights.
 npm install
 npm run dev        # watch build, deploys to the vault on each save
 npm run build      # typecheck + minified build + deploy
-npm test           # render every panel against a real vault
+npm test           # render every widget against a real vault
 npm run lint       # oxlint with the vendored anti-slop ruleset
 npm run lint:fix   # apply the autofixable rules
 ```
@@ -456,8 +456,8 @@ Settings → Community plugins.
 
 ## Design notes
 
-- Colour comes from Obsidian theme variables, so panels follow light and dark
+- Colour comes from Obsidian theme variables, so widgets follow light and dark
   mode with no configuration.
 - The block redraws when frontmatter changes, via a `metadataCache` hook.
 - Config errors render inline in the note rather than failing silently, naming
-  the panel and the problem.
+  the widget and the problem.

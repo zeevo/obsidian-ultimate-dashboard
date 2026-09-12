@@ -1,13 +1,13 @@
 import { parseYaml } from "obsidian";
-import { ContainerKind, assertNever, toContainerKind, toPanelKind } from "./kinds";
-import { NodeBase, Panel, specFor } from "./panels";
+import { ContainerKind, assertNever, toContainerKind, toWidgetKind } from "./kinds";
+import { NodeBase, Widget, specFor } from "./widgets";
 import { FieldError, isComplete, parseFields } from "./schema";
 
 /**
  * The layout document: parsing, and the tree it produces.
  *
- * Panel options are not parsed here. Each panel declares its fields in the
- * registry and this walks that declaration, so a new panel type needs no change
+ * Widget options are not parsed here. Each widget declares its fields in the
+ * registry and this walks that declaration, so a new widget type needs no change
  * to this file.
  */
 
@@ -20,10 +20,10 @@ export interface ContainerNode extends NodeBase {
 	wrap?: boolean;
 }
 
-export type LayoutNode = ContainerNode | Panel;
+export type LayoutNode = ContainerNode | Widget;
 
 export interface Dashboard {
-	/** Folder holding the dated notes every panel reads. */
+	/** Folder holding the dated notes every widget reads. */
 	folder: string;
 	root: ContainerNode;
 }
@@ -65,7 +65,7 @@ function readFlex(raw: Record<string, unknown>, where: string): number | undefin
 	return v;
 }
 
-/** Keys handled by the tree rather than by a panel's own field list. */
+/** Keys handled by the tree rather than by a widget's own field list. */
 const STRUCTURAL = ["type", "flex", "children", "gap", "wrap"] as const;
 
 function parseNode(raw: unknown, where: string, depth: number): LayoutNode {
@@ -114,23 +114,23 @@ function parseNode(raw: unknown, where: string, depth: number): LayoutNode {
 		};
 	}
 
-	const panel = toPanelKind(node.type);
+	const widget = toWidgetKind(node.type);
 
-	if (panel === null) {
+	if (widget === null) {
 		throw new ConfigError(
 			`${where}: unknown type "${String(node.type)}". ` +
-				`Expected a panel or a container (row, column).`,
+				`Expected a widget or a container (row, column).`,
 		);
 	}
 
 	if (node.children !== undefined) {
 		throw new ConfigError(
-			`${where}: \`${panel}\` is a panel and cannot have \`children\`. ` +
-				`Wrap panels in a row or column instead.`,
+			`${where}: \`${widget}\` is a widget and cannot have \`children\`. ` +
+				`Wrap widgets in a row or column instead.`,
 		);
 	}
 
-	const spec = specFor(panel);
+	const spec = specFor(widget);
 	let fields;
 
 	try {
@@ -140,11 +140,11 @@ function parseNode(raw: unknown, where: string, depth: number): LayoutNode {
 	}
 
 
-	const built: Record<string, unknown> = { id: nextId(), type: panel, flex, ...fields };
+	const built: Record<string, unknown> = { id: nextId(), type: widget, flex, ...fields };
 
-	// SAFETY: every key came from this panel's own field declaration, and every
+	// SAFETY: every key came from this widget's own field declaration, and every
 	// value was validated against the kind that declaration names.
-	const parsed = built as unknown as Panel;
+	const parsed = built as unknown as Widget;
 	const complaint = spec.validate?.(parsed);
 
 	if (complaint) throw new ConfigError(`${where}: ${complaint}`);
@@ -163,9 +163,11 @@ export function parseDashboard(source: string): Dashboard {
 
 	const doc = asRecord(raw, "the block");
 
+	// spelled the old way on purpose: this detects configs written before the
+	// rename, which really do carry a top level `panels` key
 	if (doc.panels !== undefined) {
 		throw new ConfigError(
-			"`panels` is gone. Use `layout:` with a row or column holding the panels.",
+			"`panels` is gone. Use `layout:` with a row or column holding the widgets.",
 		);
 	}
 
@@ -173,7 +175,7 @@ export function parseDashboard(source: string): Dashboard {
 	const root = parseNode(doc.layout, "layout", 0);
 
 	if (!isContainer(root)) {
-		throw new ConfigError(`layout: the root must be a row or column, not a "${root.type}" panel`);
+		throw new ConfigError(`layout: the root must be a row or column, not a "${root.type}" widget`);
 	}
 
 	return {
@@ -182,15 +184,15 @@ export function parseDashboard(source: string): Dashboard {
 	};
 }
 
-/** Whether a panel still needs configuring before it can be drawn. */
+/** Whether a widget still needs configuring before it can be drawn. */
 export function needsSetup(node: LayoutNode): boolean {
 	if (isContainer(node)) return false;
 
 	return !isComplete(specFor(node.type).fields, node);
 }
 
-export function countPanels(node: LayoutNode): number {
-	return isContainer(node) ? node.children.reduce((n, c) => n + countPanels(c), 0) : 1;
+export function countWidgets(node: LayoutNode): number {
+	return isContainer(node) ? node.children.reduce((n, c) => n + countWidgets(c), 0) : 1;
 }
 
 export { assertNever };

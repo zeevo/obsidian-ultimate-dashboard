@@ -1,10 +1,10 @@
-import { PanelKind } from "./kinds";
+import { WidgetKind } from "./kinds";
 import { Field, FieldKind } from "./schema";
 
 /**
- * The panel registry.
+ * The widget registry.
  *
- * Every panel type is declared here once: its fields, its label, and how it
+ * Every widget type is declared here once: its fields, its label, and how it
  * draws. Parsing, serialising, the configuration form and the editor palette
  * are all derived from these declarations, so adding a type is one entry rather
  * than edits scattered across six files.
@@ -34,10 +34,10 @@ export function toAgg(v: unknown): Agg | null {
 	return AGGS.find((a) => a === v) ?? null;
 }
 
-/* -------------------------------------------------------------- the panels */
+/* -------------------------------------------------------------- the widgets */
 
-export interface StatPanel extends NodeBase {
-	type: typeof PanelKind.Stat;
+export interface StatWidget extends NodeBase {
+	type: typeof WidgetKind.Stat;
 	/** Caption. Defaults to the property name. */
 	label?: string;
 	property: string;
@@ -58,8 +58,8 @@ interface Ranged {
 	to?: string;
 }
 
-export interface LinePanel extends NodeBase, Ranged {
-	type: typeof PanelKind.Line;
+export interface LineWidget extends NodeBase, Ranged {
+	type: typeof WidgetKind.Line;
 	title?: string;
 	property: string;
 	rolling?: number;
@@ -67,16 +67,16 @@ export interface LinePanel extends NodeBase, Ranged {
 	color?: string;
 }
 
-export interface HeatmapPanel extends NodeBase, Ranged {
-	type: typeof PanelKind.Heatmap;
+export interface HeatmapWidget extends NodeBase, Ranged {
+	type: typeof WidgetKind.Heatmap;
 	title?: string;
 	property: string;
 	intensity?: string;
 	color?: string;
 }
 
-export interface UpcomingPanel extends NodeBase {
-	type: typeof PanelKind.Upcoming;
+export interface UpcomingWidget extends NodeBase {
+	type: typeof WidgetKind.Upcoming;
 	title?: string;
 	calendars?: readonly string[];
 	/** How far ahead to look. Named to avoid colliding with `back`, which looks the other way. */
@@ -85,8 +85,8 @@ export interface UpcomingPanel extends NodeBase {
 	past?: boolean;
 }
 
-export interface CalendarPanel extends NodeBase {
-	type: typeof PanelKind.Calendar;
+export interface CalendarWidget extends NodeBase {
+	type: typeof WidgetKind.Calendar;
 	title?: string;
 	calendars?: readonly string[];
 	month?: string;
@@ -94,8 +94,8 @@ export interface CalendarPanel extends NodeBase {
 	weekStart?: number;
 }
 
-export interface NotePanel extends NodeBase {
-	type: typeof PanelKind.Note;
+export interface NoteWidget extends NodeBase {
+	type: typeof WidgetKind.Note;
 	/** Caption. Defaults to the note's own path. */
 	title?: string;
 	/** A link path, written the way you would inside `[[ ]]`. */
@@ -104,27 +104,27 @@ export interface NotePanel extends NodeBase {
 	height?: number;
 }
 
-export interface BlankPanel extends NodeBase {
-	type: typeof PanelKind.Blank;
+export interface BlankWidget extends NodeBase {
+	type: typeof WidgetKind.Blank;
 	/** How tall the placeholder stands, in pixels. */
 	height?: number;
 }
 
-export type Panel =
-	| StatPanel
-	| LinePanel
-	| HeatmapPanel
-	| UpcomingPanel
-	| CalendarPanel
-	| NotePanel
-	| BlankPanel;
+export type Widget =
+	| StatWidget
+	| LineWidget
+	| HeatmapWidget
+	| UpcomingWidget
+	| CalendarWidget
+	| NoteWidget
+	| BlankWidget;
 
 /* ------------------------------------------------------------ field groups */
 
 /**
- * A date window, shared by the panels that plot over time. `back` looks
+ * A date window, shared by the widgets that plot over time. `back` looks
  * backwards from today; `ahead` on an agenda looks forwards. They used to share
- * the name `days`, which meant opposite things on different panels.
+ * the name `days`, which meant opposite things on different widgets.
  */
 const RANGE_FIELDS: readonly Field<Ranged>[] = [
 	{ key: "year", kind: FieldKind.Number, label: "Year", min: 1970 },
@@ -139,50 +139,50 @@ export const RANGE_KEYS = ["year", "months", "back", "from", "to"] as const;
 /* ---------------------------------------------------------------- registry */
 
 /**
- * A new panel of this type, before the tree assigns it an id. Written as a
+ * A new widget of this type, before the tree assigns it an id. Written as a
  * conditional so it distributes over the union rather than collapsing to the
- * keys every panel shares.
+ * keys every widget shares.
  */
-export type NewPanel<P extends Panel = Panel> = P extends Panel ? Omit<P, "id"> : never;
+export type NewWidget<P extends Widget = Widget> = P extends Widget ? Omit<P, "id"> : never;
 
-export interface PanelSpec<P extends Panel = Panel> {
+export interface WidgetSpec<P extends Widget = Widget> {
 	readonly type: P["type"];
 	readonly label: string;
 	readonly hint: string;
 	readonly fields: readonly Field<P>[];
 	/**
 	 * What dropping this type onto the canvas creates. Required fields start
-	 * empty, so a fresh panel reads as needing setup and opens its form.
+	 * empty, so a fresh widget reads as needing setup and opens its form.
 	 */
-	blank(): NewPanel<P>;
+	blank(): NewWidget<P>;
 	/** A one line summary for the editor's card. */
-	summary(panel: P): string;
+	summary(widget: P): string;
 	/**
 	 * Rules spanning more than one field, which a per-field schema cannot see.
-	 * Returns a message, or null when the panel is coherent.
+	 * Returns a message, or null when the widget is coherent.
 	 */
-	validate?(panel: P): string | null;
+	validate?(widget: P): string | null;
 }
 
 /** Ranges are mutually exclusive, and a window must run forwards. */
-function validateRange(panel: Ranged): string | null {
+function validateRange(widget: Ranged): string | null {
 	const set = RANGE_KEYS.filter(
-		(k) => k !== "to" && panel[k as keyof Ranged] !== undefined,
+		(k) => k !== "to" && widget[k as keyof Ranged] !== undefined,
 	);
 
 	const named = set.map((k) => (k === "from" ? "from/to" : k));
 
 	if (named.length > 1) return `pick one range only, got ${named.join(" and ")}`;
 
-	if (panel.from && panel.to && panel.from > panel.to) {
-		return `\`from\` (${panel.from}) is after \`to\` (${panel.to})`;
+	if (widget.from && widget.to && widget.from > widget.to) {
+		return `\`from\` (${widget.from}) is after \`to\` (${widget.to})`;
 	}
 
 	return null;
 }
 
-const stat: PanelSpec<StatPanel> = {
-	type: PanelKind.Stat,
+const stat: WidgetSpec<StatWidget> = {
+	type: WidgetKind.Stat,
 	label: "Stat",
 	hint: "One number",
 	fields: [
@@ -199,12 +199,12 @@ const stat: PanelSpec<StatPanel> = {
 		{ key: "unit", kind: FieldKind.Text, label: "Unit", placeholder: "lb" },
 		{ key: "precision", kind: FieldKind.Number, label: "Decimal places", min: 0 },
 	],
-	blank: () => ({ type: PanelKind.Stat, property: "" }),
+	blank: () => ({ type: WidgetKind.Stat, property: "" }),
 	summary: (p) => (p.property ? `${p.agg ?? Agg.Latest} of ${p.property}` : "not configured"),
 };
 
-const line: PanelSpec<LinePanel> = {
-	type: PanelKind.Line,
+const line: WidgetSpec<LineWidget> = {
+	type: WidgetKind.Line,
 	label: "Line chart",
 	hint: "A value over time",
 	fields: [
@@ -215,13 +215,13 @@ const line: PanelSpec<LinePanel> = {
 		{ key: "color", kind: FieldKind.Colour, label: "Color", placeholder: "#3b82f6" },
 		...RANGE_FIELDS,
 	],
-	blank: () => ({ type: PanelKind.Line, property: "" }),
+	blank: () => ({ type: WidgetKind.Line, property: "" }),
 	summary: (p) => p.property || "not configured",
 	validate: validateRange,
 };
 
-const heatmap: PanelSpec<HeatmapPanel> = {
-	type: PanelKind.Heatmap,
+const heatmap: WidgetSpec<HeatmapWidget> = {
+	type: WidgetKind.Heatmap,
 	label: "Heatmap",
 	hint: "A year of activity",
 	fields: [
@@ -231,13 +231,13 @@ const heatmap: PanelSpec<HeatmapPanel> = {
 		{ key: "color", kind: FieldKind.Colour, label: "Color", placeholder: "#3b82f6" },
 		...RANGE_FIELDS,
 	],
-	blank: () => ({ type: PanelKind.Heatmap, property: "" }),
+	blank: () => ({ type: WidgetKind.Heatmap, property: "" }),
 	summary: (p) => p.property || "not configured",
 	validate: validateRange,
 };
 
-const upcoming: PanelSpec<UpcomingPanel> = {
-	type: PanelKind.Upcoming,
+const upcoming: WidgetSpec<UpcomingWidget> = {
+	type: WidgetKind.Upcoming,
 	label: "Upcoming",
 	hint: "Agenda list",
 	fields: [
@@ -247,12 +247,12 @@ const upcoming: PanelSpec<UpcomingPanel> = {
 		{ key: "limit", kind: FieldKind.Number, label: "Most events" },
 		{ key: "past", kind: FieldKind.Toggle, label: "Include today's finished events" },
 	],
-	blank: () => ({ type: PanelKind.Upcoming }),
+	blank: () => ({ type: WidgetKind.Upcoming }),
 	summary: (p) => `${p.ahead ?? 14} days`,
 };
 
-const calendar: PanelSpec<CalendarPanel> = {
-	type: PanelKind.Calendar,
+const calendar: WidgetSpec<CalendarWidget> = {
+	type: WidgetKind.Calendar,
 	label: "Month",
 	hint: "Month grid",
 	fields: [
@@ -270,12 +270,12 @@ const calendar: PanelSpec<CalendarPanel> = {
 			],
 		},
 	],
-	blank: () => ({ type: PanelKind.Calendar }),
+	blank: () => ({ type: WidgetKind.Calendar }),
 	summary: (p) => p.month ?? "this month",
 };
 
-const note: PanelSpec<NotePanel> = {
-	type: PanelKind.Note,
+const note: WidgetSpec<NoteWidget> = {
+	type: WidgetKind.Note,
 	label: "Note",
 	hint: "Another note, embedded",
 	fields: [
@@ -289,31 +289,31 @@ const note: PanelSpec<NotePanel> = {
 		},
 		{ key: "height", kind: FieldKind.Number, label: "Height (px)", min: 60 },
 	],
-	blank: () => ({ type: PanelKind.Note, path: "" }),
+	blank: () => ({ type: WidgetKind.Note, path: "" }),
 	summary: (p) => p.path || "not configured",
 };
 
-const blankPanel: PanelSpec<BlankPanel> = {
-	type: PanelKind.Blank,
+const blankWidget: WidgetSpec<BlankWidget> = {
+	type: WidgetKind.Blank,
 	label: "Blank",
 	hint: "A placeholder that holds space",
 	fields: [{ key: "height", kind: FieldKind.Number, label: "Height (px)" }],
-	blank: () => ({ type: PanelKind.Blank }),
+	blank: () => ({ type: WidgetKind.Blank }),
 	summary: () => "placeholder",
 };
 
-/** Every panel type, keyed by its discriminant. */
-export const PANELS: { readonly [K in PanelKind]: PanelSpec } = {
-	[PanelKind.Stat]: stat as PanelSpec,
-	[PanelKind.Line]: line as PanelSpec,
-	[PanelKind.Heatmap]: heatmap as PanelSpec,
-	[PanelKind.Upcoming]: upcoming as PanelSpec,
-	[PanelKind.Calendar]: calendar as PanelSpec,
-	[PanelKind.Note]: note as PanelSpec,
-	[PanelKind.Blank]: blankPanel as PanelSpec,
+/** Every widget type, keyed by its discriminant. */
+export const WIDGETS: { readonly [K in WidgetKind]: WidgetSpec } = {
+	[WidgetKind.Stat]: stat as WidgetSpec,
+	[WidgetKind.Line]: line as WidgetSpec,
+	[WidgetKind.Heatmap]: heatmap as WidgetSpec,
+	[WidgetKind.Upcoming]: upcoming as WidgetSpec,
+	[WidgetKind.Calendar]: calendar as WidgetSpec,
+	[WidgetKind.Note]: note as WidgetSpec,
+	[WidgetKind.Blank]: blankWidget as WidgetSpec,
 };
 
-export function specFor(type: PanelKind): PanelSpec {
-	return PANELS[type];
+export function specFor(type: WidgetKind): WidgetSpec {
+	return WIDGETS[type];
 }
 
