@@ -706,15 +706,15 @@
 	min-width: 0;
 }
 
-/* an hourly strip can run to 48 columns, so it scrolls inside the tile rather
-   than squeezing every column down to nothing */
 .udash-weather-hourly {
 	overflow-x: auto;
 	padding-bottom: 2px;
 }
 
+/* grow to fill a wide tile, but never shrink past legible: a narrow tile then
+   overflows and scrolls instead of crushing twelve columns into nothing */
 .udash-weather-hourly .udash-weather-cell {
-	flex: 0 0 42px;
+	flex: 1 0 42px;
 }
 
 .udash-weather-when {
