@@ -42,8 +42,6 @@ export interface Place {
 }
 
 export interface Conditions {
-	/** Local to the place, as the API returned it. Not the reader's clock. */
-	time: string;
 	temperature: number;
 	feelsLike: number;
 	code: number;
@@ -261,7 +259,6 @@ export function parseForecast(raw: unknown): Forecast {
 
 	return {
 		current: {
-			time: typeof current.time === "string" ? current.time : "",
 			temperature: number(current.temperature_2m, "`current.temperature_2m`"),
 			feelsLike: number(current.apparent_temperature, "`current.apparent_temperature`"),
 			code: number(current.weather_code, "`current.weather_code`"),

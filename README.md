@@ -486,12 +486,6 @@ and low are separate rather than written `78/66`, which read as a fraction. The
 hourly strip fills a wide tile and scrolls sideways in a narrow one rather than
 squeezing twelve columns into nothing.
 
-In `hourly`, the column covering right now is highlighted and labelled with the
-clock time rather than the hour, so `2:00am` sits where `2am` would. That is
-also the only thing on the tile that says how fresh it is, which matters given
-readings are cached for half an hour. The time is the forecast location's own,
-so a tile pointed at Tokyo shows Tokyo's clock.
-
 A chance of rain appears only at 20% or above, because a 3% chance is not
 information. Wind is reported in mph beside Fahrenheit and km/h beside Celsius.
 
