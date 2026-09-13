@@ -650,11 +650,12 @@ export function renderWeather(el: HTMLElement, widget: WeatherWidget): HTMLEleme
 	const wrap = el.createDiv({ cls: "udash-weather" });
 	const head = wrap.createDiv({ cls: "udash-heatmap-head" });
 	head.createSpan({ text: widget.title ?? widget.place });
+	head.createSpan({ cls: "udash-weather-where" });
 
 	const body = wrap.createDiv({ cls: "udash-weather-body" });
 	body.createDiv({ cls: "udash-empty", text: "Loading\u2026" });
 
-	return body;
+	return wrap;
 }
 
 /** A temperature with no decimal point: a tile has no room for the tenths. */
@@ -664,9 +665,58 @@ function degrees(value: number, unit: string): string {
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+/**
+ * "2pm" from a naive ISO stamp. Read off the string rather than through `Date`,
+ * because these times are local to the place being forecast, not to the reader.
+ */
+export function hourLabel(iso: string): string {
+	const hour = Number(iso.slice(11, 13));
+
+	return `${hour % 12 === 0 ? 12 : hour % 12}${hour < 12 ? "am" : "pm"}`;
+}
+
+/** "6:39am", from the same kind of stamp. */
+export function clockLabel(iso: string): string {
+	const hour = Number(iso.slice(11, 13));
+
+	return `${hour % 12 === 0 ? 12 : hour % 12}:${iso.slice(14, 16)}${hour < 12 ? "am" : "pm"}`;
+}
+
+/** One column of a forecast strip. */
+function strip(parent: HTMLElement, cls: string): HTMLElement {
+	return parent.createDiv({ cls: `udash-weather-strip ${cls}` });
+}
+
+function column(parent: HTMLElement, label: string, code: number, value: string, rain: number): void {
+	const cell = parent.createDiv({ cls: "udash-weather-cell" });
+
+	cell.createDiv({ cls: "udash-weather-when", text: label });
+	cell.createDiv({ cls: "udash-weather-glyph", text: describeWeather(code).icon });
+	cell.createDiv({ cls: "udash-weather-range", text: value });
+
+	// a 3% chance is not information; at 20% it starts to be
+	if (rain >= 20) cell.createDiv({ cls: "udash-weather-rain", text: `${Math.round(rain)}%` });
+}
+
 /** Fills a shell created by `renderWeather`. */
-export function fillWeather(body: HTMLElement, weather: Weather): void {
-	const { current, days, unit } = weather.forecast;
+export function fillWeather(wrap: HTMLElement, weather: Weather, widget: WeatherWidget): void {
+	// SAFETY: created by renderWeather on this element; the guard below covers
+	// the shell having been replaced under us.
+	const body = wrap.querySelector(".udash-weather-body") as HTMLElement | null;
+
+	// SAFETY: as above, and every read of it is guarded.
+	const where = wrap.querySelector(".udash-weather-where") as HTMLElement | null;
+
+	if (!body) return;
+
+	const { current, days, hours, unit, windUnit } = weather.forecast;
+
+	// what the place name actually resolved to, so a wrong Springfield shows
+	if (where) {
+		where.setText(weather.place.name);
+		where.setAttr("title", weather.place.name);
+	}
+
 	body.empty();
 
 	const now = describeWeather(current.code, current.isDay);
@@ -683,26 +733,40 @@ export function fillWeather(body: HTMLElement, weather: Weather): void {
 
 	readout.createDiv({ cls: "udash-weather-label", text: feels });
 
-	// today is already summarised above, so the strip starts tomorrow
+	const extras: string[] = [];
+
+	if (current.wind !== undefined) extras.push(`${Math.round(current.wind)} ${windUnit ?? ""} wind`.trim());
+
+	if (current.humidity !== undefined) extras.push(`${Math.round(current.humidity)}% humidity`);
+
+	const today = days[0];
+
+	if (widget.sun && today?.sunrise && today.sunset) {
+		extras.push(`\u2191 ${clockLabel(today.sunrise)}`, `\u2193 ${clockLabel(today.sunset)}`);
+	}
+
+	if (extras.length > 0) {
+		readout.createDiv({ cls: "udash-weather-extras", text: extras.join("  \u00b7  ") });
+	}
+
+	if (hours.length > 0) {
+		const row = strip(body, "udash-weather-hourly");
+
+		for (const hour of hours) {
+			column(row, hourLabel(hour.time), hour.code, degrees(hour.temperature, ""), hour.rain);
+		}
+	}
+
+	// today is already the headline, so the daily strip starts tomorrow
 	const ahead = days.slice(1);
 
 	if (ahead.length === 0) return;
 
-	const strip = body.createDiv({ cls: "udash-weather-days" });
+	const row = strip(body, "udash-weather-days");
 
 	for (const day of ahead) {
-		const cell = strip.createDiv({ cls: "udash-weather-day" });
 		const when = new Date(day.date + "T00:00:00");
 
-		cell.createDiv({ cls: "udash-weather-dow", text: WEEKDAYS[when.getDay()] });
-		cell.createDiv({ cls: "udash-weather-glyph", text: describeWeather(day.code).icon });
-		cell.createDiv({
-			cls: "udash-weather-range",
-			text: `${Math.round(day.high)}/${Math.round(day.low)}`,
-		});
-
-		if (day.rain >= 20) {
-			cell.createDiv({ cls: "udash-weather-rain", text: `${Math.round(day.rain)}%` });
-		}
+		column(row, WEEKDAYS[when.getDay()], day.code, `${Math.round(day.high)}/${Math.round(day.low)}`, day.rain);
 	}
 }

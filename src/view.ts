@@ -3,7 +3,7 @@ import { ConfigError, countWidgets, parseDashboard } from "./layout-tree";
 import { readDays, stripFrontmatter } from "./data";
 import { CalendarFiller, DEFAULT_GAP, NoteFiller, WeatherFiller, renderNode } from "./layout";
 import { CalendarService } from "./calendar";
-import { WeatherService, WeatherUnit } from "./weather";
+import { WeatherQuery, WeatherService, WeatherUnit } from "./weather";
 import { CalendarWidget, NoteWidget, UpcomingWidget, WeatherWidget } from "./widgets";
 import { fillCalendar, fillMonth, fillWeather, monthWindow } from "./render";
 import { EventModal, NameModal } from "./modal";
@@ -296,22 +296,31 @@ export class DashboardView extends ItemView {
 	 * vault, so an uncached widget would call out on every keystroke.
 	 */
 	private makeWeatherFiller(): WeatherFiller {
-		return (body: HTMLElement, widget: WeatherWidget) => {
-			const units = widget.units ?? WeatherUnit.Fahrenheit;
+		return (shell: HTMLElement, widget: WeatherWidget) => {
+			// the strip skips today, so a three day forecast needs four days back
+			const query: WeatherQuery = {
+				place: widget.place,
+				unit: widget.units ?? WeatherUnit.Fahrenheit,
+				days: (widget.days ?? 3) + 1,
+				hours: widget.hours ?? 0,
+				wind: widget.wind === true,
+				humidity: widget.humidity === true,
+				sun: widget.sun === true,
+			};
 
 			void (async () => {
 				try {
-					const weather = await this.host.weather.weather(widget.place, units, (widget.days ?? 3) + 1);
+					const weather = await this.host.weather.weather(query);
 
 					// the view may have redrawn while the request was in flight
-					if (!body.isConnected) return;
-					fillWeather(body, weather);
+					if (!shell.isConnected) return;
+					fillWeather(shell, weather, widget);
 				} catch (e) {
-					if (!body.isConnected) return;
-					body.empty();
+					if (!shell.isConnected) return;
+					shell.empty();
 					// SAFETY: the service throws WeatherError and requestUrl rejects with
 					// an Error; the fallback covers anything else that reaches here.
-					this.error(body, `${widget.place}: ${(e as Error).message || "could not load"}`);
+					this.error(shell, `${widget.place}: ${(e as Error).message || "could not load"}`);
 				}
 			})();
 		};

@@ -42,8 +42,8 @@ export type CalendarFiller = (el: HTMLElement, widget: CalendarWidget | Upcoming
 /** Renders an embedded note into the body a note tile made for it. */
 export type NoteFiller = (body: HTMLElement, widget: NoteWidget) => void;
 
-/** Fetches a forecast and fills the body a weather tile made for it. */
-export type WeatherFiller = (body: HTMLElement, widget: WeatherWidget) => void;
+/** Fetches a forecast and fills the shell a weather tile made for it. */
+export type WeatherFiller = (shell: HTMLElement, widget: WeatherWidget) => void;
 
 /**
  * Widgets whose content arrives from the network draw a shell first and are
@@ -110,9 +110,9 @@ export function renderNode(
 			}
 
 			case WidgetKind.Weather: {
-				const body = renderWeather(el, node);
+				const shell = renderWeather(el, node);
 
-				fillers.weather?.(body, node);
+				fillers.weather?.(shell, node);
 				break;
 			}
 

@@ -121,7 +121,13 @@ export interface WeatherWidget extends NodeBase {
 	place: string;
 	/** Days of forecast to show under the current conditions. */
 	days?: number;
+	/** Hours of hourly forecast, starting with the current hour. */
+	hours?: number;
 	units?: WeatherUnit;
+	wind?: boolean;
+	humidity?: boolean;
+	/** Today's sunrise and sunset. */
+	sun?: boolean;
 }
 
 export type Widget =
@@ -338,11 +344,21 @@ const weather: WidgetSpec<WeatherWidget> = {
 		},
 		{ key: "days", kind: FieldKind.Number, label: "Forecast days", min: 1 },
 		{
+			key: "hours",
+			kind: FieldKind.Number,
+			label: "Hourly forecast",
+			hint: "Hours to show, starting with this one. Leave empty for none",
+			min: 1,
+		},
+		{
 			key: "units",
 			kind: FieldKind.Choice,
 			label: "Units",
 			choices: WEATHER_UNITS.map((u) => ({ value: u, label: u === "celsius" ? "Celsius" : "Fahrenheit" })),
 		},
+		{ key: "wind", kind: FieldKind.Toggle, label: "Show wind" },
+		{ key: "humidity", kind: FieldKind.Toggle, label: "Show humidity" },
+		{ key: "sun", kind: FieldKind.Toggle, label: "Show sunrise and sunset" },
 	],
 	blank: () => ({ type: WidgetKind.Weather, place: "" }),
 	summary: (w) => w.place || "not configured",

@@ -26,6 +26,17 @@ export interface Conditions {
 	feelsLike: number;
 	code: number;
 	isDay: boolean;
+	/** Only present when the widget asked for it. */
+	wind?: number;
+	humidity?: number;
+}
+
+export interface HourForecast {
+	/** Local to the place, as the API returned it. */
+	time: string;
+	temperature: number;
+	code: number;
+	rain: number;
 }
 
 export interface DayForecast {
@@ -35,13 +46,30 @@ export interface DayForecast {
 	low: number;
 	/** Chance of precipitation, as a percentage. */
 	rain: number;
+	sunrise?: string;
+	sunset?: string;
 }
 
 export interface Forecast {
 	current: Conditions;
 	days: DayForecast[];
+	/** Empty unless the widget asked for an hourly forecast. */
+	hours: HourForecast[];
 	/** Whatever the API labelled the temperatures, so nothing is hardcoded. */
 	unit: string;
+	windUnit?: string;
+}
+
+/** Everything that changes the request, and therefore the cache entry. */
+export interface WeatherQuery {
+	place: string;
+	unit: WeatherUnit;
+	days: number;
+	/** Hours of hourly forecast. Zero asks for none. */
+	hours: number;
+	wind: boolean;
+	humidity: boolean;
+	sun: boolean;
 }
 
 /* ------------------------------------------------------------- conditions */
@@ -126,30 +154,78 @@ export function parsePlaces(raw: unknown): Place[] {
 	});
 }
 
+/** A list of ISO stamps, which the API sends for every time series. */
+function stamps(v: unknown, where: string): string[] {
+	if (!Array.isArray(v) || v.some((d) => typeof d !== "string")) {
+		throw new WeatherError(`${where} was not a list of times`);
+	}
+
+	return v as string[];
+}
+
+/** Optional stamps: absent when the widget did not ask for that field. */
+function maybeStamps(v: unknown): string[] {
+	return Array.isArray(v) && v.every((d) => typeof d === "string") ? (v as string[]) : [];
+}
+
+/** Optional numbers, for the same reason. */
+function maybeNumbers(v: unknown): number[] {
+	return Array.isArray(v) && v.every((n) => typeof n === "number") ? (v as number[]) : [];
+}
+
+function maybeNumber(v: unknown): number | undefined {
+	return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+}
+
+/** mp/h is what Open-Meteo calls miles per hour. Nobody else does. */
+function tidyUnit(unit: string): string {
+	return unit === "mp/h" ? "mph" : unit;
+}
+
 export function parseForecast(raw: unknown): Forecast {
 	const doc = record(raw, "the forecast response");
 	const current = record(doc.current, "`current`");
 	const daily = record(doc.daily, "`daily`");
 	const units = record(doc.current_units, "`current_units`");
 
-	const dates = daily.time;
-
-	if (!Array.isArray(dates) || dates.some((d) => typeof d !== "string")) {
-		throw new WeatherError("`daily.time` was not a list of dates");
-	}
-
+	const dates = stamps(daily.time, "`daily.time`");
 	const codes = numbers(daily.weather_code, "`daily.weather_code`");
 	const highs = numbers(daily.temperature_2m_max, "`daily.temperature_2m_max`");
 	const lows = numbers(daily.temperature_2m_min, "`daily.temperature_2m_min`");
 	const rain = numbers(daily.precipitation_probability_max, "`daily.precipitation_probability_max`");
+	const sunrise = maybeStamps(daily.sunrise);
+	const sunset = maybeStamps(daily.sunset);
 
-	const days: DayForecast[] = (dates as string[]).map((date, i) => ({
+	const days: DayForecast[] = dates.map((date, i) => ({
 		date,
 		code: codes[i] ?? 0,
 		high: highs[i] ?? 0,
 		low: lows[i] ?? 0,
 		rain: rain[i] ?? 0,
+		sunrise: sunrise[i],
+		sunset: sunset[i],
 	}));
+
+	const hours: HourForecast[] = [];
+
+	if (doc.hourly !== undefined) {
+		const hourly = record(doc.hourly, "`hourly`");
+		const times = stamps(hourly.time, "`hourly.time`");
+		const temps = numbers(hourly.temperature_2m, "`hourly.temperature_2m`");
+		const hourCodes = numbers(hourly.weather_code, "`hourly.weather_code`");
+		const hourRain = maybeNumbers(hourly.precipitation_probability);
+
+		for (const [i, time] of times.entries()) {
+			hours.push({
+				time,
+				temperature: temps[i] ?? 0,
+				code: hourCodes[i] ?? 0,
+				rain: hourRain[i] ?? 0,
+			});
+		}
+	}
+
+	const windUnit = typeof units.wind_speed_10m === "string" ? tidyUnit(units.wind_speed_10m) : undefined;
 
 	return {
 		current: {
@@ -157,9 +233,13 @@ export function parseForecast(raw: unknown): Forecast {
 			feelsLike: number(current.apparent_temperature, "`current.apparent_temperature`"),
 			code: number(current.weather_code, "`current.weather_code`"),
 			isDay: current.is_day !== 0,
+			wind: maybeNumber(current.wind_speed_10m),
+			humidity: maybeNumber(current.relative_humidity_2m),
 		},
 		days,
+		hours,
 		unit: typeof units.temperature_2m === "string" ? units.temperature_2m : "°",
+		windUnit,
 	};
 }
 
@@ -169,6 +249,9 @@ const FORECAST_TTL_MS = 30 * 60 * 1000;
 
 /** Open-Meteo serves at most 16 days; more than a week is noise on a tile. */
 const MAX_DAYS = 7;
+
+/** Two days of hourly columns is already more than a tile can show legibly. */
+const MAX_HOURS = 48;
 
 export interface Weather {
 	place: Place;
@@ -211,9 +294,53 @@ export class WeatherService {
 		return found[0];
 	}
 
-	async weather(name: string, unit: WeatherUnit, days: number): Promise<Weather> {
-		const wanted = Math.max(1, Math.min(MAX_DAYS, days));
-		const key = `${name.trim().toLowerCase()}|${unit}|${wanted}`;
+	/** The URL for one query. Only the fields a widget asked for are requested. */
+	private url(place: Place, query: WeatherQuery): string {
+		const current = ["temperature_2m", "apparent_temperature", "weather_code", "is_day"];
+
+		if (query.wind) current.push("wind_speed_10m");
+
+		if (query.humidity) current.push("relative_humidity_2m");
+
+		const daily = [
+			"weather_code",
+			"temperature_2m_max",
+			"temperature_2m_min",
+			"precipitation_probability_max",
+		];
+
+		if (query.sun) daily.push("sunrise", "sunset");
+
+		let url =
+			"https://api.open-meteo.com/v1/forecast" +
+			`?latitude=${place.latitude}&longitude=${place.longitude}` +
+			`&current=${current.join(",")}&daily=${daily.join(",")}` +
+			`&temperature_unit=${query.unit}&timezone=auto&forecast_days=${query.days}`;
+
+		// mph reads better beside Fahrenheit; km/h beside Celsius
+		if (query.wind) {
+			url += `&wind_speed_unit=${query.unit === WeatherUnit.Fahrenheit ? "mph" : "kmh"}`;
+		}
+
+		if (query.hours > 0) {
+			url +=
+				"&hourly=temperature_2m,weather_code,precipitation_probability" +
+				`&forecast_hours=${query.hours}`;
+		}
+
+		return url;
+	}
+
+	async weather(request: WeatherQuery): Promise<Weather> {
+		const query: WeatherQuery = {
+			...request,
+			place: request.place.trim(),
+			days: Math.max(1, Math.min(MAX_DAYS, request.days)),
+			hours: Math.max(0, Math.min(MAX_HOURS, request.hours)),
+		};
+
+		// every option changes the response, so every option belongs in the key
+		const key = JSON.stringify({ ...query, place: query.place.toLowerCase() });
 		const hit = this.cache.get(key);
 
 		if (hit && Date.now() - hit.at < FORECAST_TTL_MS) return hit.value;
@@ -223,16 +350,8 @@ export class WeatherService {
 		if (running) return running;
 
 		const job = (async () => {
-			const place = await this.locate(name);
-
-			const url =
-				"https://api.open-meteo.com/v1/forecast" +
-				`?latitude=${place.latitude}&longitude=${place.longitude}` +
-				"&current=temperature_2m,apparent_temperature,weather_code,is_day" +
-				"&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max" +
-				`&temperature_unit=${unit}&timezone=auto&forecast_days=${wanted}`;
-
-			const value = { place, forecast: await this.read(url, parseForecast) };
+			const place = await this.locate(query.place);
+			const value = { place, forecast: await this.read(this.url(place, query), parseForecast) };
 			this.cache.set(key, { at: Date.now(), value });
 			this.inflight.delete(key);
 

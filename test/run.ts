@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { load } from "js-yaml";
 import { ConfigError, ContainerNode, countWidgets, isContainer, needsSetup, parseDashboard } from "../src/layout-tree";
 import { DayRecord, shiftDate, stripFrontmatter, today } from "../src/data";
-import { currentStreak, fillMonth, monthWindow, renderBlank, renderHeatmap, renderLine, renderMonth, renderNote, renderStat, fillWeather, renderWeather } from "../src/render";
+import { currentStreak, fillMonth, monthWindow, renderBlank, renderHeatmap, renderLine, renderMonth, renderNote, renderStat, clockLabel, fillWeather, hourLabel, renderWeather } from "../src/render";
 import { renderNode } from "../src/layout";
 import { parseICS } from "../src/ics";
 import { serializeDashboard } from "../src/serialize";
@@ -1174,14 +1174,21 @@ console.log("\nweather");
 
 	const FORECAST = JSON.parse(`{"latitude":39.746895,"longitude":-104.987076,"timezone":"America/Denver",
 		"current_units":{"time":"iso8601","temperature_2m":"°F","apparent_temperature":"°F",
-		"weather_code":"wmo code","is_day":""},
-		"current":{"time":"2026-09-12T22:00","temperature_2m":66.9,"apparent_temperature":63.8,
-		"weather_code":0,"is_day":0},
+		"weather_code":"wmo code","is_day":"","wind_speed_10m":"mp/h","relative_humidity_2m":"%"},
+		"current":{"time":"2026-09-12T22:15","temperature_2m":66.9,"apparent_temperature":63.8,
+		"weather_code":0,"is_day":0,"wind_speed_10m":3.7,"relative_humidity_2m":43},
+		"hourly_units":{"time":"iso8601","temperature_2m":"°F"},
+		"hourly":{"time":["2026-09-12T22:00","2026-09-12T23:00","2026-09-13T00:00","2026-09-13T13:00"],
+		"temperature_2m":[66.9,64.7,62.9,80.1],"weather_code":[0,0,3,0],
+		"precipitation_probability":[3,6,29,45]},
 		"daily_units":{"time":"iso8601","temperature_2m_max":"°F"},
 		"daily":{"time":["2026-09-12","2026-09-13","2026-09-14","2026-09-15"],
 		"weather_code":[3,3,3,53],"temperature_2m_max":[81.8,94.6,85.3,74.9],
 		"temperature_2m_min":[55.7,55.1,68.2,59.3],
-		"precipitation_probability_max":[3,6,29,45]}}`.replace(/\n\s*/g, ""));
+		"precipitation_probability_max":[3,6,29,45],
+		"sunrise":["2026-09-12T06:38","2026-09-13T06:39","2026-09-14T06:40","2026-09-15T06:41"],
+		"sunset":["2026-09-12T19:13","2026-09-13T19:11","2026-09-14T19:10","2026-09-15T19:08"]}}`
+		.replace(/\n\s*/g, ""));
 
 	const places = parsePlaces(GEOCODE);
 
@@ -1196,10 +1203,28 @@ console.log("\nweather");
 	check("night is detected from is_day", forecast.current.isDay === false);
 	check("the unit is read off the response", forecast.unit === "°F", forecast.unit);
 	check("every forecast day parsed", forecast.days.length === 4, String(forecast.days.length));
-	check("highs and lows line up",
-		forecast.days[1].high === 94.6 && forecast.days[1].low === 55.1);
+	check("highs and lows line up", forecast.days[1].high === 94.6 && forecast.days[1].low === 55.1);
+	check("wind and humidity parsed", forecast.current.wind === 3.7 && forecast.current.humidity === 43);
+	check("mp/h is renamed to something people write", forecast.windUnit === "mph", forecast.windUnit);
+	check("sun times parsed", forecast.days[0].sunrise === "2026-09-12T06:38");
+	check("hourly parsed", forecast.hours.length === 4, String(forecast.hours.length));
+	check("an hour carries its own reading",
+		forecast.hours[1].temperature === 64.7 && forecast.hours[1].code === 0);
 
-	// a malformed response must say so rather than render nonsense
+	// the optional sections are absent unless the widget asked for them
+	const bare = parseForecast({
+		current: { temperature_2m: 5, apparent_temperature: 5, weather_code: 0, is_day: 1 },
+		current_units: { temperature_2m: "°C" },
+		daily: {
+			time: ["2026-01-01"], weather_code: [0], temperature_2m_max: [5],
+			temperature_2m_min: [1], precipitation_probability_max: [0],
+		},
+	});
+
+	check("no hourly section means no hours", bare.hours.length === 0);
+	check("no wind asked for means none reported", bare.current.wind === undefined);
+	check("no sun asked for means none reported", bare.days[0].sunrise === undefined);
+
 	let threw = false;
 
 	try {
@@ -1216,33 +1241,64 @@ console.log("\nweather");
 	check("rain at night keeps its glyph", describeWeather(61, false).icon === describeWeather(61, true).icon);
 	check("an unknown code reports the number", describeWeather(42).label === "Code 42", describeWeather(42).label);
 
+	// read off the string, so a forecast for another timezone is not shifted
+	check("midnight is 12am", hourLabel("2026-09-13T00:00") === "12am", hourLabel("2026-09-13T00:00"));
+	check("noon is 12pm", hourLabel("2026-09-13T12:00") === "12pm", hourLabel("2026-09-13T12:00"));
+	check("afternoon converts", hourLabel("2026-09-13T13:00") === "1pm", hourLabel("2026-09-13T13:00"));
+	check("a clock keeps its minutes", clockLabel("2026-09-13T06:39") === "6:39am", clockLabel("2026-09-13T06:39"));
+	check("an evening clock converts", clockLabel("2026-09-13T19:11") === "7:11pm", clockLabel("2026-09-13T19:11"));
+
+	const widget = { id: "t", type: "weather", place: "Denver" } as const;
 	const host = new El();
-	const body = renderWeather(host, { id: "t", type: "weather", place: "Denver" });
+	const shell = renderWeather(host, widget);
 
-	check("the shell carries the place", host.all.some((e) => e.text === "Denver"));
+	check("the shell carries the typed place", host.all.some((e) => e.text === "Denver"));
 
-	fillWeather(body as never, { place: places[0], forecast });
+	fillWeather(shell as never, { place: places[0], forecast }, widget);
 
-	check("the temperature is rounded", body.byClass("udash-weather-temp")[0]?.text === "67°F",
-		body.byClass("udash-weather-temp")[0]?.text);
+	check("the resolved location is shown",
+		shell.byClass("udash-weather-where")[0]?.text === "Denver, Colorado, United States",
+		shell.byClass("udash-weather-where")[0]?.text);
+
+	check("the temperature is rounded", shell.byClass("udash-weather-temp")[0]?.text === "67°F",
+		shell.byClass("udash-weather-temp")[0]?.text);
 	check("feels-like is shown when it differs",
-		body.byClass("udash-weather-label")[0]?.text === "Clear, feels 64°F",
-		body.byClass("udash-weather-label")[0]?.text);
+		shell.byClass("udash-weather-label")[0]?.text === "Clear, feels 64°F",
+		shell.byClass("udash-weather-label")[0]?.text);
 
-	// today is already the headline, so the strip starts tomorrow
-	check("the strip skips today", body.byClass("udash-weather-day").length === 3,
-		String(body.byClass("udash-weather-day").length));
-	check("a day shows its range", body.byClass("udash-weather-range")[0]?.text === "95/55",
-		body.byClass("udash-weather-range")[0]?.text);
+	check("wind and humidity reach the readout",
+		shell.byClass("udash-weather-extras")[0]?.text === "4 mph wind  ·  43% humidity",
+		shell.byClass("udash-weather-extras")[0]?.text);
 
-	// a 6% chance is not worth the ink; 29% and 45% are
-	check("only meaningful rain chances are shown", body.byClass("udash-weather-rain").length === 2,
-		String(body.byClass("udash-weather-rain").length));
+	// today is already the headline, so the daily strip starts tomorrow
+	check("the daily strip skips today", shell.byClass("udash-weather-days")[0]?.children.length === 3,
+		String(shell.byClass("udash-weather-days")[0]?.children.length));
+	check("an hourly strip is drawn", shell.byClass("udash-weather-hourly")[0]?.children.length === 4,
+		String(shell.byClass("udash-weather-hourly")[0]?.children.length));
+	check("hours are labelled by the hour", shell.all.some((e) => e.text === "11pm"));
+	check("a day shows its range", shell.all.some((e) => e.text === "95/55"));
 
-	const dry = new El();
-	fillWeather(dry as never, { place: places[0], forecast: { ...forecast, days: [forecast.days[0]] } });
+	// 3% and 6% are noise; 29% and 45% are not. Two hourly plus two daily.
+	check("only meaningful rain chances are shown", shell.byClass("udash-weather-rain").length === 4,
+		String(shell.byClass("udash-weather-rain").length));
 
-	check("one day means no strip", dry.byClass("udash-weather-days").length === 0);
+	const sunny = new El();
+	const sunShell = renderWeather(sunny, { ...widget, sun: true });
+
+	fillWeather(sunShell as never, { place: places[0], forecast }, { ...widget, sun: true });
+
+	check("sunrise and sunset are shown when asked",
+		sunShell.byClass("udash-weather-extras")[0]?.text.includes("↑ 6:38") === true,
+		sunShell.byClass("udash-weather-extras")[0]?.text);
+
+	const quiet = new El();
+	const quietShell = renderWeather(quiet, widget);
+
+	fillWeather(quietShell as never, { place: places[0], forecast: bare }, widget);
+
+	check("one day means no daily strip", quietShell.byClass("udash-weather-days").length === 0);
+	check("no hours means no hourly strip", quietShell.byClass("udash-weather-hourly").length === 0);
+	check("nothing extra means no extras line", quietShell.byClass("udash-weather-extras").length === 0);
 }
 
 console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED"}`);

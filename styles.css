@@ -644,6 +644,18 @@
 	background: var(--background-secondary);
 }
 
+/* the resolved place, so a wrong Springfield is visible. It shares the heatmap
+   header, which is why it truncates rather than pushing the title around. */
+.udash-weather-where {
+	font-weight: 400;
+	font-size: 0.8em;
+	opacity: 0.7;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 60%;
+}
+
 .udash-weather-now {
 	display: flex;
 	align-items: center;
@@ -653,6 +665,10 @@
 .udash-weather-icon {
 	font-size: 2.2em;
 	line-height: 1;
+}
+
+.udash-weather-readout {
+	min-width: 0;
 }
 
 .udash-weather-temp {
@@ -666,22 +682,42 @@
 	color: var(--text-muted);
 }
 
-.udash-weather-days {
+.udash-weather-extras {
+	font-size: 0.75em;
+	color: var(--text-faint);
+	margin-top: 2px;
+}
+
+.udash-weather-strip {
 	display: flex;
 	gap: 4px;
 	margin-top: 10px;
 }
 
-.udash-weather-day {
-	flex: 1 1 0;
-	min-width: 0;
+.udash-weather-cell {
 	text-align: center;
 	padding: 6px 2px;
 	border-radius: 6px;
 	background: var(--background-primary-alt);
 }
 
-.udash-weather-dow {
+.udash-weather-days .udash-weather-cell {
+	flex: 1 1 0;
+	min-width: 0;
+}
+
+/* an hourly strip can run to 48 columns, so it scrolls inside the tile rather
+   than squeezing every column down to nothing */
+.udash-weather-hourly {
+	overflow-x: auto;
+	padding-bottom: 2px;
+}
+
+.udash-weather-hourly .udash-weather-cell {
+	flex: 0 0 42px;
+}
+
+.udash-weather-when {
 	font-size: 0.7em;
 	text-transform: uppercase;
 	color: var(--text-muted);
