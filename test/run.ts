@@ -1286,7 +1286,16 @@ console.log("\nweather");
 	check("an hourly strip is drawn", shell.byClass("udash-weather-hourly")[0]?.children.length === 4,
 		String(shell.byClass("udash-weather-hourly")[0]?.children.length));
 	check("hours are labelled by the hour", shell.all.some((e) => e.text === "11pm"));
-	check("a day shows its range", shell.all.some((e) => e.text === "95/55"));
+	// separate elements, since "95/55" read as a fraction
+	check("a day shows its high", shell.byClass("udash-weather-high").some((e) => e.text === "95°"),
+		shell.byClass("udash-weather-high").map((e) => e.text).join(" "));
+	check("a day shows its low", shell.byClass("udash-weather-low").some((e) => e.text === "55°"),
+		shell.byClass("udash-weather-low").map((e) => e.text).join(" "));
+	check("an hour has no low to show", shell.byClass("udash-weather-hourly")[0]
+		?.all.filter((e) => e.classes.has("udash-weather-low")).length === 0);
+	check("a daily column names the date, not just the weekday",
+		shell.byClass("udash-weather-days")[0]?.all.some((e) => e.text === "Sun 13") === true,
+		shell.byClass("udash-weather-days")[0]?.all.filter((e) => e.classes.has("udash-weather-when")).map((e) => e.text).join(" "));
 
 	// 3% and 6% are noise; 29% and 45% are not. Two hourly plus two daily.
 	check("only meaningful rain chances are shown", shell.byClass("udash-weather-rain").length === 4,

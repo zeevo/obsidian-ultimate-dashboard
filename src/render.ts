@@ -658,7 +658,7 @@ export function renderWeather(el: HTMLElement, widget: WeatherWidget): HTMLEleme
 	return wrap;
 }
 
-/** A temperature with no decimal point: a tile has no room for the tenths. */
+/** A temperature with no decimal point: a headline has no room for the tenths. */
 function degrees(value: number, unit: string): string {
 	return `${Math.round(value)}${unit}`;
 }
@@ -687,12 +687,29 @@ function strip(parent: HTMLElement, cls: string): HTMLElement {
 	return parent.createDiv({ cls: `udash-weather-strip ${cls}` });
 }
 
-function column(parent: HTMLElement, label: string, code: number, value: string, rain: number): void {
+/**
+ * One column. The high and the low are separate elements rather than `78/66`,
+ * which reads as a fraction and left people asking what the number meant.
+ */
+function column(
+	parent: HTMLElement,
+	label: string,
+	code: number,
+	high: number,
+	rain: number,
+	low?: number,
+): void {
 	const cell = parent.createDiv({ cls: "udash-weather-cell" });
 
 	cell.createDiv({ cls: "udash-weather-when", text: label });
 	cell.createDiv({ cls: "udash-weather-glyph", text: describeWeather(code).icon });
-	cell.createDiv({ cls: "udash-weather-range", text: value });
+
+	const temps = cell.createDiv({ cls: "udash-weather-range" });
+	temps.createSpan({ cls: "udash-weather-high", text: `${Math.round(high)}\u00b0` });
+
+	if (low !== undefined) {
+		temps.createSpan({ cls: "udash-weather-low", text: `${Math.round(low)}\u00b0` });
+	}
 
 	// a 3% chance is not information; at 20% it starts to be
 	if (rain >= 20) cell.createDiv({ cls: "udash-weather-rain", text: `${Math.round(rain)}%` });
@@ -753,7 +770,7 @@ export function fillWeather(wrap: HTMLElement, weather: Weather, widget: Weather
 		const row = strip(body, "udash-weather-hourly");
 
 		for (const hour of hours) {
-			column(row, hourLabel(hour.time), hour.code, degrees(hour.temperature, ""), hour.rain);
+			column(row, hourLabel(hour.time), hour.code, hour.temperature, hour.rain);
 		}
 	}
 
@@ -767,6 +784,7 @@ export function fillWeather(wrap: HTMLElement, weather: Weather, widget: Weather
 	for (const day of ahead) {
 		const when = new Date(day.date + "T00:00:00");
 
-		column(row, WEEKDAYS[when.getDay()], day.code, `${Math.round(day.high)}/${Math.round(day.low)}`, day.rain);
+		// the date as well as the weekday, so which day a column means is checkable
+		column(row, `${WEEKDAYS[when.getDay()]} ${when.getDate()}`, day.code, day.high, day.rain, day.low);
 	}
 }

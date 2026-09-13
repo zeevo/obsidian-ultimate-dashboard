@@ -728,7 +728,15 @@
 }
 
 .udash-weather-range {
+	display: flex;
+	justify-content: center;
+	gap: 5px;
 	font-size: 0.78em;
+}
+
+/* the low is dimmed rather than separated by a slash, which read as a fraction */
+.udash-weather-low {
+	opacity: 0.55;
 }
 
 .udash-weather-rain {
