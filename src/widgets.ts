@@ -179,6 +179,12 @@ export interface WidgetSpec<P extends Widget = Widget> {
 	 * empty, so a fresh widget reads as needing setup and opens its form.
 	 */
 	blank(): NewWidget<P>;
+	/**
+	 * What the widget calls itself. Declared once so the heading it draws and
+	 * the placeholder in its form cannot disagree, and so leaving the title
+	 * empty never produces a blank heading.
+	 */
+	title(widget: P): string;
 	/** A one line summary for the editor's card. */
 	summary(widget: P): string;
 	/**
@@ -186,6 +192,25 @@ export interface WidgetSpec<P extends Widget = Widget> {
 	 * Returns a message, or null when the widget is coherent.
 	 */
 	validate?(widget: P): string | null;
+}
+
+const MONTHS = [
+	"January", "February", "March", "April", "May", "June",
+	"July", "August", "September", "October", "November", "December",
+];
+
+/** "2026-02" as "February 2026", or the current month when unset. */
+function monthName(month?: string): string {
+	const date = month
+		? new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1, 1)
+		: new Date();
+
+	return `${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+/** The last segment of a vault path, without the extension. */
+function basename(path: string): string {
+	return path.split("/").pop()?.replace(/\.md$/i, "") ?? path;
 }
 
 /** Ranges are mutually exclusive, and a window must run forwards. */
@@ -224,6 +249,7 @@ const stat: WidgetSpec<StatWidget> = {
 		{ key: "precision", kind: FieldKind.Number, label: "Decimal places", min: 0 },
 	],
 	blank: () => ({ type: WidgetKind.Stat, property: "" }),
+	title: (w) => w.label || w.property || "Stat",
 	summary: (p) => (p.property ? `${p.agg ?? Agg.Latest} of ${p.property}` : "not configured"),
 };
 
@@ -240,6 +266,7 @@ const line: WidgetSpec<LineWidget> = {
 		...RANGE_FIELDS,
 	],
 	blank: () => ({ type: WidgetKind.Line, property: "" }),
+	title: (w) => w.title || w.property || "Line chart",
 	summary: (p) => p.property || "not configured",
 	validate: validateRange,
 };
@@ -262,6 +289,7 @@ const heatmap: WidgetSpec<HeatmapWidget> = {
 		...RANGE_FIELDS,
 	],
 	blank: () => ({ type: WidgetKind.Heatmap, property: "" }),
+	title: (w) => w.title || w.property || "Heatmap",
 	summary: (p) => p.property || "not configured",
 	validate: validateRange,
 };
@@ -278,6 +306,7 @@ const upcoming: WidgetSpec<UpcomingWidget> = {
 		{ key: "past", kind: FieldKind.Toggle, label: "Include today's finished events" },
 	],
 	blank: () => ({ type: WidgetKind.Upcoming }),
+	title: (w) => w.title || "Upcoming",
 	summary: (p) => `${p.ahead ?? 14} days`,
 };
 
@@ -301,6 +330,7 @@ const calendar: WidgetSpec<CalendarWidget> = {
 		},
 	],
 	blank: () => ({ type: WidgetKind.Calendar }),
+	title: (w) => w.title || monthName(w.month),
 	summary: (p) => p.month ?? "this month",
 };
 
@@ -320,6 +350,7 @@ const note: WidgetSpec<NoteWidget> = {
 		{ key: "height", kind: FieldKind.Number, label: "Height (px)", min: 60 },
 	],
 	blank: () => ({ type: WidgetKind.Note, path: "" }),
+	title: (w) => w.title || basename(w.path) || "Note",
 	summary: (p) => p.path || "not configured",
 };
 
@@ -329,6 +360,7 @@ const blankWidget: WidgetSpec<BlankWidget> = {
 	hint: "A placeholder that holds space",
 	fields: [{ key: "height", kind: FieldKind.Number, label: "Height (px)" }],
 	blank: () => ({ type: WidgetKind.Blank }),
+	title: () => "Blank",
 	summary: () => "placeholder",
 };
 
@@ -373,6 +405,7 @@ const weather: WidgetSpec<WeatherWidget> = {
 		{ key: "sun", kind: FieldKind.Toggle, label: "Show sunrise and sunset" },
 	],
 	blank: () => ({ type: WidgetKind.Weather, place: "" }),
+	title: (w) => w.title || w.place || "Weather",
 	summary: (w) => w.place || "not configured",
 };
 

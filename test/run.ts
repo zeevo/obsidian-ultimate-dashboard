@@ -13,7 +13,7 @@ import { serializeDashboard } from "../src/serialize";
 import { newNode } from "../src/editor";
 import { SPANS, WEATHER_MODES, WeatherError, describeWeather, parseForecast, parsePlaces, toWeatherMode } from "../src/weather";
 import { CONTAINER_KINDS, WIDGET_KINDS } from "../src/kinds";
-import { specFor } from "../src/widgets";
+import { Widget, specFor } from "../src/widgets";
 import { DEFAULT_CONFIG, activeDashboard, defaultSettings, findAccount, makeDashboard, migrate, uniqueName } from "../src/store";
 
 const VAULT = process.argv[2];
@@ -784,7 +784,7 @@ layout:
 	check("weekStart 1 starts on Monday", monday.from.getDay() === 1, `day ${monday.from.getDay()}`);
 
 	const host = new El();
-	const shell = renderMonth(host as never, { id: "t", type: "calendar", month: "2026-02" }, feb.first);
+	const shell = renderMonth(host as never, { id: "t", type: "calendar", month: "2026-02" });
 
 	fillMonth(shell as never, { id: "t", type: "calendar", month: "2026-02", maxPerDay: 2 }, feb.first, [
 		{ summary: "One", start: new Date(2026, 1, 10, 9), end: new Date(2026, 1, 10, 10), allDay: false },
@@ -1028,7 +1028,8 @@ console.log("\nnote widget");
 
 	check("body scrolls within the declared height", body.style.maxHeight === "240px", body.style.maxHeight);
 	check("body starts with a placeholder", body.byClass("udash-empty").length === 1);
-	check("header falls back to the path", shell.all.some((e) => e.text === "0 All/Health.md"));
+	// the note's name, not its path: "0 All/Health.md" is not a heading
+	check("header falls back to the note name", shell.all.some((e) => e.text === "Health"));
 
 	const titled = new El();
 	renderNote(titled, { id: "t", type: "note", path: "0 All/Health.md", title: "Plan" });
@@ -1357,6 +1358,49 @@ console.log("\nweather");
 
 	// a strip already shows ranges, so the readout must not repeat one
 	check("a strip means no range in the readout", shell.byClass("udash-weather-today").length === 0);
+}
+
+console.log("\ndefault titles");
+
+{
+	// every widget names itself when its title is left empty, so a heading is
+	// never blank and the form can show what you will get
+	const named: Record<string, Widget> = {
+		stat: { id: "t", type: "stat", property: "weight" },
+		line: { id: "t", type: "line", property: "weight" },
+		heatmap: { id: "t", type: "heatmap", property: "lift" },
+		upcoming: { id: "t", type: "upcoming" },
+		calendar: { id: "t", type: "calendar", month: "2026-02" },
+		note: { id: "t", type: "note", path: "0 All/Health.md" },
+		blank: { id: "t", type: "blank" },
+		weather: { id: "t", type: "weather", place: "Denver" },
+	};
+
+	for (const kind of WIDGET_KINDS) {
+		const title = specFor(kind).title(named[kind]);
+
+		check(`${kind} names itself`, title.length > 0, title);
+	}
+
+	check("a stat falls back to its property", specFor("stat").title(named.stat) === "weight");
+	check("a note falls back to the note name, not the path",
+		specFor("note").title(named.note) === "Health", specFor("note").title(named.note));
+	check("a month falls back to the month it draws",
+		specFor("calendar").title(named.calendar) === "February 2026",
+		specFor("calendar").title(named.calendar));
+	check("weather falls back to the place", specFor("weather").title(named.weather) === "Denver");
+	check("an agenda has a fixed name", specFor("upcoming").title(named.upcoming) === "Upcoming");
+
+	// an explicit title always wins
+	check("a title beats the fallback",
+		specFor("line").title({ ...named.line, title: "Body weight" } as never) === "Body weight");
+
+	// a half-configured widget still names itself rather than drawing nothing
+	for (const kind of WIDGET_KINDS) {
+		const title = specFor(kind).title(newNode(kind) as never);
+
+		check(`a fresh ${kind} still has a name`, title.length > 0, title);
+	}
 }
 
 console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED"}`);

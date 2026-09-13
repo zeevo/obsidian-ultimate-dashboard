@@ -127,7 +127,7 @@ export function renderNode(
 
 			case WidgetKind.Calendar: {
 				const { first } = monthWindow(node);
-				const shell = renderMonth(el, node, first);
+				const shell = renderMonth(el, node);
 
 				if (fillers.calendar) fillers.calendar(shell, node);
 				else fillMonth(shell, node, first, [], [noCalendars]);

@@ -1,4 +1,4 @@
-import { Agg, BlankWidget, CalendarWidget, HeatmapWidget, LineWidget, NoteWidget, StatWidget, UpcomingWidget, WeatherWidget } from "./widgets";
+import { Agg, BlankWidget, CalendarWidget, HeatmapWidget, LineWidget, NoteWidget, StatWidget, UpcomingWidget, WeatherWidget, specFor } from "./widgets";
 import { Weather, describeWeather } from "./weather";
 import { assertNever } from "./kinds";
 import { DayRecord, daysBetween, num, shiftDate, shiftMonths, toISO, today, truthy } from "./data";
@@ -54,7 +54,7 @@ export function renderStat(el: HTMLElement, days: DayRecord[], widget: StatWidge
 	const precision = widget.precision ?? (agg === Agg.Count ? 0 : 1);
 	const card = el.createDiv({ cls: "udash-tile" });
 
-	card.createDiv({ cls: "udash-tile-label", text: widget.label ?? widget.property });
+	card.createDiv({ cls: "udash-tile-label", text: specFor(widget.type).title(widget) });
 
 	const valueEl = card.createDiv({ cls: "udash-tile-value" });
 
@@ -185,7 +185,7 @@ export function renderHeatmap(el: HTMLElement, days: DayRecord[], widget: Heatma
 
 	const wrap = el.createDiv({ cls: "udash-heatmap" });
 	const head = wrap.createDiv({ cls: "udash-heatmap-head" });
-	head.createSpan({ text: widget.title ?? widget.property });
+	head.createSpan({ text: specFor(widget.type).title(widget) });
 
 	const meta = head.createDiv({ cls: "udash-heatmap-meta" });
 
@@ -273,7 +273,7 @@ export function renderLine(el: HTMLElement, days: DayRecord[], widget: LineWidge
 
 	const wrap = el.createDiv({ cls: "udash-line" });
 	const head = wrap.createDiv({ cls: "udash-heatmap-head" });
-	head.createSpan({ text: widget.title ?? widget.property });
+	head.createSpan({ text: specFor(widget.type).title(widget) });
 	head.createSpan({
 		cls: "udash-heatmap-count",
 		text: `${points.length} ${points.length === 1 ? "reading" : "readings"}`,
@@ -382,7 +382,7 @@ const hhmm = (d: Date) =>
 export function renderUpcoming(el: HTMLElement, widget: UpcomingWidget): HTMLElement {
 	const wrap = el.createDiv({ cls: "udash-calendar" });
 	const head = wrap.createDiv({ cls: "udash-heatmap-head" });
-	head.createSpan({ text: widget.title ?? "Upcoming" });
+	head.createSpan({ text: specFor(widget.type).title(widget) });
 	const body = wrap.createDiv({ cls: "udash-calendar-body" });
 	body.createDiv({ cls: "udash-empty", text: "Loading calendars\u2026" });
 
@@ -491,13 +491,13 @@ export function monthWindow(widget: CalendarWidget): MonthWindow {
 }
 
 /** The month shell: heading, weekday row, and 42 empty day cells. */
-export function renderMonth(el: HTMLElement, widget: CalendarWidget, first: Date): HTMLElement {
+export function renderMonth(el: HTMLElement, widget: CalendarWidget): HTMLElement {
 	const wrap = el.createDiv({ cls: "udash-month" });
 	const head = wrap.createDiv({ cls: "udash-heatmap-head" });
 
 	head.createSpan({
 		cls: "udash-month-title",
-		text: widget.title ?? `${MONTH_NAMES[first.getMonth()]} ${first.getFullYear()}`,
+		text: specFor(widget.type).title(widget),
 	});
 	head.createDiv({ cls: "udash-calendar-actions" });
 
@@ -616,7 +616,7 @@ const DEFAULT_NOTE_HEIGHT = 320;
 export function renderNote(el: HTMLElement, widget: NoteWidget): HTMLElement {
 	const wrap = el.createDiv({ cls: "udash-note" });
 	const head = wrap.createDiv({ cls: "udash-heatmap-head" });
-	head.createSpan({ text: widget.title ?? widget.path });
+	head.createSpan({ text: specFor(widget.type).title(widget) });
 
 	const body = wrap.createDiv({ cls: "udash-note-body" });
 	body.style.maxHeight = `${widget.height ?? DEFAULT_NOTE_HEIGHT}px`;
@@ -649,7 +649,7 @@ export function renderBlank(el: HTMLElement, widget: BlankWidget): void {
 export function renderWeather(el: HTMLElement, widget: WeatherWidget): HTMLElement {
 	const wrap = el.createDiv({ cls: "udash-weather" });
 	const head = wrap.createDiv({ cls: "udash-heatmap-head" });
-	head.createSpan({ text: widget.title ?? widget.place });
+	head.createSpan({ text: specFor(widget.type).title(widget) });
 	head.createSpan({ cls: "udash-weather-where" });
 
 	const body = wrap.createDiv({ cls: "udash-weather-body" });

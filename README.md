@@ -64,6 +64,25 @@ Community plugins → Ultimate Dashboard.
 
 Layouts are stored in the plugin's `data.json`, not in your notes.
 
+## Titles
+
+Every widget names itself when its title is left empty, so a heading is never
+blank. The fallback is declared next to the widget's fields, which is also what
+the configuration form shows as the placeholder: an empty Title box tells you
+what you will get instead of nothing at all.
+
+| Widget | Falls back to |
+|--------|---------------|
+| `stat` | Its property, e.g. `weight` |
+| `line`, `heatmap` | Their property |
+| `note` | The note's name, without the folder or the `.md` |
+| `weather` | The place you typed |
+| `calendar` | The month it draws, e.g. `February 2026` |
+| `upcoming` | `Upcoming` |
+
+A widget still half configured falls back again, to its type name, so a fresh
+tile reads `Line chart` rather than an empty bar.
+
 ## Adding a widget type
 
 Widgets are declared once, in `src/widgets.ts`:
@@ -78,7 +97,9 @@ const heatmap: WidgetSpec<HeatmapWidget> = {
     { key: "color",    kind: FieldKind.Colour,   label: "Color" },
     ...RANGE_FIELDS,
   ],
-  summary: (p) => p.property || "not configured",
+  blank: () => ({ type: WidgetKind.Heatmap, property: "" }),
+  title: (w) => w.title || w.property || "Heatmap",
+  summary: (w) => w.property || "not configured",
   validate: validateRange,
 };
 ```

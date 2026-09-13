@@ -112,7 +112,7 @@ export class WidgetForm extends Modal {
 			case FieldKind.Colour:
 				setting.addText((t) =>
 					t
-						.setPlaceholder(field.placeholder ?? "")
+						.setPlaceholder(field.placeholder ?? this.fallback(field, node))
 						.setValue(String(get() ?? ""))
 						.onChange((v) => put(v.trim() || undefined)),
 				);
@@ -199,6 +199,21 @@ export class WidgetForm extends Modal {
 			default:
 				assertNever(field, "WidgetForm.field");
 		}
+	}
+
+	/**
+	 * What a title field will read if left empty. Shown as the placeholder so an
+	 * empty box says what you will get rather than nothing at all.
+	 */
+	private fallback<P>(field: Field<P>, node: LayoutNode): string {
+		if (field.key !== "title" && field.key !== "label") return "";
+
+		if (isContainer(node)) return "";
+
+		// SAFETY: the spec is this node's own, so its title accepts this widget.
+		const bag = { ...node, [field.key]: undefined } as typeof node;
+
+		return specFor(node.type).title(bag);
 	}
 
 	private numberControl(
