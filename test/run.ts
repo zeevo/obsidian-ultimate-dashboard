@@ -6,11 +6,12 @@ import { join } from "node:path";
 import { load } from "js-yaml";
 import { ConfigError, ContainerNode, countWidgets, isContainer, needsSetup, parseDashboard } from "../src/layout-tree";
 import { DayRecord, shiftDate, stripFrontmatter, today } from "../src/data";
-import { currentStreak, fillMonth, monthWindow, renderBlank, renderHeatmap, renderLine, renderMonth, renderNote, renderStat } from "../src/render";
+import { currentStreak, fillMonth, monthWindow, renderBlank, renderHeatmap, renderLine, renderMonth, renderNote, renderStat, fillWeather, renderWeather } from "../src/render";
 import { renderNode } from "../src/layout";
 import { parseICS } from "../src/ics";
 import { serializeDashboard } from "../src/serialize";
 import { newNode } from "../src/editor";
+import { WeatherError, describeWeather, parseForecast, parsePlaces } from "../src/weather";
 import { CONTAINER_KINDS, WIDGET_KINDS } from "../src/kinds";
 import { specFor } from "../src/widgets";
 import { DEFAULT_CONFIG, activeDashboard, defaultSettings, findAccount, makeDashboard, migrate, uniqueName } from "../src/store";
@@ -416,7 +417,12 @@ layout:
       path: 0 All/Health.md
       height: 240
     - type: blank
-      height: 80`,
+      height: 80
+    - type: weather
+      title: Outside
+      place: Denver
+      days: 4
+      units: celsius`,
 		// nesting, flex sizing and an explicit range
 		`folder: Notes
 layout:
@@ -1140,6 +1146,87 @@ console.log("\nheatmap streak");
 	renderHeatmap(hidden, on(0, 1, 2), widget);
 
 	check("no streak element unless asked", hidden.byClass("udash-heatmap-streak").length === 0);
+}
+
+console.log("\nweather");
+
+{
+	// captured from Open-Meteo, so the parser is checked against the real shape
+	const GEOCODE = JSON.parse(`{"results":[{"id":5419384,"name":"Denver","latitude":39.73915,
+		"longitude":-104.9847,"country_code":"US","timezone":"America/Denver","country":"United States",
+		"admin1":"Colorado","admin2":"Denver"}]}`.replace(/\n\s*/g, ""));
+
+	const FORECAST = JSON.parse(`{"latitude":39.746895,"longitude":-104.987076,"timezone":"America/Denver",
+		"current_units":{"time":"iso8601","temperature_2m":"°F","apparent_temperature":"°F",
+		"weather_code":"wmo code","is_day":""},
+		"current":{"time":"2026-09-12T22:00","temperature_2m":66.9,"apparent_temperature":63.8,
+		"weather_code":0,"is_day":0},
+		"daily_units":{"time":"iso8601","temperature_2m_max":"°F"},
+		"daily":{"time":["2026-09-12","2026-09-13","2026-09-14","2026-09-15"],
+		"weather_code":[3,3,3,53],"temperature_2m_max":[81.8,94.6,85.3,74.9],
+		"temperature_2m_min":[55.7,55.1,68.2,59.3],
+		"precipitation_probability_max":[3,6,29,45]}}`.replace(/\n\s*/g, ""));
+
+	const places = parsePlaces(GEOCODE);
+
+	check("a place resolves", places.length === 1 && places[0].name === "Denver, Colorado, United States",
+		places[0]?.name);
+	check("coordinates come through", places[0]?.latitude === 39.73915 && places[0]?.longitude === -104.9847);
+	check("no match is empty, not an error", parsePlaces({}).length === 0);
+
+	const forecast = parseForecast(FORECAST);
+
+	check("current temperature parsed", forecast.current.temperature === 66.9, String(forecast.current.temperature));
+	check("night is detected from is_day", forecast.current.isDay === false);
+	check("the unit is read off the response", forecast.unit === "°F", forecast.unit);
+	check("every forecast day parsed", forecast.days.length === 4, String(forecast.days.length));
+	check("highs and lows line up",
+		forecast.days[1].high === 94.6 && forecast.days[1].low === 55.1);
+
+	// a malformed response must say so rather than render nonsense
+	let threw = false;
+
+	try {
+		parseForecast({ current: {}, daily: {}, current_units: {} });
+	} catch (e) {
+		threw = e instanceof WeatherError;
+	}
+
+	check("a malformed response is rejected", threw);
+
+	check("a known code reads as words", describeWeather(3).label === "Overcast", describeWeather(3).label);
+	check("clear at night is not a sun", describeWeather(0, false).icon === "🌙");
+	check("clear by day is a sun", describeWeather(0, true).icon === "☀️");
+	check("rain at night keeps its glyph", describeWeather(61, false).icon === describeWeather(61, true).icon);
+	check("an unknown code reports the number", describeWeather(42).label === "Code 42", describeWeather(42).label);
+
+	const host = new El();
+	const body = renderWeather(host, { id: "t", type: "weather", place: "Denver" });
+
+	check("the shell carries the place", host.all.some((e) => e.text === "Denver"));
+
+	fillWeather(body as never, { place: places[0], forecast });
+
+	check("the temperature is rounded", body.byClass("udash-weather-temp")[0]?.text === "67°F",
+		body.byClass("udash-weather-temp")[0]?.text);
+	check("feels-like is shown when it differs",
+		body.byClass("udash-weather-label")[0]?.text === "Clear, feels 64°F",
+		body.byClass("udash-weather-label")[0]?.text);
+
+	// today is already the headline, so the strip starts tomorrow
+	check("the strip skips today", body.byClass("udash-weather-day").length === 3,
+		String(body.byClass("udash-weather-day").length));
+	check("a day shows its range", body.byClass("udash-weather-range")[0]?.text === "95/55",
+		body.byClass("udash-weather-range")[0]?.text);
+
+	// a 6% chance is not worth the ink; 29% and 45% are
+	check("only meaningful rain chances are shown", body.byClass("udash-weather-rain").length === 2,
+		String(body.byClass("udash-weather-rain").length));
+
+	const dry = new El();
+	fillWeather(dry as never, { place: places[0], forecast: { ...forecast, days: [forecast.days[0]] } });
+
+	check("one day means no strip", dry.byClass("udash-weather-days").length === 0);
 }
 
 console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED"}`);

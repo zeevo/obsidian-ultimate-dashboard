@@ -1,5 +1,6 @@
 import { Plugin, WorkspaceLeaf } from "obsidian";
 import { CalendarService } from "./calendar";
+import { WeatherService } from "./weather";
 import { DashboardSettingTab } from "./settings";
 import { DashboardSettings, defaultSettings, makeDashboard, migrate, uniqueName } from "./store";
 import { DashboardView, VIEW_TYPE_DASHBOARD } from "./view";
@@ -8,6 +9,7 @@ import { NameModal } from "./modal";
 export default class UltimateDashboardPlugin extends Plugin {
 	settings: DashboardSettings = defaultSettings();
 	calendars = new CalendarService();
+	weather = new WeatherService();
 
 	get pluginId(): string {
 		return this.manifest.id;

@@ -21,6 +21,7 @@ export const WidgetKind = {
 	Calendar: "calendar",
 	Note: "note",
 	Blank: "blank",
+	Weather: "weather",
 } as const;
 
 export type WidgetKind = (typeof WidgetKind)[keyof typeof WidgetKind];

@@ -425,6 +425,39 @@ Nothing is drawn: it is an invisible spacer, so it also works for pushing a
 row's other children into place. Use `flex` to try column widths and `height` to
 try row heights.
 
+### `type: weather`
+
+Current conditions and a short forecast, from
+[Open-Meteo](https://open-meteo.com). No API key and no account: type a place
+name and it works.
+
+| Key | Meaning |
+|-----|---------|
+| `place` | Any place name, resolved to coordinates once and remembered |
+| `days` | Forecast days shown under the current conditions. Defaults to 3 |
+| `units` | `fahrenheit` (default) or `celsius` |
+| `title` | Caption. Defaults to the place name |
+
+```yaml
+- type: weather
+  place: Denver
+  days: 4
+```
+
+The headline is today: temperature, conditions, and the feels-like when it
+differs from the actual. The strip below starts tomorrow, since repeating today
+in both would waste a column. A day shows its chance of rain only at 20% or
+above, because a 3% chance is not information.
+
+**It is the one widget that leaves your vault.** A place name goes to
+Open-Meteo's geocoding endpoint and coordinates go to its forecast endpoint.
+Nothing else is sent, and no key or account is involved.
+
+Forecasts are cached for 30 minutes and coordinates for the session. That is
+load bearing rather than an optimisation: the dashboard redraws whenever any
+note in the vault changes, so an uncached widget would call out to the network
+while you typed.
+
 ## Development
 
 ```sh

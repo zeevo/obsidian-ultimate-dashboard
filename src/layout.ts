@@ -1,8 +1,8 @@
 import { ContainerNode, LayoutNode, isContainer } from "./layout-tree";
-import { CalendarWidget, NoteWidget, UpcomingWidget } from "./widgets";
-import { ContainerKind } from "./kinds";
+import { CalendarWidget, NoteWidget, UpcomingWidget, WeatherWidget } from "./widgets";
+import { ContainerKind, WidgetKind, assertNever } from "./kinds";
 import { DayRecord } from "./data";
-import { fillCalendar, fillMonth, monthWindow, renderBlank, renderHeatmap, renderLine, renderMonth, renderNote, renderStat, renderUpcoming } from "./render";
+import { fillCalendar, fillMonth, monthWindow, renderBlank, renderHeatmap, renderLine, renderMonth, renderNote, renderStat, renderUpcoming, renderWeather } from "./render";
 
 const DEFAULT_GAP = 20;
 
@@ -42,14 +42,27 @@ export type CalendarFiller = (el: HTMLElement, widget: CalendarWidget | Upcoming
 /** Renders an embedded note into the body a note tile made for it. */
 export type NoteFiller = (body: HTMLElement, widget: NoteWidget) => void;
 
+/** Fetches a forecast and fills the body a weather tile made for it. */
+export type WeatherFiller = (body: HTMLElement, widget: WeatherWidget) => void;
+
+/**
+ * Widgets whose content arrives from the network draw a shell first and are
+ * filled in when it lands. Grouped rather than passed one positional argument
+ * at a time, which was three parameters deep and still growing.
+ */
+export interface Fillers {
+	calendar?: CalendarFiller;
+	note?: NoteFiller;
+	weather?: WeatherFiller;
+}
+
 export function renderNode(
 	parent: HTMLElement,
 	node: LayoutNode,
 	days: DayRecord[],
 	inheritedGap: number,
 	onError: (el: HTMLElement, message: string) => void,
-	fillCalendarWidget?: CalendarFiller,
-	fillNoteWidget?: NoteFiller,
+	fillers: Fillers = {},
 ): void {
 	const el = parent.createDiv({ cls: `udash-node udash-${node.type}` });
 	applySizing(el, node);
@@ -58,7 +71,7 @@ export function renderNode(
 		const gap = applyContainer(el, node, inheritedGap);
 
 		for (const child of node.children) {
-			renderNode(el, child, days, gap, onError, fillCalendarWidget, fillNoteWidget);
+			renderNode(el, child, days, gap, onError, fillers);
 		}
 
 		return;
@@ -66,27 +79,64 @@ export function renderNode(
 
 	el.addClass("udash-widget");
 
+	const noCalendars = "No calendars configured. Add one in settings.";
+
 	try {
-		if (node.type === "blank") renderBlank(el, node);
-		else if (node.type === "stat") renderStat(el, days, node);
-		else if (node.type === "heatmap") renderHeatmap(el, days, node);
-		else if (node.type === "line") renderLine(el, days, node);
-		else if (node.type === "note") {
-			const body = renderNote(el, node);
+		// a switch rather than a chain of ifs: the compiler then names any widget
+		// type nobody has handled, instead of it quietly rendering as the last one
+		switch (node.type) {
+			case WidgetKind.Blank:
+				renderBlank(el, node);
+				break;
 
-			// left showing its placeholder when no renderer is available, as in tests
-			if (fillNoteWidget) fillNoteWidget(body, node);
-		} else if (node.type === "upcoming") {
-			const shell = renderUpcoming(el, node);
+			case WidgetKind.Stat:
+				renderStat(el, days, node);
+				break;
 
-			if (fillCalendarWidget) fillCalendarWidget(shell, node);
-			else fillCalendar(shell, [], ["No calendars configured. Add one in settings."], false);
-		} else {
-			const { first } = monthWindow(node);
-			const shell = renderMonth(el, node, first);
+			case WidgetKind.Heatmap:
+				renderHeatmap(el, days, node);
+				break;
 
-			if (fillCalendarWidget) fillCalendarWidget(shell, node);
-			else fillMonth(shell, node, first, [], ["No calendars configured. Add one in settings."]);
+			case WidgetKind.Line:
+				renderLine(el, days, node);
+				break;
+
+			case WidgetKind.Note: {
+				const body = renderNote(el, node);
+
+				// left showing its placeholder when no renderer is available, as in tests
+				fillers.note?.(body, node);
+				break;
+			}
+
+			case WidgetKind.Weather: {
+				const body = renderWeather(el, node);
+
+				fillers.weather?.(body, node);
+				break;
+			}
+
+			case WidgetKind.Upcoming: {
+				const shell = renderUpcoming(el, node);
+
+				if (fillers.calendar) fillers.calendar(shell, node);
+				else fillCalendar(shell, [], [noCalendars], false);
+
+				break;
+			}
+
+			case WidgetKind.Calendar: {
+				const { first } = monthWindow(node);
+				const shell = renderMonth(el, node, first);
+
+				if (fillers.calendar) fillers.calendar(shell, node);
+				else fillMonth(shell, node, first, [], [noCalendars]);
+
+				break;
+			}
+
+			default:
+				assertNever(node, "renderNode");
 		}
 	} catch (e) {
 		// SAFETY: the catch binding is whatever a widget renderer threw; Error is

@@ -1,10 +1,11 @@
 import { Component, ItemView, MarkdownRenderer, WorkspaceLeaf, setIcon, setTooltip } from "obsidian";
 import { ConfigError, countWidgets, parseDashboard } from "./layout-tree";
 import { readDays, stripFrontmatter } from "./data";
-import { CalendarFiller, DEFAULT_GAP, NoteFiller, renderNode } from "./layout";
+import { CalendarFiller, DEFAULT_GAP, NoteFiller, WeatherFiller, renderNode } from "./layout";
 import { CalendarService } from "./calendar";
-import { CalendarWidget, NoteWidget, UpcomingWidget } from "./widgets";
-import { fillCalendar, fillMonth, monthWindow } from "./render";
+import { WeatherService, WeatherUnit } from "./weather";
+import { CalendarWidget, NoteWidget, UpcomingWidget, WeatherWidget } from "./widgets";
+import { fillCalendar, fillMonth, fillWeather, monthWindow } from "./render";
 import { EventModal, NameModal } from "./modal";
 import { VisualEditor } from "./editor";
 import { serializeDashboard } from "./serialize";
@@ -25,6 +26,7 @@ export interface ViewHost {
 	settings: DashboardSettings;
 	pluginId: string;
 	calendars: CalendarService;
+	weather: WeatherService;
 	saveSettings(): Promise<void>;
 	refreshViews(): void;
 	invalidateCalendars(): void;
@@ -131,8 +133,11 @@ export class DashboardView extends ItemView {
 			days,
 			DEFAULT_GAP,
 			(target, message) => this.error(target, message),
-			this.makeCalendarFiller(),
-			this.makeNoteFiller(),
+			{
+				calendar: this.makeCalendarFiller(),
+				note: this.makeNoteFiller(),
+				weather: this.makeWeatherFiller(),
+			},
 		);
 	}
 
@@ -282,6 +287,33 @@ export class DashboardView extends ItemView {
 					this.scrolled.set(widget.path, body.scrollTop),
 				);
 			});
+		};
+	}
+
+	/**
+	 * Fetches a forecast in the background. The service caches, which matters
+	 * more here than it looks: this view redraws on every metadata change in the
+	 * vault, so an uncached widget would call out on every keystroke.
+	 */
+	private makeWeatherFiller(): WeatherFiller {
+		return (body: HTMLElement, widget: WeatherWidget) => {
+			const units = widget.units ?? WeatherUnit.Fahrenheit;
+
+			void (async () => {
+				try {
+					const weather = await this.host.weather.weather(widget.place, units, (widget.days ?? 3) + 1);
+
+					// the view may have redrawn while the request was in flight
+					if (!body.isConnected) return;
+					fillWeather(body, weather);
+				} catch (e) {
+					if (!body.isConnected) return;
+					body.empty();
+					// SAFETY: the service throws WeatherError and requestUrl rejects with
+					// an Error; the fallback covers anything else that reaches here.
+					this.error(body, `${widget.place}: ${(e as Error).message || "could not load"}`);
+				}
+			})();
 		};
 	}
 

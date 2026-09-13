@@ -634,3 +634,68 @@
 .udash-blank {
 	height: 100%;
 }
+
+/* ---------------------------------------------------------------- weather */
+
+.udash-weather {
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	padding: 10px 12px;
+	background: var(--background-secondary);
+}
+
+.udash-weather-now {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.udash-weather-icon {
+	font-size: 2.2em;
+	line-height: 1;
+}
+
+.udash-weather-temp {
+	font-size: 1.8em;
+	font-weight: 600;
+	line-height: 1.1;
+}
+
+.udash-weather-label {
+	font-size: 0.8em;
+	color: var(--text-muted);
+}
+
+.udash-weather-days {
+	display: flex;
+	gap: 4px;
+	margin-top: 10px;
+}
+
+.udash-weather-day {
+	flex: 1 1 0;
+	min-width: 0;
+	text-align: center;
+	padding: 6px 2px;
+	border-radius: 6px;
+	background: var(--background-primary-alt);
+}
+
+.udash-weather-dow {
+	font-size: 0.7em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.udash-weather-glyph {
+	line-height: 1.5;
+}
+
+.udash-weather-range {
+	font-size: 0.78em;
+}
+
+.udash-weather-rain {
+	font-size: 0.68em;
+	color: var(--text-accent);
+}

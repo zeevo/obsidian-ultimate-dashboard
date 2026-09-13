@@ -1,4 +1,5 @@
-import { Agg, BlankWidget, CalendarWidget, HeatmapWidget, LineWidget, NoteWidget, StatWidget, UpcomingWidget } from "./widgets";
+import { Agg, BlankWidget, CalendarWidget, HeatmapWidget, LineWidget, NoteWidget, StatWidget, UpcomingWidget, WeatherWidget } from "./widgets";
+import { Weather, describeWeather } from "./weather";
 import { assertNever } from "./kinds";
 import { DayRecord, daysBetween, num, shiftDate, shiftMonths, toISO, today, truthy } from "./data";
 
@@ -637,4 +638,71 @@ const DEFAULT_BLANK_HEIGHT = 120;
 export function renderBlank(el: HTMLElement, widget: BlankWidget): void {
 	const box = el.createDiv({ cls: "udash-blank" });
 	box.style.minHeight = `${widget.height ?? DEFAULT_BLANK_HEIGHT}px`;
+}
+
+/* ---------------------------------------------------------------- weather */
+
+/**
+ * The shell for a forecast. As with a note, the view fills it: fetching belongs
+ * to a service, not to a module that otherwise only touches the DOM.
+ */
+export function renderWeather(el: HTMLElement, widget: WeatherWidget): HTMLElement {
+	const wrap = el.createDiv({ cls: "udash-weather" });
+	const head = wrap.createDiv({ cls: "udash-heatmap-head" });
+	head.createSpan({ text: widget.title ?? widget.place });
+
+	const body = wrap.createDiv({ cls: "udash-weather-body" });
+	body.createDiv({ cls: "udash-empty", text: "Loading\u2026" });
+
+	return body;
+}
+
+/** A temperature with no decimal point: a tile has no room for the tenths. */
+function degrees(value: number, unit: string): string {
+	return `${Math.round(value)}${unit}`;
+}
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** Fills a shell created by `renderWeather`. */
+export function fillWeather(body: HTMLElement, weather: Weather): void {
+	const { current, days, unit } = weather.forecast;
+	body.empty();
+
+	const now = describeWeather(current.code, current.isDay);
+	const top = body.createDiv({ cls: "udash-weather-now" });
+
+	top.createSpan({ cls: "udash-weather-icon", text: now.icon });
+
+	const readout = top.createDiv({ cls: "udash-weather-readout" });
+	readout.createDiv({ cls: "udash-weather-temp", text: degrees(current.temperature, unit) });
+
+	const feels = Math.round(current.feelsLike) !== Math.round(current.temperature)
+		? `${now.label}, feels ${degrees(current.feelsLike, unit)}`
+		: now.label;
+
+	readout.createDiv({ cls: "udash-weather-label", text: feels });
+
+	// today is already summarised above, so the strip starts tomorrow
+	const ahead = days.slice(1);
+
+	if (ahead.length === 0) return;
+
+	const strip = body.createDiv({ cls: "udash-weather-days" });
+
+	for (const day of ahead) {
+		const cell = strip.createDiv({ cls: "udash-weather-day" });
+		const when = new Date(day.date + "T00:00:00");
+
+		cell.createDiv({ cls: "udash-weather-dow", text: WEEKDAYS[when.getDay()] });
+		cell.createDiv({ cls: "udash-weather-glyph", text: describeWeather(day.code).icon });
+		cell.createDiv({
+			cls: "udash-weather-range",
+			text: `${Math.round(day.high)}/${Math.round(day.low)}`,
+		});
+
+		if (day.rain >= 20) {
+			cell.createDiv({ cls: "udash-weather-rain", text: `${Math.round(day.rain)}%` });
+		}
+	}
 }

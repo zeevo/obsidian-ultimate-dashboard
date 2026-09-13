@@ -42,7 +42,8 @@ export default defineConfig({
 			 * codebase to rely on: config.ts parses YAML from the settings editor,
 			 * store.ts parses data.json, ics.ts parses a downloaded calendar feed,
 			 * data.ts parses note frontmatter out of the metadata cache, and
-			 * google.ts parses JSON off the Calendar API, and
+			 * google.ts parses JSON off the Calendar API, weather.ts parses JSON off
+			 * Open-Meteo, and
 			 * kinds, schema, widgets, serialize and widget-form sit on the seam where a
 			 * typed widget meets its declared field list: reading a field by its declared
 			 * key is the point of the registry, and it cannot be expressed without it.
@@ -50,7 +51,7 @@ export default defineConfig({
 			 * before it can become a domain type, which is exactly what these rules
 			 * forbid. They stay on everywhere else so the narrowing cannot leak out.
 			 */
-			files: ["src/config.ts", "src/store.ts", "src/ics.ts", "src/data.ts", "src/google.ts", "src/kinds.ts", "src/schema.ts", "src/widgets.ts", "src/serialize.ts", "src/widget-form.ts", "src/layout-tree.ts"],
+			files: ["src/config.ts", "src/store.ts", "src/ics.ts", "src/data.ts", "src/google.ts", "src/weather.ts", "src/kinds.ts", "src/schema.ts", "src/widgets.ts", "src/serialize.ts", "src/widget-form.ts", "src/layout-tree.ts"],
 			rules: {
 				"anti-slop/no-runtime-typeof": "off",
 				"anti-slop/no-unknown-parameters": "off",

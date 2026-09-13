@@ -1,5 +1,6 @@
 import { WidgetKind } from "./kinds";
 import { Field, FieldKind } from "./schema";
+import { WEATHER_UNITS, WeatherUnit } from "./weather";
 
 /**
  * The widget registry.
@@ -112,6 +113,17 @@ export interface BlankWidget extends NodeBase {
 	height?: number;
 }
 
+export interface WeatherWidget extends NodeBase {
+	type: typeof WidgetKind.Weather;
+	/** Caption. Defaults to the place the forecast resolved to. */
+	title?: string;
+	/** A place name, resolved to coordinates once and remembered. */
+	place: string;
+	/** Days of forecast to show under the current conditions. */
+	days?: number;
+	units?: WeatherUnit;
+}
+
 export type Widget =
 	| StatWidget
 	| LineWidget
@@ -119,7 +131,8 @@ export type Widget =
 	| UpcomingWidget
 	| CalendarWidget
 	| NoteWidget
-	| BlankWidget;
+	| BlankWidget
+	| WeatherWidget;
 
 /* ------------------------------------------------------------ field groups */
 
@@ -310,6 +323,31 @@ const blankWidget: WidgetSpec<BlankWidget> = {
 	summary: () => "placeholder",
 };
 
+const weather: WidgetSpec<WeatherWidget> = {
+	type: WidgetKind.Weather,
+	label: "Weather",
+	hint: "Current conditions and forecast",
+	fields: [
+		{ key: "title", kind: FieldKind.Text, label: "Title" },
+		{
+			key: "place",
+			kind: FieldKind.Text,
+			label: "Place",
+			required: true,
+			placeholder: "Denver",
+		},
+		{ key: "days", kind: FieldKind.Number, label: "Forecast days", min: 1 },
+		{
+			key: "units",
+			kind: FieldKind.Choice,
+			label: "Units",
+			choices: WEATHER_UNITS.map((u) => ({ value: u, label: u === "celsius" ? "Celsius" : "Fahrenheit" })),
+		},
+	],
+	blank: () => ({ type: WidgetKind.Weather, place: "" }),
+	summary: (w) => w.place || "not configured",
+};
+
 /** Every widget type, keyed by its discriminant. */
 export const WIDGETS: { readonly [K in WidgetKind]: WidgetSpec } = {
 	[WidgetKind.Stat]: stat as WidgetSpec,
@@ -319,6 +357,7 @@ export const WIDGETS: { readonly [K in WidgetKind]: WidgetSpec } = {
 	[WidgetKind.Calendar]: calendar as WidgetSpec,
 	[WidgetKind.Note]: note as WidgetSpec,
 	[WidgetKind.Blank]: blankWidget as WidgetSpec,
+	[WidgetKind.Weather]: weather as WidgetSpec,
 };
 
 export function specFor(type: WidgetKind): WidgetSpec {
