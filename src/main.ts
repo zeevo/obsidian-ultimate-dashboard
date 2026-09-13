@@ -18,6 +18,11 @@ export default class UltimateDashboardPlugin extends Plugin {
 	async onload(): Promise<void> {
 		await this.loadSettings();
 
+		// The layout is already up when a plugin is enabled by hand or reloaded,
+		// which is not a startup. Opening the dashboard then would yank you out of
+		// whatever tab you were reading, so only a cold start counts.
+		const coldStart = !this.app.workspace.layoutReady;
+
 		this.registerView(
 			VIEW_TYPE_DASHBOARD,
 			(leaf: WorkspaceLeaf) => new DashboardView(leaf, this),
@@ -58,6 +63,28 @@ export default class UltimateDashboardPlugin extends Plugin {
 		}));
 
 		this.addSettingTab(new DashboardSettingTab(this.app, this));
+
+		this.app.workspace.onLayoutReady(() => {
+			if (coldStart) void this.openStartupDashboard();
+		});
+	}
+
+	/**
+	 * Opens the dashboard chosen in settings, if one is. An existing tab is
+	 * focused rather than duplicated, so a restored workspace stays as it was.
+	 */
+	private async openStartupDashboard(): Promise<void> {
+		const { startupId } = this.settings;
+
+		if (!startupId || !this.settings.dashboards.some((d) => d.id === startupId)) return;
+
+		if (this.settings.activeId !== startupId) {
+			this.settings.activeId = startupId;
+			await this.saveSettings();
+		}
+
+		await this.activateView();
+		this.refreshViews();
 	}
 
 	/** Focus the dashboard tab, opening one only if none is already there. */

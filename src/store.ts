@@ -53,6 +53,11 @@ export interface DashboardSettings {
 	dashboards: Dashboard[];
 	/** Which dashboard the view shows. Falls back to the first if unknown. */
 	activeId: string;
+	/**
+	 * Opened automatically when Obsidian starts. Absent means startup is left
+	 * alone, which is the default: a plugin that seizes a tab uninvited is rude.
+	 */
+	startupId?: string;
 	/** Calendar sources, shared by every dashboard. */
 	calendars: CalendarSource[];
 	google: GoogleConfig;
@@ -157,7 +162,14 @@ export function migrate(raw: unknown): DashboardSettings {
 			? d.activeId
 			: dashboards[0].id;
 
-	return { dashboards, activeId, calendars, google };
+	// a startup choice pointing at a deleted dashboard is dropped, not repaired:
+	// silently opening a different one is worse than opening none
+	const startupId =
+		typeof d.startupId === "string" && dashboards.some((x) => x.id === d.startupId)
+			? d.startupId
+			: undefined;
+
+	return { dashboards, activeId, startupId, calendars, google };
 }
 
 function readGoogle(raw: unknown): GoogleConfig {

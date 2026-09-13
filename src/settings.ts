@@ -115,6 +115,8 @@ export class DashboardSettingTab extends PluginSettingTab {
 							async () => {
 								settings.dashboards = settings.dashboards.filter((d) => d.id !== current.id);
 								settings.activeId = settings.dashboards[0]?.id ?? "";
+
+								if (settings.startupId === current.id) settings.startupId = undefined;
 								await this.host.saveSettings();
 								this.host.refreshViews();
 								this.display();
@@ -122,6 +124,20 @@ export class DashboardSettingTab extends PluginSettingTab {
 						).open();
 					}),
 			);
+
+		new Setting(containerEl)
+			.setName("Open on startup")
+			.setDesc("Which dashboard opens when Obsidian starts. Applies to every dashboard, not just this one.")
+			.addDropdown((dd) => {
+				dd.addOption("", "Nothing");
+
+				for (const d of settings.dashboards) dd.addOption(d.id, d.name);
+				dd.setValue(settings.startupId ?? "");
+				dd.onChange(async (value) => {
+					settings.startupId = value || undefined;
+					await this.host.saveSettings();
+				});
+			});
 
 		new Setting(containerEl)
 			.setName("Layout")

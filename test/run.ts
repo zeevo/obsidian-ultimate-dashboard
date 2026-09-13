@@ -238,6 +238,22 @@ console.log("\ndashboard store");
 
 		return m.activeId === "a";
 	})());
+
+	const two = [{ id: "a", name: "A", config: "x" }, { id: "b", name: "B", config: "y" }];
+
+	check("a startup choice survives", migrate({ dashboards: two, startupId: "b" }).startupId === "b");
+	check("no startup choice stays unset", migrate({ dashboards: two }).startupId === undefined);
+
+	// opening some other dashboard would be worse than opening none
+	check("a startup choice pointing at a deleted dashboard is dropped",
+		migrate({ dashboards: two, startupId: "gone" }).startupId === undefined);
+	check("a non-string startup choice is dropped",
+		migrate({ dashboards: two, startupId: 7 }).startupId === undefined);
+	check("the startup choice is independent of the active one", (() => {
+		const m = migrate({ dashboards: two, activeId: "a", startupId: "b" });
+
+		return m.activeId === "a" && m.startupId === "b";
+	})());
 	check("round trip is stable", (() => {
 		const once = migrate(defaultSettings());
 

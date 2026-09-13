@@ -13,6 +13,17 @@ Run **Ultimate Dashboard: Open dashboard** from the command palette, or click th
 ribbon icon. Running it again focuses the existing tab rather than opening a
 second one.
 
+### Opening one automatically
+
+**Settings > Ultimate Dashboard > Open on startup** picks a dashboard to open
+when Obsidian starts, the way the Homepage plugin opens a note. Leave it on
+`Nothing` and startup is untouched.
+
+An existing dashboard tab is focused rather than duplicated, so a restored
+workspace stays as it was. Enabling or reloading the plugin by hand does not
+count as a startup: the dashboard would otherwise yank you out of whatever you
+were reading.
+
 ### Editing
 
 The pencil opens edit mode, which has two tabs.
