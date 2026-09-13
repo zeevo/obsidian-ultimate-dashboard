@@ -698,8 +698,11 @@ function column(
 	high: number,
 	rain: number,
 	low?: number,
+	now = false,
 ): void {
 	const cell = parent.createDiv({ cls: "udash-weather-cell" });
+
+	if (now) cell.addClass("is-now");
 
 	cell.createDiv({ cls: "udash-weather-when", text: label });
 	cell.createDiv({ cls: "udash-weather-glyph", text: describeWeather(code).icon });
@@ -780,7 +783,12 @@ export function fillWeather(wrap: HTMLElement, weather: Weather, widget: Weather
 		const row = strip(body, "udash-weather-hourly");
 
 		for (const hour of hours) {
-			column(row, hourLabel(hour.time), hour.code, hour.temperature, hour.rain);
+			// the column covering right now is labelled with the actual clock time,
+			// which is also the only thing on the tile saying how fresh it is
+			const isNow = current.time.slice(0, 13) === hour.time.slice(0, 13);
+			const label = isNow && current.time ? clockLabel(current.time) : hourLabel(hour.time);
+
+			column(row, label, hour.code, hour.temperature, hour.rain, undefined, isNow);
 		}
 	}
 

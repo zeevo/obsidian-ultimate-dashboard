@@ -1288,6 +1288,15 @@ console.log("\nweather");
 	check("an hourly strip is drawn", shell.byClass("udash-weather-hourly")[0]?.children.length === 4,
 		String(shell.byClass("udash-weather-hourly")[0]?.children.length));
 	check("hours are labelled by the hour", shell.all.some((e) => e.text === "11pm"));
+
+	// the column covering now says the clock time and is marked, so you can see
+	// both which column you are in and how stale the tile is
+	check("the current hour is marked", shell.byClass("is-now").length === 1,
+		String(shell.byClass("is-now").length));
+	check("the current hour shows the clock, not the hour",
+		shell.byClass("is-now")[0]?.all.some((e) => e.text === "10:15pm") === true,
+		shell.byClass("is-now")[0]?.all.filter((e) => e.classes.has("udash-weather-when")).map((e) => e.text).join());
+	check("the other hours keep their hour label", shell.all.some((e) => e.text === "12am"));
 	// separate elements, since "95/55" read as a fraction
 	check("a day shows its high", shell.byClass("udash-weather-high").some((e) => e.text === "95°"),
 		shell.byClass("udash-weather-high").map((e) => e.text).join(" "));
