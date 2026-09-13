@@ -444,7 +444,7 @@ API key and no account: type a place name and it works.
 | Key | Meaning |
 |-----|---------|
 | `place` | Any place name, resolved to coordinates once and remembered |
-| `mode` | `3day` (default), `hourly`, or `weekly` |
+| `mode` | `today` (default), `3day`, `hourly`, or `weekly` |
 | `units` | `fahrenheit` (default) or `celsius` |
 | `wind` | `true` to show wind speed |
 | `humidity` | `true` to show relative humidity |
@@ -463,6 +463,7 @@ modes are exclusive rather than a set of lengths you combine:
 
 | Mode | Shows |
 |------|-------|
+| `today` | Now, with today's high and low. No strip |
 | `3day` | The next three days |
 | `hourly` | The next twelve hours, starting with this one |
 | `weekly` | The next seven days |
@@ -476,9 +477,14 @@ wrong. The left half stays whatever you typed, or your `title`.
 
 Every mode leads with now: temperature, conditions, and the feels-like when it
 differs from the actual, with wind, humidity and sun times beneath it when asked
-for. The daily modes start tomorrow, since today is already the headline. The
-hourly strip scrolls sideways inside the tile rather than squeezing twelve
-columns into nothing.
+for. The strips start tomorrow, since today is already the headline, which is
+why `today` mode prints today's high and low in the readout instead: with no
+strip, nothing else would carry them.
+
+Daily columns are labelled with the date as well as the weekday, and the high
+and low are separate rather than written `78/66`, which read as a fraction. The
+hourly strip fills a wide tile and scrolls sideways in a narrow one rather than
+squeezing twelve columns into nothing.
 
 A chance of rain appears only at 20% or above, because a 3% chance is not
 information. Wind is reported in mph beside Fahrenheit and km/h beside Celsius.

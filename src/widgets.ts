@@ -119,7 +119,7 @@ export interface WeatherWidget extends NodeBase {
 	title?: string;
 	/** A place name, resolved to coordinates once and remembered. */
 	place: string;
-	/** What the tile shows under the current conditions. Defaults to three days. */
+	/** What the tile shows. Defaults to today alone. */
 	mode?: WeatherMode;
 	units?: WeatherUnit;
 	wind?: boolean;
@@ -345,6 +345,7 @@ const weather: WidgetSpec<WeatherWidget> = {
 			kind: FieldKind.Choice,
 			label: "Forecast",
 			choices: [
+				{ value: WeatherMode.Today, label: "Today" },
 				{ value: WeatherMode.ThreeDay, label: "Next 3 days" },
 				{ value: WeatherMode.Hourly, label: "Next 12 hours" },
 				{ value: WeatherMode.Weekly, label: "Next 7 days" },

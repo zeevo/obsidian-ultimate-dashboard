@@ -300,7 +300,7 @@ export class DashboardView extends ItemView {
 			const query: WeatherQuery = {
 				place: widget.place,
 				unit: widget.units ?? WeatherUnit.Fahrenheit,
-				mode: widget.mode ?? WeatherMode.ThreeDay,
+				mode: widget.mode ?? WeatherMode.Today,
 				wind: widget.wind === true,
 				humidity: widget.humidity === true,
 				sun: widget.sun === true,

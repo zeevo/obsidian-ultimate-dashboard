@@ -1249,8 +1249,10 @@ console.log("\nweather");
 	check("a clock keeps its minutes", clockLabel("2026-09-13T06:39") === "6:39am", clockLabel("2026-09-13T06:39"));
 	check("an evening clock converts", clockLabel("2026-09-13T19:11") === "7:11pm", clockLabel("2026-09-13T19:11"));
 
-	check("three modes are offered", WEATHER_MODES.length === 3, WEATHER_MODES.join(","));
+	check("four modes are offered", WEATHER_MODES.length === 4, WEATHER_MODES.join(","));
+	check("today is the first offered, and so the default", WEATHER_MODES[0] === "today");
 	check("every mode has a span", WEATHER_MODES.every((m) => SPANS[m].days >= 1));
+	check("today asks for one day only", SPANS.today.days === 1 && SPANS.today.hours === 0);
 	check("three day asks for four, since the strip skips today", SPANS["3day"].days === 4);
 	check("weekly asks for eight", SPANS.weekly.days === 8);
 	check("only hourly asks for hours",
@@ -1318,6 +1320,17 @@ console.log("\nweather");
 	check("one day means no daily strip", quietShell.byClass("udash-weather-days").length === 0);
 	check("no hours means no hourly strip", quietShell.byClass("udash-weather-hourly").length === 0);
 	check("nothing extra means no extras line", quietShell.byClass("udash-weather-extras").length === 0);
+
+	// today mode has no strip, so its own range has to appear in the readout
+	check("today's range is shown when nothing else carries it",
+		quietShell.byClass("udash-weather-today").length === 1);
+	check("the high is labelled", quietShell.byClass("udash-weather-high")[0]?.text === "H 5°",
+		quietShell.byClass("udash-weather-high")[0]?.text);
+	check("the low is labelled", quietShell.byClass("udash-weather-low")[0]?.text === "L 1°",
+		quietShell.byClass("udash-weather-low")[0]?.text);
+
+	// a strip already shows ranges, so the readout must not repeat one
+	check("a strip means no range in the readout", shell.byClass("udash-weather-today").length === 0);
 }
 
 console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED"}`);

@@ -21,6 +21,7 @@ export const WEATHER_UNITS = Object.values(WeatherUnit);
  * none of them well.
  */
 export const WeatherMode = {
+	Today: "today",
 	ThreeDay: "3day",
 	Hourly: "hourly",
 	Weekly: "weekly",
@@ -95,6 +96,7 @@ export interface WeatherQuery {
  * one day, because the headline and the sun times are read off it.
  */
 export const SPANS: { readonly [M in WeatherMode]: { days: number; hours: number } } = {
+	[WeatherMode.Today]: { days: 1, hours: 0 },
 	[WeatherMode.ThreeDay]: { days: 4, hours: 0 },
 	[WeatherMode.Weekly]: { days: 8, hours: 0 },
 	[WeatherMode.Hourly]: { days: 1, hours: 12 },

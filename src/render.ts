@@ -750,13 +750,23 @@ export function fillWeather(wrap: HTMLElement, weather: Weather, widget: Weather
 
 	readout.createDiv({ cls: "udash-weather-label", text: feels });
 
+	const today = days[0];
+	// today is already the headline, so the strips start tomorrow
+	const ahead = days.slice(1);
+
+	// with no strip to carry them, today's own high and low would be nowhere
+	if (hours.length === 0 && ahead.length === 0 && today) {
+		const range = readout.createDiv({ cls: "udash-weather-today" });
+
+		range.createSpan({ cls: "udash-weather-high", text: `H ${Math.round(today.high)}\u00b0` });
+		range.createSpan({ cls: "udash-weather-low", text: `L ${Math.round(today.low)}\u00b0` });
+	}
+
 	const extras: string[] = [];
 
 	if (current.wind !== undefined) extras.push(`${Math.round(current.wind)} ${windUnit ?? ""} wind`.trim());
 
 	if (current.humidity !== undefined) extras.push(`${Math.round(current.humidity)}% humidity`);
-
-	const today = days[0];
 
 	if (widget.sun && today?.sunrise && today.sunset) {
 		extras.push(`\u2191 ${clockLabel(today.sunrise)}`, `\u2193 ${clockLabel(today.sunset)}`);
@@ -773,9 +783,6 @@ export function fillWeather(wrap: HTMLElement, weather: Weather, widget: Weather
 			column(row, hourLabel(hour.time), hour.code, hour.temperature, hour.rain);
 		}
 	}
-
-	// today is already the headline, so the daily strip starts tomorrow
-	const ahead = days.slice(1);
 
 	if (ahead.length === 0) return;
 
