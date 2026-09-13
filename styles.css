@@ -779,3 +779,56 @@
 	font-size: 0.8em;
 	color: var(--text-muted);
 }
+
+.udash-clock-face {
+	display: block;
+	width: 100%;
+	max-width: 150px;
+	aspect-ratio: 1;
+	margin: 0 auto;
+}
+
+.udash-clock-rim {
+	fill: var(--background-primary-alt);
+	stroke: var(--background-modifier-border);
+	stroke-width: 1.5;
+}
+
+.udash-clock-tick {
+	stroke: var(--text-faint);
+	stroke-width: 1.5;
+}
+
+.udash-clock-tick.is-quarter {
+	stroke: var(--text-muted);
+	stroke-width: 2.5;
+}
+
+.udash-clock-hour,
+.udash-clock-minute {
+	stroke: var(--text-normal);
+	stroke-linecap: round;
+}
+
+.udash-clock-hour {
+	stroke-width: 4.5;
+}
+
+.udash-clock-minute {
+	stroke-width: 3;
+}
+
+.udash-clock-second {
+	stroke: var(--interactive-accent);
+	stroke-width: 1.5;
+	stroke-linecap: round;
+}
+
+.udash-clock-pin {
+	fill: var(--text-normal);
+}
+
+.udash-clock-face + .udash-clock-date {
+	text-align: center;
+	margin-top: 6px;
+}

@@ -838,10 +838,81 @@ export function renderClock(el: HTMLElement, widget: ClockWidget): HTMLElement {
 	return wrap.createDiv({ cls: "udash-clock-body" });
 }
 
+/**
+ * Where each hand points, in degrees clockwise from twelve.
+ *
+ * The hour hand carries the minutes and the minute hand carries the seconds, so
+ * the hands creep the way a real movement does rather than jumping on the hour.
+ */
+export interface HandAngles {
+	hour: number;
+	minute: number;
+	second: number;
+}
+
+export function handAngles(now: Date): HandAngles {
+	const seconds = now.getSeconds();
+	const minutes = now.getMinutes() + seconds / 60;
+	const hours = (now.getHours() % 12) + minutes / 60;
+
+	return { hour: hours * 30, minute: minutes * 6, second: seconds * 6 };
+}
+
+/** A hand as a line from the centre of a 100 unit face. */
+function hand(angle: number, length: number) {
+	const radians = ((angle - 90) * Math.PI) / 180;
+
+	return {
+		x2: (50 + Math.cos(radians) * length).toFixed(2),
+		y2: (50 + Math.sin(radians) * length).toFixed(2),
+	};
+}
+
+function drawFace(body: HTMLElement, widget: ClockWidget, now: Date): void {
+	const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+	svg.setAttribute("viewBox", "0 0 100 100");
+	svg.addClass("udash-clock-face");
+
+	const add = (tag: string, attrs: Record<string, string>) => {
+		const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
+
+		for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+		svg.appendChild(node);
+	};
+
+	add("circle", { cx: "50", cy: "50", r: "48", class: "udash-clock-rim" });
+
+	// a tick per hour, longer at the quarters so the face reads at a glance
+	for (let i = 0; i < 12; i++) {
+		const quarter = i % 3 === 0;
+		const outer = hand(i * 30, 44);
+		const inner = hand(i * 30, quarter ? 36 : 40);
+
+		add("line", {
+			x1: inner.x2, y1: inner.y2, x2: outer.x2, y2: outer.y2,
+			class: quarter ? "udash-clock-tick is-quarter" : "udash-clock-tick",
+		});
+	}
+
+	const angles = handAngles(now);
+
+	add("line", { x1: "50", y1: "50", ...hand(angles.hour, 24), class: "udash-clock-hour" });
+	add("line", { x1: "50", y1: "50", ...hand(angles.minute, 36), class: "udash-clock-minute" });
+
+	if (widget.seconds) {
+		add("line", { x1: "50", y1: "50", ...hand(angles.second, 40), class: "udash-clock-second" });
+	}
+
+	add("circle", { cx: "50", cy: "50", r: "2.5", class: "udash-clock-pin" });
+	body.appendChild(svg);
+}
+
 /** Fills a shell created by `renderClock`. Called again on every tick. */
 export function fillClock(body: HTMLElement, widget: ClockWidget, now: Date): void {
 	body.empty();
-	body.createDiv({ cls: "udash-clock-time", text: clockText(now, widget) });
+
+	if (widget.analog) drawFace(body, widget, now);
+	else body.createDiv({ cls: "udash-clock-time", text: clockText(now, widget) });
 
 	if (widget.date) {
 		body.createDiv({

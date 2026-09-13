@@ -141,6 +141,8 @@ export interface ClockWidget extends NodeBase {
 	/** Today's date under the time. */
 	date?: boolean;
 	hour24?: boolean;
+	/** Draw a face instead of digits. A face is always twelve hour. */
+	analog?: boolean;
 }
 
 export type Widget =
@@ -426,13 +428,19 @@ const clock: WidgetSpec<ClockWidget> = {
 	hint: "The time, ticking",
 	fields: [
 		{ key: "title", kind: FieldKind.Text, label: "Title" },
+		{ key: "analog", kind: FieldKind.Toggle, label: "Analog face" },
 		{ key: "seconds", kind: FieldKind.Toggle, label: "Show seconds" },
 		{ key: "date", kind: FieldKind.Toggle, label: "Show the date" },
-		{ key: "hour24", kind: FieldKind.Toggle, label: "24 hour clock" },
+		{
+			key: "hour24",
+			kind: FieldKind.Toggle,
+			label: "24 hour clock",
+			hint: "Digital only. A face is always twelve hour",
+		},
 	],
 	blank: () => ({ type: WidgetKind.Clock }),
 	title: (w) => w.title || "Clock",
-	summary: (w) => (w.hour24 ? "24 hour" : "12 hour"),
+	summary: (w) => (w.analog ? "analog" : w.hour24 ? "24 hour" : "12 hour"),
 };
 
 /** Every widget type, keyed by its discriminant. */

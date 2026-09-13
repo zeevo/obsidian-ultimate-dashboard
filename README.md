@@ -70,15 +70,22 @@ The time, ticking. Reads no data and needs no configuration.
 
 | Key | Meaning |
 |-----|---------|
-| `seconds` | `true` to tick the seconds |
-| `date` | `true` to show today's date under the time |
-| `hour24` | `true` for a 24 hour clock |
+| `analog` | `true` for a face instead of digits |
+| `seconds` | `true` to tick the seconds, or draw a second hand |
+| `date` | `true` to show today's date underneath |
+| `hour24` | `true` for a 24 hour clock. Digital only |
 | `title` | Heading. Omitted entirely when unset |
 
 ```yaml
 - type: clock
-  date: true
+  analog: true
+  seconds: true
 ```
+
+The face is drawn as SVG in theme colours, so it follows light and dark mode. Its
+hands creep the way a movement does rather than jumping: the hour hand carries
+the minutes, so at half past three it sits halfway between the three and the
+four, and the minute hand carries the seconds.
 
 It redraws once a second only when `seconds` is on, and every fifteen otherwise,
 which is enough for the minute to roll over promptly. The interval belongs to

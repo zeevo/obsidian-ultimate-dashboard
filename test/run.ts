@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { load } from "js-yaml";
 import { ConfigError, ContainerNode, countWidgets, isContainer, needsSetup, parseDashboard } from "../src/layout-tree";
 import { DayRecord, shiftDate, stripFrontmatter, today } from "../src/data";
-import { currentStreak, fillMonth, monthWindow, renderBlank, renderHeatmap, renderLine, renderMonth, renderNote, renderStat, clockLabel, fillWeather, hourLabel, renderWeather, clockText, fillClock, renderClock } from "../src/render";
+import { currentStreak, fillMonth, monthWindow, renderBlank, renderHeatmap, renderLine, renderMonth, renderNote, renderStat, clockLabel, fillWeather, hourLabel, renderWeather, clockText, fillClock, handAngles, renderClock } from "../src/render";
 import { renderNode } from "../src/layout";
 import { parseICS } from "../src/ics";
 import { serializeDashboard } from "../src/serialize";
@@ -1457,6 +1457,60 @@ console.log("\nclock");
 		datedBody.byClass("udash-clock-time").map((e) => e.text).join());
 
 	check("a clock never needs setup", !needsSetup(newNode("clock")));
+
+	/* --------------------------------------------------------- analog face */
+
+	// degrees clockwise from twelve
+	check("noon points every hand up", (() => {
+		const a = handAngles(at(12, 0, 0));
+
+		return a.hour === 0 && a.minute === 0 && a.second === 0;
+	})());
+	check("three o'clock is a quarter turn", handAngles(at(15, 0, 0)).hour === 90,
+		String(handAngles(at(15, 0, 0)).hour));
+	check("six o'clock is half a turn", handAngles(at(18, 0, 0)).hour === 180);
+	check("midnight and noon point the same way", handAngles(at(0, 0, 0)).hour === 0);
+	check("thirty minutes is half a turn", handAngles(at(1, 30, 0)).minute === 180);
+	check("forty five seconds is three quarters", handAngles(at(1, 0, 45)).second === 270);
+
+	// a real movement creeps: the hour hand is halfway between at half past
+	check("the hour hand carries the minutes", handAngles(at(3, 30, 0)).hour === 105,
+		String(handAngles(at(3, 30, 0)).hour));
+	check("the minute hand carries the seconds", handAngles(at(3, 0, 30)).minute === 3,
+		String(handAngles(at(3, 0, 30)).minute));
+
+	const face = new El();
+	const faceBody = renderClock(face, { ...plain, analog: true });
+
+	fillClock(faceBody as never, { ...plain, analog: true }, at(10, 10));
+
+	check("a face is drawn, not digits", faceBody.byClass("udash-clock-face").length === 1
+		&& faceBody.byClass("udash-clock-time").length === 0);
+
+	// SVG children carry `class` as an attribute, not through addClass
+	const parts = (root: El, cls: string) =>
+		root.all.filter((e) => (e.attrs.class ?? "").split(" ").includes(cls));
+
+	check("twelve hour ticks", parts(faceBody as never, "udash-clock-tick").length === 12,
+		String(parts(faceBody as never, "udash-clock-tick").length));
+	check("four of them mark the quarters", parts(faceBody as never, "is-quarter").length === 4);
+	check("two hands without seconds", parts(faceBody as never, "udash-clock-second").length === 0
+		&& parts(faceBody as never, "udash-clock-hour").length === 1);
+
+	const ticker = new El();
+	const tickerBody = renderClock(ticker, { ...plain, analog: true, seconds: true });
+
+	fillClock(tickerBody as never, { ...plain, analog: true, seconds: true }, at(10, 10, 30));
+
+	check("a second hand when asked", parts(tickerBody as never, "udash-clock-second").length === 1);
+
+	// the date still belongs under a face
+	const dial = new El();
+	const dialBody = renderClock(dial, { ...plain, analog: true, date: true });
+
+	fillClock(dialBody as never, { ...plain, analog: true, date: true }, at(10, 10));
+
+	check("a face can still carry the date", dialBody.byClass("udash-clock-date").length === 1);
 }
 
 console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED"}`);
