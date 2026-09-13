@@ -133,6 +133,16 @@ export interface WeatherWidget extends NodeBase {
 	sun?: boolean;
 }
 
+export interface ClockWidget extends NodeBase {
+	type: typeof WidgetKind.Clock;
+	title?: string;
+	/** Tick the seconds. Off by default, since it costs a redraw a second. */
+	seconds?: boolean;
+	/** Today's date under the time. */
+	date?: boolean;
+	hour24?: boolean;
+}
+
 export type Widget =
 	| StatWidget
 	| LineWidget
@@ -141,7 +151,8 @@ export type Widget =
 	| CalendarWidget
 	| NoteWidget
 	| BlankWidget
-	| WeatherWidget;
+	| WeatherWidget
+	| ClockWidget;
 
 /* ------------------------------------------------------------ field groups */
 
@@ -409,6 +420,21 @@ const weather: WidgetSpec<WeatherWidget> = {
 	summary: (w) => w.place || "not configured",
 };
 
+const clock: WidgetSpec<ClockWidget> = {
+	type: WidgetKind.Clock,
+	label: "Clock",
+	hint: "The time, ticking",
+	fields: [
+		{ key: "title", kind: FieldKind.Text, label: "Title" },
+		{ key: "seconds", kind: FieldKind.Toggle, label: "Show seconds" },
+		{ key: "date", kind: FieldKind.Toggle, label: "Show the date" },
+		{ key: "hour24", kind: FieldKind.Toggle, label: "24 hour clock" },
+	],
+	blank: () => ({ type: WidgetKind.Clock }),
+	title: (w) => w.title || "Clock",
+	summary: (w) => (w.hour24 ? "24 hour" : "12 hour"),
+};
+
 /** Every widget type, keyed by its discriminant. */
 export const WIDGETS: { readonly [K in WidgetKind]: WidgetSpec } = {
 	[WidgetKind.Stat]: stat as WidgetSpec,
@@ -419,6 +445,7 @@ export const WIDGETS: { readonly [K in WidgetKind]: WidgetSpec } = {
 	[WidgetKind.Note]: note as WidgetSpec,
 	[WidgetKind.Blank]: blankWidget as WidgetSpec,
 	[WidgetKind.Weather]: weather as WidgetSpec,
+	[WidgetKind.Clock]: clock as WidgetSpec,
 };
 
 export function specFor(type: WidgetKind): WidgetSpec {

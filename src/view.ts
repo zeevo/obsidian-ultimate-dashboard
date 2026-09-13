@@ -1,11 +1,11 @@
 import { Component, ItemView, MarkdownRenderer, WorkspaceLeaf, setIcon, setTooltip } from "obsidian";
 import { ConfigError, countWidgets, parseDashboard } from "./layout-tree";
 import { readDays, stripFrontmatter } from "./data";
-import { CalendarFiller, DEFAULT_GAP, NoteFiller, WeatherFiller, renderNode } from "./layout";
+import { CalendarFiller, ClockFiller, DEFAULT_GAP, NoteFiller, WeatherFiller, renderNode } from "./layout";
 import { CalendarService } from "./calendar";
 import { WeatherMode, WeatherQuery, WeatherService, WeatherUnit } from "./weather";
-import { CalendarWidget, NoteWidget, UpcomingWidget, WeatherWidget } from "./widgets";
-import { fillCalendar, fillMonth, fillWeather, monthWindow } from "./render";
+import { CalendarWidget, ClockWidget, NoteWidget, UpcomingWidget, WeatherWidget } from "./widgets";
+import { fillCalendar, fillClock, fillMonth, fillWeather, monthWindow } from "./render";
 import { EventModal, NameModal } from "./modal";
 import { VisualEditor } from "./editor";
 import { serializeDashboard } from "./serialize";
@@ -137,6 +137,7 @@ export class DashboardView extends ItemView {
 				calendar: this.makeCalendarFiller(),
 				note: this.makeNoteFiller(),
 				weather: this.makeWeatherFiller(),
+				clock: this.makeClockFiller(),
 			},
 		);
 	}
@@ -287,6 +288,25 @@ export class DashboardView extends ItemView {
 					this.scrolled.set(widget.path, body.scrollTop),
 				);
 			});
+		};
+	}
+
+	/**
+	 * Keeps a clock ticking. The interval belongs to a child component so it is
+	 * cleared on the next redraw: registering it on the view itself would leave
+	 * one running per redraw, and this view redraws on every metadata change.
+	 */
+	private makeClockFiller(): ClockFiller {
+		return (body: HTMLElement, widget: ClockWidget) => {
+			const owner = new Component();
+			this.addChild(owner);
+			this.embeds.push(owner);
+
+			const tick = () => fillClock(body, widget, new Date());
+
+			tick();
+			// no point redrawing every second for a clock that hides them
+			owner.registerInterval(window.setInterval(tick, widget.seconds ? 1000 : 15000));
 		};
 	}
 

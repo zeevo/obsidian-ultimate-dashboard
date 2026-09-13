@@ -751,3 +751,31 @@
 	font-size: 0.68em;
 	color: var(--text-accent);
 }
+
+/* ------------------------------------------------------------------ clock */
+
+.udash-clock {
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	padding: 10px 12px;
+	background: var(--background-secondary);
+}
+
+.udash-clock-body {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	height: 100%;
+}
+
+.udash-clock-time {
+	font-size: 2em;
+	font-weight: 600;
+	line-height: 1.15;
+	font-variant-numeric: tabular-nums;
+}
+
+.udash-clock-date {
+	font-size: 0.8em;
+	color: var(--text-muted);
+}

@@ -1,8 +1,8 @@
 import { ContainerNode, LayoutNode, isContainer } from "./layout-tree";
-import { CalendarWidget, NoteWidget, UpcomingWidget, WeatherWidget } from "./widgets";
+import { CalendarWidget, ClockWidget, NoteWidget, UpcomingWidget, WeatherWidget } from "./widgets";
 import { ContainerKind, WidgetKind, assertNever } from "./kinds";
 import { DayRecord } from "./data";
-import { fillCalendar, fillMonth, monthWindow, renderBlank, renderHeatmap, renderLine, renderMonth, renderNote, renderStat, renderUpcoming, renderWeather } from "./render";
+import { fillCalendar, fillMonth, monthWindow, renderBlank, renderClock, renderHeatmap, renderLine, renderMonth, renderNote, renderStat, renderUpcoming, renderWeather } from "./render";
 
 const DEFAULT_GAP = 20;
 
@@ -45,6 +45,9 @@ export type NoteFiller = (body: HTMLElement, widget: NoteWidget) => void;
 /** Fetches a forecast and fills the shell a weather tile made for it. */
 export type WeatherFiller = (shell: HTMLElement, widget: WeatherWidget) => void;
 
+/** Writes the time into a clock, and keeps writing it. */
+export type ClockFiller = (body: HTMLElement, widget: ClockWidget) => void;
+
 /**
  * Widgets whose content arrives from the network draw a shell first and are
  * filled in when it lands. Grouped rather than passed one positional argument
@@ -54,6 +57,7 @@ export interface Fillers {
 	calendar?: CalendarFiller;
 	note?: NoteFiller;
 	weather?: WeatherFiller;
+	clock?: ClockFiller;
 }
 
 export function renderNode(
@@ -113,6 +117,13 @@ export function renderNode(
 				const shell = renderWeather(el, node);
 
 				fillers.weather?.(shell, node);
+				break;
+			}
+
+			case WidgetKind.Clock: {
+				const body = renderClock(el, node);
+
+				fillers.clock?.(body, node);
 				break;
 			}
 

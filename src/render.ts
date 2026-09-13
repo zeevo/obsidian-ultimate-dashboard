@@ -1,4 +1,4 @@
-import { Agg, BlankWidget, CalendarWidget, HeatmapWidget, LineWidget, NoteWidget, StatWidget, UpcomingWidget, WeatherWidget, specFor } from "./widgets";
+import { Agg, BlankWidget, ClockWidget, CalendarWidget, HeatmapWidget, LineWidget, NoteWidget, StatWidget, UpcomingWidget, WeatherWidget, specFor } from "./widgets";
 import { Weather, describeWeather } from "./weather";
 import { assertNever } from "./kinds";
 import { DayRecord, daysBetween, num, shiftDate, shiftMonths, toISO, today, truthy } from "./data";
@@ -804,5 +804,49 @@ export function fillWeather(wrap: HTMLElement, weather: Weather, widget: Weather
 
 		// the date as well as the weekday, so which day a column means is checkable
 		column(row, `${WEEKDAYS[when.getDay()]} ${when.getDate()}`, day.code, day.high, day.rain, day.low);
+	}
+}
+
+/* ------------------------------------------------------------------ clock */
+
+/**
+ * The time, as a string. Takes the moment rather than reading the clock, so it
+ * can be tested at midnight and noon without waiting for either.
+ */
+export function clockText(now: Date, widget: ClockWidget): string {
+	const hours = now.getHours();
+	const pad = (n: number) => String(n).padStart(2, "0");
+
+	const parts = [
+		widget.hour24 === true ? pad(hours) : String(hours % 12 === 0 ? 12 : hours % 12),
+		pad(now.getMinutes()),
+	];
+
+	if (widget.seconds) parts.push(pad(now.getSeconds()));
+
+	const time = parts.join(":");
+
+	return widget.hour24 === true ? time : `${time} ${hours < 12 ? "am" : "pm"}`;
+}
+
+/** The shell for a clock. The view fills it, and keeps filling it. */
+export function renderClock(el: HTMLElement, widget: ClockWidget): HTMLElement {
+	const wrap = el.createDiv({ cls: "udash-clock" });
+
+	if (widget.title) wrap.createDiv({ cls: "udash-heatmap-head", text: widget.title });
+
+	return wrap.createDiv({ cls: "udash-clock-body" });
+}
+
+/** Fills a shell created by `renderClock`. Called again on every tick. */
+export function fillClock(body: HTMLElement, widget: ClockWidget, now: Date): void {
+	body.empty();
+	body.createDiv({ cls: "udash-clock-time", text: clockText(now, widget) });
+
+	if (widget.date) {
+		body.createDiv({
+			cls: "udash-clock-date",
+			text: now.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" }),
+		});
 	}
 }

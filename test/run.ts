@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { load } from "js-yaml";
 import { ConfigError, ContainerNode, countWidgets, isContainer, needsSetup, parseDashboard } from "../src/layout-tree";
 import { DayRecord, shiftDate, stripFrontmatter, today } from "../src/data";
-import { currentStreak, fillMonth, monthWindow, renderBlank, renderHeatmap, renderLine, renderMonth, renderNote, renderStat, clockLabel, fillWeather, hourLabel, renderWeather } from "../src/render";
+import { currentStreak, fillMonth, monthWindow, renderBlank, renderHeatmap, renderLine, renderMonth, renderNote, renderStat, clockLabel, fillWeather, hourLabel, renderWeather, clockText, fillClock, renderClock } from "../src/render";
 import { renderNode } from "../src/layout";
 import { parseICS } from "../src/ics";
 import { serializeDashboard } from "../src/serialize";
@@ -1374,6 +1374,7 @@ console.log("\ndefault titles");
 		note: { id: "t", type: "note", path: "0 All/Health.md" },
 		blank: { id: "t", type: "blank" },
 		weather: { id: "t", type: "weather", place: "Denver" },
+		clock: { id: "t", type: "clock" },
 	};
 
 	for (const kind of WIDGET_KINDS) {
@@ -1401,6 +1402,61 @@ console.log("\ndefault titles");
 
 		check(`a fresh ${kind} still has a name`, title.length > 0, title);
 	}
+}
+
+console.log("\nclock");
+
+{
+	// the moment is passed in, so midnight and noon are testable at any hour
+	const at = (h: number, m: number, sec = 0) => new Date(2026, 8, 13, h, m, sec);
+	const plain = { id: "t", type: "clock" } as const;
+
+	check("morning reads am", clockText(at(9, 5), plain) === "9:05 am", clockText(at(9, 5), plain));
+	check("afternoon reads pm", clockText(at(13, 5), plain) === "1:05 pm", clockText(at(13, 5), plain));
+	check("midnight is twelve, not zero", clockText(at(0, 30), plain) === "12:30 am", clockText(at(0, 30), plain));
+	check("noon is twelve pm", clockText(at(12, 0), plain) === "12:00 pm", clockText(at(12, 0), plain));
+	check("minutes are padded", clockText(at(9, 5), plain).endsWith("9:05 am"));
+
+	const military = { ...plain, hour24: true };
+
+	check("24 hour drops the suffix", clockText(at(13, 5), military) === "13:05", clockText(at(13, 5), military));
+	check("24 hour pads the hour", clockText(at(9, 5), military) === "09:05", clockText(at(9, 5), military));
+	check("24 hour midnight is zero", clockText(at(0, 30), military) === "00:30", clockText(at(0, 30), military));
+
+	const ticking = { ...plain, seconds: true };
+
+	check("seconds appear when asked", clockText(at(9, 5, 7), ticking) === "9:05:07 am",
+		clockText(at(9, 5, 7), ticking));
+	check("seconds are off by default", clockText(at(9, 5, 7), plain) === "9:05 am");
+
+	const host = new El();
+	const body = renderClock(host, plain);
+
+	fillClock(body as never, plain, at(14, 30));
+
+	check("the time is drawn", body.byClass("udash-clock-time")[0]?.text === "2:30 pm",
+		body.byClass("udash-clock-time")[0]?.text);
+	check("no date unless asked", body.byClass("udash-clock-date").length === 0);
+	check("an untitled clock draws no heading", host.byClass("udash-heatmap-head").length === 0);
+
+	const dated = new El();
+	const datedBody = renderClock(dated, { ...plain, date: true, title: "Now" });
+
+	fillClock(datedBody as never, { ...plain, date: true }, at(14, 30));
+
+	check("the date is drawn when asked", datedBody.byClass("udash-clock-date")[0]?.text.includes("13") === true,
+		datedBody.byClass("udash-clock-date")[0]?.text);
+	check("a titled clock draws a heading", dated.byClass("udash-heatmap-head").length === 1);
+
+	// each tick replaces the previous reading rather than stacking them
+	fillClock(datedBody as never, { ...plain, date: true }, at(14, 31));
+
+	check("a tick replaces, it does not append",
+		datedBody.byClass("udash-clock-time").length === 1
+			&& datedBody.byClass("udash-clock-time")[0]?.text === "2:31 pm",
+		datedBody.byClass("udash-clock-time").map((e) => e.text).join());
+
+	check("a clock never needs setup", !needsSetup(newNode("clock")));
 }
 
 console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED"}`);

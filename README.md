@@ -64,6 +64,27 @@ Community plugins → Ultimate Dashboard.
 
 Layouts are stored in the plugin's `data.json`, not in your notes.
 
+### `type: clock`
+
+The time, ticking. Reads no data and needs no configuration.
+
+| Key | Meaning |
+|-----|---------|
+| `seconds` | `true` to tick the seconds |
+| `date` | `true` to show today's date under the time |
+| `hour24` | `true` for a 24 hour clock |
+| `title` | Heading. Omitted entirely when unset |
+
+```yaml
+- type: clock
+  date: true
+```
+
+It redraws once a second only when `seconds` is on, and every fifteen otherwise,
+which is enough for the minute to roll over promptly. The interval belongs to
+the tile and is cleared when the dashboard redraws, so switching dashboards does
+not leave clocks running behind you.
+
 ## Titles
 
 Every widget names itself when its title is left empty, so a heading is never
