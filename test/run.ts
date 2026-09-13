@@ -1312,6 +1312,32 @@ console.log("\nweather");
 		sunShell.byClass("udash-weather-extras")[0]?.text.includes("↑ 6:38") === true,
 		sunShell.byClass("udash-weather-extras")[0]?.text);
 
+	// the headline is optional: an hourly tile already opens on the current hour
+	const bare2 = new El();
+	const bareShell = renderWeather(bare2, { ...widget, current: false });
+
+	fillWeather(bareShell as never, { place: places[0], forecast }, { ...widget, current: false });
+
+	check("the headline can be turned off", bareShell.byClass("udash-weather-now").length === 0);
+	check("no headline means no big temperature", bareShell.byClass("udash-weather-temp").length === 0);
+	check("the strips survive without it", bareShell.byClass("udash-weather-hourly").length === 1
+		&& bareShell.byClass("udash-weather-days").length === 1);
+	check("the header still names the place",
+		bareShell.byClass("udash-weather-where")[0]?.text === "Denver, Colorado, United States");
+
+	// extras hang off the headline normally, so they must not vanish with it
+	const orphan = new El();
+	const orphanShell = renderWeather(orphan, { ...widget, current: false, sun: true });
+
+	fillWeather(orphanShell as never, { place: places[0], forecast: bare },
+		{ ...widget, current: false, sun: true });
+
+	check("today's range survives a hidden headline",
+		orphanShell.byClass("udash-weather-today").length === 1);
+
+	check("the headline is on unless asked otherwise",
+		shell.byClass("udash-weather-now").length === 1);
+
 	const quiet = new El();
 	const quietShell = renderWeather(quiet, widget);
 

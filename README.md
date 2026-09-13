@@ -446,6 +446,7 @@ API key and no account: type a place name and it works.
 | `place` | Any place name, resolved to coordinates once and remembered |
 | `mode` | `today` (default), `3day`, `hourly`, or `weekly` |
 | `units` | `fahrenheit` (default) or `celsius` |
+| `current` | `false` to hide the current conditions headline |
 | `wind` | `true` to show wind speed |
 | `humidity` | `true` to show relative humidity |
 | `sun` | `true` to show today's sunrise and sunset |
@@ -480,6 +481,10 @@ differs from the actual, with wind, humidity and sun times beneath it when asked
 for. The strips start tomorrow, since today is already the headline, which is
 why `today` mode prints today's high and low in the readout instead: with no
 strip, nothing else would carry them.
+
+`current: false` drops that headline. It is worth doing in `hourly`, whose first
+column already covers now, so the headline repeats it. Anything hanging off the
+headline moves up rather than disappearing with it.
 
 Daily columns are labelled with the date as well as the weekday, and the high
 and low are separate rather than written `78/66`, which read as a fraction. The

@@ -122,6 +122,11 @@ export interface WeatherWidget extends NodeBase {
 	/** What the tile shows. Defaults to today alone. */
 	mode?: WeatherMode;
 	units?: WeatherUnit;
+	/**
+	 * The current conditions headline. On by default, and worth turning off in
+	 * `hourly`, where the first column already covers now.
+	 */
+	current?: boolean;
 	wind?: boolean;
 	humidity?: boolean;
 	/** Today's sunrise and sunset. */
@@ -356,6 +361,12 @@ const weather: WidgetSpec<WeatherWidget> = {
 			kind: FieldKind.Choice,
 			label: "Units",
 			choices: WEATHER_UNITS.map((u) => ({ value: u, label: u === "celsius" ? "Celsius" : "Fahrenheit" })),
+		},
+		{
+			key: "current",
+			kind: FieldKind.Toggle,
+			label: "Show current conditions",
+			hint: "On unless set. The hourly forecast already opens on the current hour",
 		},
 		{ key: "wind", kind: FieldKind.Toggle, label: "Show wind" },
 		{ key: "humidity", kind: FieldKind.Toggle, label: "Show humidity" },

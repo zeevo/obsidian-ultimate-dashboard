@@ -736,27 +736,38 @@ export function fillWeather(wrap: HTMLElement, weather: Weather, widget: Weather
 
 	body.empty();
 
-	const now = describeWeather(current.code, current.isDay);
-	const top = body.createDiv({ cls: "udash-weather-now" });
-
-	top.createSpan({ cls: "udash-weather-icon", text: now.icon });
-
-	const readout = top.createDiv({ cls: "udash-weather-readout" });
-	readout.createDiv({ cls: "udash-weather-temp", text: degrees(current.temperature, unit) });
-
-	const feels = Math.round(current.feelsLike) !== Math.round(current.temperature)
-		? `${now.label}, feels ${degrees(current.feelsLike, unit)}`
-		: now.label;
-
-	readout.createDiv({ cls: "udash-weather-label", text: feels });
-
 	const today = days[0];
 	// today is already the headline, so the strips start tomorrow
 	const ahead = days.slice(1);
 
+	/*
+	 * Where the range and the extras hang. Normally that is under the headline,
+	 * but the headline is optional: an hourly tile opens on the current hour, so
+	 * a "now" block above it says the same thing twice. With it off they attach
+	 * to the body instead of vanishing with it.
+	 */
+	let details: HTMLElement = body;
+
+	if (widget.current !== false) {
+		const now = describeWeather(current.code, current.isDay);
+		const top = body.createDiv({ cls: "udash-weather-now" });
+
+		top.createSpan({ cls: "udash-weather-icon", text: now.icon });
+
+		const readout = top.createDiv({ cls: "udash-weather-readout" });
+		readout.createDiv({ cls: "udash-weather-temp", text: degrees(current.temperature, unit) });
+
+		const feels = Math.round(current.feelsLike) !== Math.round(current.temperature)
+			? `${now.label}, feels ${degrees(current.feelsLike, unit)}`
+			: now.label;
+
+		readout.createDiv({ cls: "udash-weather-label", text: feels });
+		details = readout;
+	}
+
 	// with no strip to carry them, today's own high and low would be nowhere
 	if (hours.length === 0 && ahead.length === 0 && today) {
-		const range = readout.createDiv({ cls: "udash-weather-today" });
+		const range = details.createDiv({ cls: "udash-weather-today" });
 
 		range.createSpan({ cls: "udash-weather-high", text: `H ${Math.round(today.high)}\u00b0` });
 		range.createSpan({ cls: "udash-weather-low", text: `L ${Math.round(today.low)}\u00b0` });
@@ -773,7 +784,7 @@ export function fillWeather(wrap: HTMLElement, weather: Weather, widget: Weather
 	}
 
 	if (extras.length > 0) {
-		readout.createDiv({ cls: "udash-weather-extras", text: extras.join("  \u00b7  ") });
+		details.createDiv({ cls: "udash-weather-extras", text: extras.join("  \u00b7  ") });
 	}
 
 	if (hours.length > 0) {
