@@ -444,8 +444,7 @@ API key and no account: type a place name and it works.
 | Key | Meaning |
 |-----|---------|
 | `place` | Any place name, resolved to coordinates once and remembered |
-| `days` | Days in the daily strip. Defaults to 3 |
-| `hours` | Hours in the hourly strip, starting with this one. Omit for none |
+| `mode` | `3day` (default), `hourly`, or `weekly` |
 | `units` | `fahrenheit` (default) or `celsius` |
 | `wind` | `true` to show wind speed |
 | `humidity` | `true` to show relative humidity |
@@ -455,21 +454,31 @@ API key and no account: type a place name and it works.
 ```yaml
 - type: weather
   place: Denver
-  days: 4
-  hours: 12
+  mode: hourly
   wind: true
-  sun: true
 ```
+
+**Mode is what the tile is for.** One widget answers one question, so the three
+modes are exclusive rather than a set of lengths you combine:
+
+| Mode | Shows |
+|------|-------|
+| `3day` | The next three days |
+| `hourly` | The next twelve hours, starting with this one |
+| `weekly` | The next seven days |
+
+Want two of them, put two widgets side by side. Each mode fetches only what it
+draws, so an hourly tile does not pull a week of daily data it will not use.
 
 **The header shows what your place name resolved to**, on the right, so a
 `Springfield` that landed in the wrong state is visible rather than quietly
 wrong. The left half stays whatever you typed, or your `title`.
 
-The headline is now: temperature, conditions, and the feels-like when it differs
-from the actual, with wind, humidity and sun times beneath it when asked for.
-The daily strip starts tomorrow, since repeating today in both would waste a
-column. An hourly strip starts with the current hour and scrolls sideways inside
-the tile, so twelve hours do not squeeze three days of columns into nothing.
+Every mode leads with now: temperature, conditions, and the feels-like when it
+differs from the actual, with wind, humidity and sun times beneath it when asked
+for. The daily modes start tomorrow, since today is already the headline. The
+hourly strip scrolls sideways inside the tile rather than squeezing twelve
+columns into nothing.
 
 A chance of rain appears only at 20% or above, because a 3% chance is not
 information. Wind is reported in mph beside Fahrenheit and km/h beside Celsius.
@@ -481,8 +490,7 @@ Nothing else is sent, and no key or account is involved.
 Forecasts are cached for 30 minutes and coordinates for the session. That is
 load bearing rather than an optimisation: the dashboard redraws whenever any
 note in the vault changes, so an uncached widget would call out to the network
-while you typed. Every option is part of the cache key, since every option
-changes what is requested.
+while you typed. Mode is part of the cache key, since it changes the request.
 
 ## Development
 

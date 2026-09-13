@@ -3,7 +3,7 @@ import { ConfigError, countWidgets, parseDashboard } from "./layout-tree";
 import { readDays, stripFrontmatter } from "./data";
 import { CalendarFiller, DEFAULT_GAP, NoteFiller, WeatherFiller, renderNode } from "./layout";
 import { CalendarService } from "./calendar";
-import { WeatherQuery, WeatherService, WeatherUnit } from "./weather";
+import { WeatherMode, WeatherQuery, WeatherService, WeatherUnit } from "./weather";
 import { CalendarWidget, NoteWidget, UpcomingWidget, WeatherWidget } from "./widgets";
 import { fillCalendar, fillMonth, fillWeather, monthWindow } from "./render";
 import { EventModal, NameModal } from "./modal";
@@ -297,12 +297,10 @@ export class DashboardView extends ItemView {
 	 */
 	private makeWeatherFiller(): WeatherFiller {
 		return (shell: HTMLElement, widget: WeatherWidget) => {
-			// the strip skips today, so a three day forecast needs four days back
 			const query: WeatherQuery = {
 				place: widget.place,
 				unit: widget.units ?? WeatherUnit.Fahrenheit,
-				days: (widget.days ?? 3) + 1,
-				hours: widget.hours ?? 0,
+				mode: widget.mode ?? WeatherMode.ThreeDay,
 				wind: widget.wind === true,
 				humidity: widget.humidity === true,
 				sun: widget.sun === true,

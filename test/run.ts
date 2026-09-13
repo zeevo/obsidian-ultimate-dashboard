@@ -11,7 +11,7 @@ import { renderNode } from "../src/layout";
 import { parseICS } from "../src/ics";
 import { serializeDashboard } from "../src/serialize";
 import { newNode } from "../src/editor";
-import { WeatherError, describeWeather, parseForecast, parsePlaces } from "../src/weather";
+import { SPANS, WEATHER_MODES, WeatherError, describeWeather, parseForecast, parsePlaces, toWeatherMode } from "../src/weather";
 import { CONTAINER_KINDS, WIDGET_KINDS } from "../src/kinds";
 import { specFor } from "../src/widgets";
 import { DEFAULT_CONFIG, activeDashboard, defaultSettings, findAccount, makeDashboard, migrate, uniqueName } from "../src/store";
@@ -437,8 +437,9 @@ layout:
     - type: weather
       title: Outside
       place: Denver
-      days: 4
-      units: celsius`,
+      mode: weekly
+      units: celsius
+      wind: true`,
 		// nesting, flex sizing and an explicit range
 		`folder: Notes
 layout:
@@ -1247,6 +1248,15 @@ console.log("\nweather");
 	check("afternoon converts", hourLabel("2026-09-13T13:00") === "1pm", hourLabel("2026-09-13T13:00"));
 	check("a clock keeps its minutes", clockLabel("2026-09-13T06:39") === "6:39am", clockLabel("2026-09-13T06:39"));
 	check("an evening clock converts", clockLabel("2026-09-13T19:11") === "7:11pm", clockLabel("2026-09-13T19:11"));
+
+	check("three modes are offered", WEATHER_MODES.length === 3, WEATHER_MODES.join(","));
+	check("every mode has a span", WEATHER_MODES.every((m) => SPANS[m].days >= 1));
+	check("three day asks for four, since the strip skips today", SPANS["3day"].days === 4);
+	check("weekly asks for eight", SPANS.weekly.days === 8);
+	check("only hourly asks for hours",
+		SPANS.hourly.hours === 12 && SPANS["3day"].hours === 0 && SPANS.weekly.hours === 0);
+	check("an unknown mode is rejected", toWeatherMode("fortnightly") === null);
+	check("a known mode round trips", toWeatherMode("weekly") === "weekly");
 
 	const widget = { id: "t", type: "weather", place: "Denver" } as const;
 	const host = new El();

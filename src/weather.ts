@@ -15,6 +15,25 @@ export type WeatherUnit = (typeof WeatherUnit)[keyof typeof WeatherUnit];
 
 export const WEATHER_UNITS = Object.values(WeatherUnit);
 
+/**
+ * What a widget shows. One mode per widget rather than a pile of independent
+ * lengths: a tile answers one question, and two strips stacked in it answered
+ * none of them well.
+ */
+export const WeatherMode = {
+	ThreeDay: "3day",
+	Hourly: "hourly",
+	Weekly: "weekly",
+} as const;
+
+export type WeatherMode = (typeof WeatherMode)[keyof typeof WeatherMode];
+
+export const WEATHER_MODES = Object.values(WeatherMode);
+
+export function toWeatherMode(v: unknown): WeatherMode | null {
+	return WEATHER_MODES.find((m) => m === v) ?? null;
+}
+
 export interface Place {
 	name: string;
 	latitude: number;
@@ -64,13 +83,22 @@ export interface Forecast {
 export interface WeatherQuery {
 	place: string;
 	unit: WeatherUnit;
-	days: number;
-	/** Hours of hourly forecast. Zero asks for none. */
-	hours: number;
+	mode: WeatherMode;
 	wind: boolean;
 	humidity: boolean;
 	sun: boolean;
 }
+
+/**
+ * How much time each mode covers. The daily strip skips today, which is already
+ * the headline, so a three day forecast asks for four. Hourly still asks for
+ * one day, because the headline and the sun times are read off it.
+ */
+export const SPANS: { readonly [M in WeatherMode]: { days: number; hours: number } } = {
+	[WeatherMode.ThreeDay]: { days: 4, hours: 0 },
+	[WeatherMode.Weekly]: { days: 8, hours: 0 },
+	[WeatherMode.Hourly]: { days: 1, hours: 12 },
+};
 
 /* ------------------------------------------------------------- conditions */
 
@@ -247,12 +275,6 @@ export function parseForecast(raw: unknown): Forecast {
 
 const FORECAST_TTL_MS = 30 * 60 * 1000;
 
-/** Open-Meteo serves at most 16 days; more than a week is noise on a tile. */
-const MAX_DAYS = 7;
-
-/** Two days of hourly columns is already more than a tile can show legibly. */
-const MAX_HOURS = 48;
-
 export interface Weather {
 	place: Place;
 	forecast: Forecast;
@@ -296,6 +318,7 @@ export class WeatherService {
 
 	/** The URL for one query. Only the fields a widget asked for are requested. */
 	private url(place: Place, query: WeatherQuery): string {
+		const span = SPANS[query.mode];
 		const current = ["temperature_2m", "apparent_temperature", "weather_code", "is_day"];
 
 		if (query.wind) current.push("wind_speed_10m");
@@ -315,29 +338,24 @@ export class WeatherService {
 			"https://api.open-meteo.com/v1/forecast" +
 			`?latitude=${place.latitude}&longitude=${place.longitude}` +
 			`&current=${current.join(",")}&daily=${daily.join(",")}` +
-			`&temperature_unit=${query.unit}&timezone=auto&forecast_days=${query.days}`;
+			`&temperature_unit=${query.unit}&timezone=auto&forecast_days=${span.days}`;
 
 		// mph reads better beside Fahrenheit; km/h beside Celsius
 		if (query.wind) {
 			url += `&wind_speed_unit=${query.unit === WeatherUnit.Fahrenheit ? "mph" : "kmh"}`;
 		}
 
-		if (query.hours > 0) {
+		if (span.hours > 0) {
 			url +=
 				"&hourly=temperature_2m,weather_code,precipitation_probability" +
-				`&forecast_hours=${query.hours}`;
+				`&forecast_hours=${span.hours}`;
 		}
 
 		return url;
 	}
 
 	async weather(request: WeatherQuery): Promise<Weather> {
-		const query: WeatherQuery = {
-			...request,
-			place: request.place.trim(),
-			days: Math.max(1, Math.min(MAX_DAYS, request.days)),
-			hours: Math.max(0, Math.min(MAX_HOURS, request.hours)),
-		};
+		const query: WeatherQuery = { ...request, place: request.place.trim() };
 
 		// every option changes the response, so every option belongs in the key
 		const key = JSON.stringify({ ...query, place: query.place.toLowerCase() });

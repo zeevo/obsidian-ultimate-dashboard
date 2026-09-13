@@ -1,6 +1,6 @@
 import { WidgetKind } from "./kinds";
 import { Field, FieldKind } from "./schema";
-import { WEATHER_UNITS, WeatherUnit } from "./weather";
+import { WEATHER_UNITS, WeatherMode, WeatherUnit } from "./weather";
 
 /**
  * The widget registry.
@@ -119,10 +119,8 @@ export interface WeatherWidget extends NodeBase {
 	title?: string;
 	/** A place name, resolved to coordinates once and remembered. */
 	place: string;
-	/** Days of forecast to show under the current conditions. */
-	days?: number;
-	/** Hours of hourly forecast, starting with the current hour. */
-	hours?: number;
+	/** What the tile shows under the current conditions. Defaults to three days. */
+	mode?: WeatherMode;
 	units?: WeatherUnit;
 	wind?: boolean;
 	humidity?: boolean;
@@ -342,13 +340,15 @@ const weather: WidgetSpec<WeatherWidget> = {
 			required: true,
 			placeholder: "Denver",
 		},
-		{ key: "days", kind: FieldKind.Number, label: "Forecast days", min: 1 },
 		{
-			key: "hours",
-			kind: FieldKind.Number,
-			label: "Hourly forecast",
-			hint: "Hours to show, starting with this one. Leave empty for none",
-			min: 1,
+			key: "mode",
+			kind: FieldKind.Choice,
+			label: "Forecast",
+			choices: [
+				{ value: WeatherMode.ThreeDay, label: "Next 3 days" },
+				{ value: WeatherMode.Hourly, label: "Next 12 hours" },
+				{ value: WeatherMode.Weekly, label: "Next 7 days" },
+			],
 		},
 		{
 			key: "units",
