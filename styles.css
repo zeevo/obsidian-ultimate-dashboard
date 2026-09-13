@@ -73,6 +73,17 @@
 	margin-bottom: 4px;
 }
 
+.udash-heatmap-meta {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+}
+
+.udash-heatmap-streak {
+	font-size: 0.85em;
+	color: var(--text-accent);
+}
+
 .udash-heatmap-count {
 	font-weight: 400;
 	font-size: 0.85em;

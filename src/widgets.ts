@@ -73,6 +73,8 @@ export interface HeatmapWidget extends NodeBase, Ranged {
 	property: string;
 	intensity?: string;
 	color?: string;
+	/** Show how many days in a row are filled in, counting back from today. */
+	streak?: boolean;
 }
 
 export interface UpcomingWidget extends NodeBase {
@@ -229,6 +231,12 @@ const heatmap: WidgetSpec<HeatmapWidget> = {
 		{ key: "property", kind: FieldKind.Property, label: "Property", required: true },
 		{ key: "intensity", kind: FieldKind.Property, label: "Shade by", hint: "Numeric property" },
 		{ key: "color", kind: FieldKind.Colour, label: "Color", placeholder: "#3b82f6" },
+		{
+			key: "streak",
+			kind: FieldKind.Toggle,
+			label: "Show current streak",
+			hint: "Days in a row, counting back from today",
+		},
 		...RANGE_FIELDS,
 	],
 	blank: () => ({ type: WidgetKind.Heatmap, property: "" }),

@@ -126,6 +126,40 @@ export function resolveWindow(
 
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+/** Whether a day counts as filled in: the same test the boxes are shaded by. */
+function logged(day: DayRecord, widget: HeatmapWidget): boolean {
+	if (truthy(day, widget.property)) return true;
+
+	return widget.intensity !== undefined && num(day, widget.intensity) !== null;
+}
+
+/**
+ * How many days in a row are filled in, counting back from today.
+ *
+ * Today not being logged yet does not break the run: the count then ends
+ * yesterday, so a streak does not read zero every morning until you write the
+ * day up. The window the heatmap draws is ignored, since a six month view
+ * should not report a two hundred day streak as one hundred and eighty.
+ */
+export function currentStreak(days: DayRecord[], widget: HeatmapWidget): number {
+	const filled = new Set<string>();
+
+	for (const day of days) {
+		if (logged(day, widget)) filled.add(day.date);
+	}
+
+	const now = today();
+	let cursor = filled.has(now) ? now : shiftDate(now, -1);
+	let run = 0;
+
+	while (filled.has(cursor)) {
+		run += 1;
+		cursor = shiftDate(cursor, -1);
+	}
+
+	return run;
+}
+
 export function renderHeatmap(el: HTMLElement, days: DayRecord[], widget: HeatmapWidget): void {
 	const color = widget.color ?? DEFAULT_COLOR;
 	const { start, end } = resolveWindow(widget, days, "year");
@@ -135,9 +169,7 @@ export function renderHeatmap(el: HTMLElement, days: DayRecord[], widget: Heatma
 	for (const day of days) {
 		if (day.date < start || day.date > end) continue;
 
-		if (!truthy(day, widget.property) && !(widget.intensity && num(day, widget.intensity) !== null)) {
-			continue;
-		}
+		if (!logged(day, widget)) continue;
 
 		values.set(day.date, widget.intensity ? (num(day, widget.intensity) ?? 1) : 1);
 	}
@@ -153,7 +185,19 @@ export function renderHeatmap(el: HTMLElement, days: DayRecord[], widget: Heatma
 	const wrap = el.createDiv({ cls: "udash-heatmap" });
 	const head = wrap.createDiv({ cls: "udash-heatmap-head" });
 	head.createSpan({ text: widget.title ?? widget.property });
-	head.createSpan({
+
+	const meta = head.createDiv({ cls: "udash-heatmap-meta" });
+
+	if (widget.streak) {
+		const run = currentStreak(days, widget);
+
+		meta.createSpan({
+			cls: "udash-heatmap-streak",
+			text: `${run} in a row`,
+		});
+	}
+
+	meta.createSpan({
 		cls: "udash-heatmap-count",
 		text: `${values.size} ${values.size === 1 ? "day" : "days"}`,
 	});

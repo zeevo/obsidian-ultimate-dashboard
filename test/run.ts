@@ -5,8 +5,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { load } from "js-yaml";
 import { ConfigError, ContainerNode, countWidgets, isContainer, needsSetup, parseDashboard } from "../src/layout-tree";
-import { DayRecord, stripFrontmatter } from "../src/data";
-import { fillMonth, monthWindow, renderBlank, renderHeatmap, renderLine, renderMonth, renderNote, renderStat } from "../src/render";
+import { DayRecord, shiftDate, stripFrontmatter, today } from "../src/data";
+import { currentStreak, fillMonth, monthWindow, renderBlank, renderHeatmap, renderLine, renderMonth, renderNote, renderStat } from "../src/render";
 import { renderNode } from "../src/layout";
 import { parseICS } from "../src/ics";
 import { serializeDashboard } from "../src/serialize";
@@ -401,6 +401,7 @@ layout:
       title: Lifting
       property: lift
       color: "#ef4444"
+      streak: true
       months: 6
     - type: upcoming
       ahead: 21
@@ -1072,6 +1073,73 @@ console.log("\nblank widget");
 
 	// it holds space and nothing else, so it must never ask to be configured
 	check("a blank never needs setup", !needsSetup(newNode("blank")));
+}
+
+console.log("\nheatmap streak");
+
+{
+	// dates are built relative to the real today, so the run is deterministic
+	// whenever the suite happens to be run
+	const on = (...backs: number[]): DayRecord[] =>
+		backs
+			.map((b) => ({ date: shiftDate(today(), -b), props: { lift: true } }))
+			.sort((a, b) => (a.date < b.date ? -1 : 1));
+
+	const widget = { id: "t", type: "heatmap", property: "lift" } as const;
+
+	check("counts back from today", currentStreak(on(0, 1, 2, 3), widget) === 4,
+		String(currentStreak(on(0, 1, 2, 3), widget)));
+
+	check("a gap ends the run", currentStreak(on(0, 1, 3, 4), widget) === 2,
+		String(currentStreak(on(0, 1, 3, 4), widget)));
+
+	// the day is not over: an unlogged today must not read as a broken streak
+	check("today still pending keeps the run", currentStreak(on(1, 2, 3), widget) === 3,
+		String(currentStreak(on(1, 2, 3), widget)));
+
+	check("two days idle breaks it", currentStreak(on(2, 3, 4), widget) === 0,
+		String(currentStreak(on(2, 3, 4), widget)));
+
+	check("nothing logged is zero", currentStreak([], widget) === 0);
+
+	check("a single day today counts", currentStreak(on(0), widget) === 1);
+
+	// a windowed heatmap must not report a shorter streak than the real one
+	const long = on(...Array.from({ length: 400 }, (_, i) => i));
+
+	check("the window does not clip the run",
+		currentStreak(long, { ...widget, months: 6 }) === 400,
+		String(currentStreak(long, { ...widget, months: 6 })));
+
+	// a falsy value is not a logged day
+	const mixed: DayRecord[] = [
+		{ date: shiftDate(today(), -1), props: { lift: false } },
+		{ date: today(), props: { lift: true } },
+	];
+
+	check("a false value does not count", currentStreak(mixed, widget) === 1,
+		String(currentStreak(mixed, widget)));
+
+	// shading by a numeric property fills a box, so it must extend a streak too
+	const byIntensity: DayRecord[] = [
+		{ date: shiftDate(today(), -1), props: { miles: 3 } },
+		{ date: today(), props: { miles: 2 } },
+	];
+
+	check("a shaded day counts even without the flag",
+		currentStreak(byIntensity, { ...widget, intensity: "miles" }) === 2,
+		String(currentStreak(byIntensity, { ...widget, intensity: "miles" })));
+
+	const shown = new El();
+	renderHeatmap(shown, on(0, 1, 2), { ...widget, streak: true });
+
+	check("the header shows the run", shown.byClass("udash-heatmap-streak")[0]?.text === "3 in a row",
+		shown.byClass("udash-heatmap-streak")[0]?.text);
+
+	const hidden = new El();
+	renderHeatmap(hidden, on(0, 1, 2), widget);
+
+	check("no streak element unless asked", hidden.byClass("udash-heatmap-streak").length === 0);
 }
 
 console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED"}`);

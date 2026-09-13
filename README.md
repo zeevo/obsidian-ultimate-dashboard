@@ -344,8 +344,18 @@ One number. Arrange several with rows and columns, like any other widget.
 | `title` | Heading (defaults to the property name) |
 | `color` | `#rrggbb`; shading is five alpha steps of it |
 | `intensity` | Numeric key used to shade each box |
+| `streak` | `true` to show how many days in a row are filled in |
 
 **Range.** See [Ranges](#ranges). Defaults to the current calendar year.
+
+**Streak.** Counts back from today over every day you have, not just the ones on
+screen, so a six month window still reports a two hundred day run in full. A day
+counts when its box is shaded, which means `intensity` days count even where the
+main property is blank.
+
+Today not being written up yet does not break the run: the count then ends
+yesterday. Without that a streak would read zero every morning until you filled
+the day in, which is the opposite of encouraging.
 
 ### `type: line`
 
