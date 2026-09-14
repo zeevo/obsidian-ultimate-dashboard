@@ -1,3 +1,5 @@
+import * as z from "zod/mini";
+
 /** Saved dashboards. Persisted to the plugin's data.json, not to a note. */
 
 export interface Dashboard {
@@ -120,118 +122,161 @@ export function defaultSettings(): DashboardSettings {
 }
 
 /**
+ * The stored shapes.
+ *
+ * `catch` rather than `optional` where a bad value should become a good one:
+ * data.json is written by this plugin, but it is also a file a person can edit,
+ * and losing every dashboard to one mistyped field would be unforgivable.
+ */
+const StoredDashboard = z.object({
+	id: z.optional(z.string()),
+	name: z.optional(z.string()),
+	config: z.string(),
+});
+
+const StoredAccount = z.object({
+	id: z.optional(z.string()),
+	email: z.optional(z.string()),
+	accessToken: z._default(z.catch(z.string(), ""), ""),
+	refreshToken: z.string(),
+	expiresAt: z._default(z.catch(z.number(), 0), 0),
+});
+
+const StoredGoogle = z.object({
+	clientId: z._default(z.catch(z.string(), ""), ""),
+	clientSecret: z._default(z.catch(z.string(), ""), ""),
+	port: z.optional(z.number()),
+	accounts: z.optional(z.array(z.unknown())),
+	/** v0.2 held a single account here. */
+	account: z.optional(z.unknown()),
+});
+
+const StoredCalendar = z.object({
+	id: z.optional(z.string()),
+	name: z.optional(z.string()),
+	type: z.optional(z.string()),
+	url: z.optional(z.string()),
+	accountId: z.optional(z.string()),
+	calendarId: z.optional(z.string()),
+	writable: z.optional(z.boolean()),
+	color: z.optional(z.string()),
+});
+
+const StoredSettings = z.object({
+	dashboards: z.optional(z.array(z.unknown())),
+	activeId: z.optional(z.string()),
+	startupId: z.optional(z.string()),
+	calendars: z.optional(z.array(z.unknown())),
+	google: z.optional(z.unknown()),
+	/** v0.1 held one config here and no dashboards list. */
+	config: z.optional(z.string()),
+});
+
+/** Rows that do not match are dropped rather than taking the file down. */
+function rows<S extends z.ZodMiniType>(schema: S, raw: unknown[] | undefined): z.infer<S>[] {
+	const out: z.infer<S>[] = [];
+
+	for (const item of raw ?? []) {
+		const parsed = schema.safeParse(item);
+
+		if (parsed.success) out.push(parsed.data);
+	}
+
+	return out;
+}
+
+const text = (v: string | undefined, fallback: string) => (v?.trim() ? v.trim() : fallback);
+
+/**
  * Accepts whatever is in data.json, including the older single-config shape,
  * and returns something the rest of the plugin can rely on.
  */
 export function migrate(raw: unknown): DashboardSettings {
 	const fallback = defaultSettings();
+	const read = StoredSettings.safeParse(raw);
 
-	if (typeof raw !== "object" || raw === null) return fallback;
-	const d = raw as Record<string, unknown>;
+	if (!read.success) return fallback;
+	const d = read.data;
 
 	const google = readGoogle(d.google);
 	const calendars = readCalendars(d.calendars, google);
 
 	// v0.1: { config: "..." }
-	if (typeof d.config === "string" && !Array.isArray(d.dashboards)) {
+	if (d.config !== undefined && d.dashboards === undefined) {
 		const only = makeDashboard("Health", d.config);
 
 		return { dashboards: [only], activeId: only.id, calendars, google };
 	}
 
-	if (!Array.isArray(d.dashboards) || d.dashboards.length === 0) return { ...fallback, calendars, google };
-
-	const dashboards: Dashboard[] = [];
-
-	for (const item of d.dashboards) {
-		if (typeof item !== "object" || item === null) continue;
-		const x = item as Record<string, unknown>;
-
-		if (typeof x.config !== "string") continue;
-		dashboards.push({
-			id: typeof x.id === "string" && x.id ? x.id : newId(),
-			name: typeof x.name === "string" && x.name.trim() ? x.name.trim() : "Untitled",
-			config: x.config,
-		});
-	}
+	const dashboards: Dashboard[] = rows(StoredDashboard, d.dashboards).map((x) => ({
+		id: text(x.id, newId()),
+		name: text(x.name, "Untitled"),
+		config: x.config,
+	}));
 
 	if (dashboards.length === 0) return { ...fallback, calendars, google };
 
-	const activeId =
-		typeof d.activeId === "string" && dashboards.some((x) => x.id === d.activeId)
-			? d.activeId
-			: dashboards[0].id;
+	const known = (id: string | undefined) => (id && dashboards.some((x) => x.id === id) ? id : undefined);
 
 	// a startup choice pointing at a deleted dashboard is dropped, not repaired:
 	// silently opening a different one is worse than opening none
-	const startupId =
-		typeof d.startupId === "string" && dashboards.some((x) => x.id === d.startupId)
-			? d.startupId
-			: undefined;
-
-	return { dashboards, activeId, startupId, calendars, google };
+	return {
+		dashboards,
+		activeId: known(d.activeId) ?? dashboards[0].id,
+		startupId: known(d.startupId),
+		calendars,
+		google,
+	};
 }
 
 function readGoogle(raw: unknown): GoogleConfig {
 	const base = defaultGoogle();
+	const read = StoredGoogle.safeParse(raw);
 
-	if (typeof raw !== "object" || raw === null) return base;
-	const g = raw as Record<string, unknown>;
-	const accounts: GoogleAccountRecord[] = [];
+	if (!read.success) return base;
+	const g = read.data;
 	// v0.2 held a single `account`; anything found there becomes the first entry
-	const raws = Array.isArray(g.accounts) ? g.accounts : g.account ? [g.account] : [];
+	const listed = g.accounts ?? (g.account === undefined ? [] : [g.account]);
 
-	for (const item of raws) {
-		if (typeof item !== "object" || item === null) continue;
-		const a = item as Record<string, unknown>;
-
-		if (typeof a.refreshToken !== "string" || !a.refreshToken) continue;
-		accounts.push({
-			id: typeof a.id === "string" && a.id ? a.id : newId(),
-			email: typeof a.email === "string" ? a.email : undefined,
-			accessToken: typeof a.accessToken === "string" ? a.accessToken : "",
+	const accounts: GoogleAccountRecord[] = rows(StoredAccount, listed)
+		.filter((a) => a.refreshToken !== "")
+		.map((a) => ({
+			id: text(a.id, newId()),
+			email: a.email,
+			accessToken: a.accessToken,
 			refreshToken: a.refreshToken,
-			expiresAt: typeof a.expiresAt === "number" ? a.expiresAt : 0,
-		});
-	}
+			expiresAt: a.expiresAt,
+		}));
 
 	return {
-		clientId: typeof g.clientId === "string" ? g.clientId : "",
-		clientSecret: typeof g.clientSecret === "string" ? g.clientSecret : "",
-		port: typeof g.port === "number" && g.port > 0 ? g.port : base.port,
+		clientId: g.clientId,
+		clientSecret: g.clientSecret,
+		port: g.port !== undefined && g.port > 0 ? g.port : base.port,
 		accounts,
 	};
 }
 
-function readCalendars(raw: unknown, google: GoogleConfig): CalendarSource[] {
-	if (!Array.isArray(raw)) return [];
+function readCalendars(raw: unknown[] | undefined, google: GoogleConfig): CalendarSource[] {
 	const out: CalendarSource[] = [];
 
-	for (const item of raw) {
-		if (typeof item !== "object" || item === null) continue;
-		const x = item as Record<string, unknown>;
+	for (const x of rows(StoredCalendar, raw)) {
 		const type = x.type === "google" ? "google" : "ics";
-		const url = typeof x.url === "string" ? x.url.trim() : "";
-		const calendarId = typeof x.calendarId === "string" ? x.calendarId.trim() : "";
+		const url = x.url?.trim() ?? "";
+		const calendarId = x.calendarId?.trim() ?? "";
 
 		// a source with nothing to point at cannot be loaded
 		if (type === "ics" && !url) continue;
 
 		if (type === "google" && !calendarId) continue;
 		out.push({
-			id: typeof x.id === "string" && x.id ? x.id : newId(),
-			name: typeof x.name === "string" && x.name.trim() ? x.name.trim() : "Calendar",
+			id: text(x.id, newId()),
+			name: text(x.name, "Calendar"),
 			type,
 			url: url || undefined,
-			accountId:
-				type === "google"
-					? typeof x.accountId === "string" && x.accountId
-						? x.accountId
-						: google.accounts[0]?.id
-					: undefined,
+			accountId: type === "google" ? (x.accountId || google.accounts[0]?.id) : undefined,
 			calendarId: calendarId || undefined,
 			writable: x.writable === true,
-			color: typeof x.color === "string" ? x.color : undefined,
+			color: x.color,
 		});
 	}
 

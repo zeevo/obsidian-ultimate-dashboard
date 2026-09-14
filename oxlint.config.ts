@@ -51,7 +51,7 @@ export default defineConfig({
 			 * before it can become a domain type, which is exactly what these rules
 			 * forbid. They stay on everywhere else so the narrowing cannot leak out.
 			 */
-			files: ["src/config.ts", "src/store.ts", "src/ics.ts", "src/data.ts", "src/google.ts", "src/weather.ts", "src/kinds.ts", "src/schema.ts", "src/widgets.ts", "src/serialize.ts", "src/widget-form.ts", "src/layout-tree.ts"],
+			files: ["src/config.ts", "src/ics.ts", "src/data.ts", "src/kinds.ts", "src/schema.ts", "src/widgets.ts", "src/serialize.ts", "src/widget-form.ts", "src/layout-tree.ts"],
 			rules: {
 				"anti-slop/no-runtime-typeof": "off",
 				"anti-slop/no-unknown-parameters": "off",
@@ -60,6 +60,18 @@ export default defineConfig({
 				"anti-slop/require-safety-comment-for-type-assertion": "off",
 				// viewing a typed widget as its own field bag needs `as unknown as`
 				"anti-slop/no-chained-type-assertions": "off",
+			},
+		},
+		{
+			/*
+			 * These parse their input with zod rather than by hand, so they need
+			 * none of the narrowing exemptions above. What is left is only the
+			 * entry point signature: something has to accept `unknown` from the
+			 * network or from data.json before a schema can be run over it.
+			 */
+			files: ["src/weather.ts", "src/google.ts", "src/store.ts"],
+			rules: {
+				"anti-slop/no-unknown-parameters": "off",
 			},
 		},
 		{

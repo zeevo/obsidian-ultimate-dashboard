@@ -72,9 +72,11 @@ async function awaitCode(port: number): Promise<{ code: string; close: () => voi
 	// a module-level require would break plugin load entirely. A dynamic import()
 	// is no good either, since Obsidian loads plugins as CommonJS and a bare
 	// specifier does not resolve through the renderer's ESM loader.
+	// SAFETY: reading a possibly absent global is the check itself; the guard
+	// below is what establishes that this is the desktop app.
 	const nodeRequire = (globalThis as { require?: NodeRequire }).require;
 
-	if (typeof nodeRequire !== "function") {
+	if (!Platform.isDesktopApp || nodeRequire === undefined) {
 		throw new Error("Connecting a Google account needs the desktop app.");
 	}
 

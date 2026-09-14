@@ -96,12 +96,12 @@ export interface WeatherQuery {
  * the headline, so a three day forecast asks for four. Hourly still asks for
  * one day, because the headline and the sun times are read off it.
  */
-export const SPANS: { readonly [M in WeatherMode]: { days: number; hours: number } } = {
+export const SPANS = {
 	[WeatherMode.Today]: { days: 1, hours: 0 },
 	[WeatherMode.ThreeDay]: { days: 4, hours: 0 },
 	[WeatherMode.Weekly]: { days: 8, hours: 0 },
 	[WeatherMode.Hourly]: { days: 1, hours: 12 },
-};
+} satisfies { readonly [M in WeatherMode]: { days: number; hours: number } };
 
 /* ------------------------------------------------------------- conditions */
 

@@ -250,6 +250,28 @@ console.log("\ndashboard store");
 		migrate({ dashboards: two, startupId: "gone" }).startupId === undefined);
 	check("a non-string startup choice is dropped",
 		migrate({ dashboards: two, startupId: 7 }).startupId === undefined);
+
+	// data.json is a file a person can edit, so a bad value becomes a good one
+	// rather than taking every dashboard down with it
+	check("a dashboard row without a config is skipped, the rest survive",
+		migrate({ dashboards: [{ id: "a", name: "A" }, { id: "b", name: "B", config: "y" }] })
+			.dashboards.length === 1);
+	check("a junk google block falls back rather than throwing",
+		migrate({ dashboards: two, google: "nonsense" }).google.accounts.length === 0);
+	check("a token stored as the wrong type is coerced, not fatal", (() => {
+		const m = migrate({
+			dashboards: two,
+			google: { accounts: [{ id: "a", refreshToken: "r", accessToken: 12345, expiresAt: "soon" }] },
+		});
+
+		return m.google.accounts.length === 1 && m.google.accounts[0].accessToken === ""
+			&& m.google.accounts[0].expiresAt === 0;
+	})());
+	check("an account with no refresh token is dropped",
+		migrate({ dashboards: two, google: { accounts: [{ id: "a" }] } }).google.accounts.length === 0);
+	check("a calendar row that is not an object is skipped",
+		migrate({ dashboards: two, calendars: [7, { name: "W", type: "ics", url: "u" }] })
+			.calendars.length === 1);
 	check("the startup choice is independent of the active one", (() => {
 		const m = migrate({ dashboards: two, activeId: "a", startupId: "b" });
 

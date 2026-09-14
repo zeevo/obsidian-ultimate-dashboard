@@ -3,9 +3,15 @@
 An Obsidian plugin that renders stat tiles, year heatmaps and rolling-average
 line charts from daily note frontmatter, driven by a declarative YAML layout.
 
-No runtime dependencies. It reads frontmatter through Obsidian's own
-`metadataCache` and draws every widget itself, so it needs neither Dataview nor
-Heatmap Calendar.
+It reads frontmatter through Obsidian's own `metadataCache` and draws every
+widget itself, so it needs neither Dataview nor Heatmap Calendar.
+
+One runtime dependency, `zod/mini`, which validates everything arriving from
+outside: the Open-Meteo and Google Calendar responses, and `data.json` itself.
+Those were the places where an unexpected shape meant a `typeof` ladder and a
+hand written error. The widget field registry does **not** use it, since those
+declarations also generate the configuration form and drive the serialiser, and
+zod would cover only the parsing third of that job.
 
 ## Using it
 
