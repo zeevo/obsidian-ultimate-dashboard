@@ -27,5 +27,8 @@
     "obsidian": "latest",
     "oxlint": "^1.82.0",
     "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
   }
 }

@@ -1,3 +1,4 @@
+import * as z from "zod/mini";
 import { requestUrl } from "obsidian";
 
 /**
@@ -143,68 +144,65 @@ export function describeWeather(code: number, isDay = true): Condition {
 
 export class WeatherError extends Error {}
 
-function record(v: unknown, where: string): Record<string, unknown> {
-	if (typeof v !== "object" || v === null || Array.isArray(v)) {
-		throw new WeatherError(`${where} was not an object`);
-	}
+/**
+ * The response shapes, declared rather than hand narrowed.
+ *
+ * Extra keys are ignored on purpose: Open-Meteo returns plenty we do not use,
+ * and a new field appearing upstream should not break a widget. Optional means
+ * "only present when the query asked for it", which is how the modes work.
+ */
+const PlaceRow = z.object({
+	name: z.optional(z.string()),
+	admin1: z.optional(z.string()),
+	country: z.optional(z.string()),
+	latitude: z.number(),
+	longitude: z.number(),
+});
 
-	return v as Record<string, unknown>;
-}
+const GeocodeResponse = z.object({
+	results: z.optional(z.array(PlaceRow)),
+});
 
-function number(v: unknown, where: string): number {
-	if (typeof v !== "number" || !Number.isFinite(v)) throw new WeatherError(`${where} was not a number`);
+const ForecastResponse = z.object({
+	current_units: z.object({
+		temperature_2m: z.optional(z.string()),
+		wind_speed_10m: z.optional(z.string()),
+	}),
+	current: z.object({
+		temperature_2m: z.number(),
+		apparent_temperature: z.number(),
+		weather_code: z.number(),
+		is_day: z.optional(z.number()),
+		wind_speed_10m: z.optional(z.number()),
+		relative_humidity_2m: z.optional(z.number()),
+	}),
+	daily: z.object({
+		time: z.array(z.string()),
+		weather_code: z.array(z.number()),
+		temperature_2m_max: z.array(z.number()),
+		temperature_2m_min: z.array(z.number()),
+		precipitation_probability_max: z.array(z.number()),
+		sunrise: z.optional(z.array(z.string())),
+		sunset: z.optional(z.array(z.string())),
+	}),
+	hourly: z.optional(
+		z.object({
+			time: z.array(z.string()),
+			temperature_2m: z.array(z.number()),
+			weather_code: z.array(z.number()),
+			precipitation_probability: z.optional(z.array(z.number())),
+		}),
+	),
+});
 
-	return v;
-}
+/** Runs a schema, turning a failure into an error a widget can display. */
+function decode<S extends z.ZodMiniType>(schema: S, raw: unknown, what: string): z.infer<S> {
+	const result = schema.safeParse(raw);
 
-function numbers(v: unknown, where: string): number[] {
-	if (!Array.isArray(v)) throw new WeatherError(`${where} was not a list`);
+	if (result.success) return result.data;
 
-	return v.map((n, i) => number(n, `${where}[${i}]`));
-}
-
-/** The geocoding response, which is how a place name becomes coordinates. */
-export function parsePlaces(raw: unknown): Place[] {
-	const doc = record(raw, "the geocoding response");
-	const results = doc.results;
-
-	if (results === undefined) return [];
-
-	if (!Array.isArray(results)) throw new WeatherError("`results` was not a list");
-
-	return results.map((entry, i) => {
-		const r = record(entry, `result ${i}`);
-		const parts = [r.name, r.admin1, r.country].filter((p) => typeof p === "string" && p);
-
-		return {
-			name: parts.join(", "),
-			latitude: number(r.latitude, `result ${i} latitude`),
-			longitude: number(r.longitude, `result ${i} longitude`),
-		};
-	});
-}
-
-/** A list of ISO stamps, which the API sends for every time series. */
-function stamps(v: unknown, where: string): string[] {
-	if (!Array.isArray(v) || v.some((d) => typeof d !== "string")) {
-		throw new WeatherError(`${where} was not a list of times`);
-	}
-
-	return v as string[];
-}
-
-/** Optional stamps: absent when the widget did not ask for that field. */
-function maybeStamps(v: unknown): string[] {
-	return Array.isArray(v) && v.every((d) => typeof d === "string") ? (v as string[]) : [];
-}
-
-/** Optional numbers, for the same reason. */
-function maybeNumbers(v: unknown): number[] {
-	return Array.isArray(v) && v.every((n) => typeof n === "number") ? (v as number[]) : [];
-}
-
-function maybeNumber(v: unknown): number | undefined {
-	return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+	// the prettified form names the path, e.g. "daily.temperature_2m_max[3]"
+	throw new WeatherError(`${what}: ${z.prettifyError(result.error).replace(/\s+/g, " ").trim()}`);
 }
 
 /** mp/h is what Open-Meteo calls miles per hour. Nobody else does. */
@@ -212,64 +210,56 @@ function tidyUnit(unit: string): string {
 	return unit === "mp/h" ? "mph" : unit;
 }
 
+/** The geocoding response, which is how a place name becomes coordinates. */
+export function parsePlaces(raw: unknown): Place[] {
+	const doc = decode(GeocodeResponse, raw, "the geocoding response");
+
+	return (doc.results ?? []).map((r) => ({
+		name: [r.name, r.admin1, r.country].filter(Boolean).join(", "),
+		latitude: r.latitude,
+		longitude: r.longitude,
+	}));
+}
+
 export function parseForecast(raw: unknown): Forecast {
-	const doc = record(raw, "the forecast response");
-	const current = record(doc.current, "`current`");
-	const daily = record(doc.daily, "`daily`");
-	const units = record(doc.current_units, "`current_units`");
+	const { current, daily, hourly, current_units: units } = decode(
+		ForecastResponse,
+		raw,
+		"the forecast response",
+	);
 
-	const dates = stamps(daily.time, "`daily.time`");
-	const codes = numbers(daily.weather_code, "`daily.weather_code`");
-	const highs = numbers(daily.temperature_2m_max, "`daily.temperature_2m_max`");
-	const lows = numbers(daily.temperature_2m_min, "`daily.temperature_2m_min`");
-	const rain = numbers(daily.precipitation_probability_max, "`daily.precipitation_probability_max`");
-	const sunrise = maybeStamps(daily.sunrise);
-	const sunset = maybeStamps(daily.sunset);
-
-	const days: DayForecast[] = dates.map((date, i) => ({
+	// the series are parallel arrays; a short one is padded rather than throwing,
+	// since a missing tail is better than no forecast at all
+	const days: DayForecast[] = daily.time.map((date, i) => ({
 		date,
-		code: codes[i] ?? 0,
-		high: highs[i] ?? 0,
-		low: lows[i] ?? 0,
-		rain: rain[i] ?? 0,
-		sunrise: sunrise[i],
-		sunset: sunset[i],
+		code: daily.weather_code[i] ?? 0,
+		high: daily.temperature_2m_max[i] ?? 0,
+		low: daily.temperature_2m_min[i] ?? 0,
+		rain: daily.precipitation_probability_max[i] ?? 0,
+		sunrise: daily.sunrise?.[i],
+		sunset: daily.sunset?.[i],
 	}));
 
-	const hours: HourForecast[] = [];
-
-	if (doc.hourly !== undefined) {
-		const hourly = record(doc.hourly, "`hourly`");
-		const times = stamps(hourly.time, "`hourly.time`");
-		const temps = numbers(hourly.temperature_2m, "`hourly.temperature_2m`");
-		const hourCodes = numbers(hourly.weather_code, "`hourly.weather_code`");
-		const hourRain = maybeNumbers(hourly.precipitation_probability);
-
-		for (const [i, time] of times.entries()) {
-			hours.push({
-				time,
-				temperature: temps[i] ?? 0,
-				code: hourCodes[i] ?? 0,
-				rain: hourRain[i] ?? 0,
-			});
-		}
-	}
-
-	const windUnit = typeof units.wind_speed_10m === "string" ? tidyUnit(units.wind_speed_10m) : undefined;
+	const hours: HourForecast[] = (hourly?.time ?? []).map((time, i) => ({
+		time,
+		temperature: hourly?.temperature_2m[i] ?? 0,
+		code: hourly?.weather_code[i] ?? 0,
+		rain: hourly?.precipitation_probability?.[i] ?? 0,
+	}));
 
 	return {
 		current: {
-			temperature: number(current.temperature_2m, "`current.temperature_2m`"),
-			feelsLike: number(current.apparent_temperature, "`current.apparent_temperature`"),
-			code: number(current.weather_code, "`current.weather_code`"),
+			temperature: current.temperature_2m,
+			feelsLike: current.apparent_temperature,
+			code: current.weather_code,
 			isDay: current.is_day !== 0,
-			wind: maybeNumber(current.wind_speed_10m),
-			humidity: maybeNumber(current.relative_humidity_2m),
+			wind: current.wind_speed_10m,
+			humidity: current.relative_humidity_2m,
 		},
 		days,
 		hours,
-		unit: typeof units.temperature_2m === "string" ? units.temperature_2m : "°",
-		windUnit,
+		unit: units.temperature_2m ?? "\u00b0",
+		windUnit: units.wind_speed_10m === undefined ? undefined : tidyUnit(units.wind_speed_10m),
 	};
 }
 

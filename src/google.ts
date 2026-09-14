@@ -1,3 +1,4 @@
+import * as z from "zod/mini";
 import { Platform, requestUrl } from "obsidian";
 
 /**
@@ -148,7 +149,50 @@ export async function connect(client: GoogleClient, port: number): Promise<Googl
 	}
 }
 
-async function postForm(body: Record<string, string>): Promise<Record<string, unknown>> {
+/**
+ * The response shapes. Extra keys are ignored: Google sends plenty we do not
+ * read, and a new one appearing should not break sign in.
+ */
+const TokenResponse = z.object({
+	access_token: z.optional(z.string()),
+	refresh_token: z.optional(z.string()),
+	expires_in: z.optional(z.number()),
+	error_description: z.optional(z.string()),
+});
+
+const UserInfo = z.object({ email: z.optional(z.string()) });
+
+/** An envelope whose items are checked one at a time, so one bad row is skipped. */
+const Envelope = z.object({ items: z.optional(z.array(z.unknown())) });
+
+const CalendarRow = z.object({
+	id: z.string(),
+	summary: z.optional(z.string()),
+	primary: z.optional(z.boolean()),
+	backgroundColor: z.optional(z.string()),
+	accessRole: z.optional(z.string()),
+});
+
+const Stamp = z.object({
+	dateTime: z.optional(z.string()),
+	date: z.optional(z.string()),
+});
+
+const EventRow = z.object({
+	summary: z.optional(z.string()),
+	location: z.optional(z.string()),
+	start: z.optional(Stamp),
+	end: z.optional(Stamp),
+});
+
+/** Reads a response, or falls back rather than throwing on a shape surprise. */
+function readOr<S extends z.ZodMiniType>(schema: S, raw: unknown, fallback: z.infer<S>): z.infer<S> {
+	const result = schema.safeParse(raw);
+
+	return result.success ? result.data : fallback;
+}
+
+async function postForm(body: Record<string, string>): Promise<z.infer<typeof TokenResponse>> {
 	const res = await requestUrl({
 		url: TOKEN_ENDPOINT,
 		method: "POST",
@@ -157,12 +201,10 @@ async function postForm(body: Record<string, string>): Promise<Record<string, un
 		throw: false,
 	});
 
-	const json = res.json as Record<string, unknown>;
+	const json = readOr(TokenResponse, res.json, {});
 
 	if (res.status < 200 || res.status >= 300) {
-		const detail = typeof json?.error_description === "string" ? json.error_description : res.status;
-
-		throw new Error(`Google rejected the request: ${detail}`);
+		throw new Error(`Google rejected the request: ${json.error_description ?? res.status}`);
 	}
 
 	return json;
@@ -184,9 +226,9 @@ async function exchange(
 	});
 
 	const tokens: GoogleTokens = {
-		accessToken: String(json.access_token ?? ""),
-		refreshToken: String(json.refresh_token ?? ""),
-		expiresAt: Date.now() + Number(json.expires_in ?? 3600) * 1000,
+		accessToken: json.access_token ?? "",
+		refreshToken: json.refresh_token ?? "",
+		expiresAt: Date.now() + (json.expires_in ?? 3600) * 1000,
 	};
 
 	if (!tokens.refreshToken) {
@@ -208,9 +250,8 @@ async function fetchEmail(accessToken: string): Promise<string | undefined> {
 	});
 
 	if (res.status !== 200) return undefined;
-	const email = (res.json as Record<string, unknown>)?.email;
 
-	return typeof email === "string" ? email : undefined;
+	return readOr(UserInfo, res.json, {}).email;
 }
 
 /** Returns a valid access token, refreshing a minute before it lapses. */
@@ -230,8 +271,8 @@ export async function validToken(
 
 	const refreshed: GoogleTokens = {
 		...tokens,
-		accessToken: String(json.access_token ?? ""),
-		expiresAt: Date.now() + Number(json.expires_in ?? 3600) * 1000,
+		accessToken: json.access_token ?? "",
+		expiresAt: Date.now() + (json.expires_in ?? 3600) * 1000,
 	};
 
 	await onRefresh(refreshed);
@@ -252,7 +293,11 @@ export interface GoogleCalendarInfo {
 	writable: boolean;
 }
 
-async function apiGet(accessToken: string, path: string): Promise<Record<string, unknown>> {
+async function apiList<S extends z.ZodMiniType>(
+	accessToken: string,
+	path: string,
+	row: S,
+): Promise<z.infer<S>[]> {
 	const res = await requestUrl({
 		url: `${API}${path}`,
 		headers: { Authorization: `Bearer ${accessToken}` },
@@ -263,27 +308,32 @@ async function apiGet(accessToken: string, path: string): Promise<Record<string,
 
 	if (res.status < 200 || res.status >= 300) throw new Error(`Google answered ${res.status}`);
 
-	return res.json as Record<string, unknown>;
+	const out: z.infer<S>[] = [];
+
+	// row by row, so one entry Google describes oddly does not lose the rest
+	for (const raw of readOr(Envelope, res.json, {}).items ?? []) {
+		const parsed = row.safeParse(raw);
+
+		if (parsed.success) out.push(parsed.data);
+	}
+
+	return out;
 }
 
 export async function listCalendars(accessToken: string): Promise<GoogleCalendarInfo[]> {
-	const json = await apiGet(accessToken, "/users/me/calendarList?maxResults=250");
-	const items = Array.isArray(json.items) ? json.items : [];
+	const rows = await apiList(accessToken, "/users/me/calendarList?maxResults=250", CalendarRow);
 	const out: GoogleCalendarInfo[] = [];
 
-	for (const raw of items) {
-		const c = raw as Record<string, unknown>;
-
-		if (typeof c.id !== "string") continue;
+	for (const c of rows) {
 		// Shared calendars like "Phases of the Moon" come back as reader, and a
 		// create against them is a 403. Only owner and writer can take events.
-		const accessRole = typeof c.accessRole === "string" ? c.accessRole : "reader";
+		const accessRole = c.accessRole ?? "reader";
 
 		out.push({
 			id: c.id,
-			summary: typeof c.summary === "string" ? c.summary : c.id,
+			summary: c.summary ?? c.id,
 			primary: c.primary === true,
-			backgroundColor: typeof c.backgroundColor === "string" ? c.backgroundColor : undefined,
+			backgroundColor: c.backgroundColor,
 			accessRole,
 			writable: accessRole === "owner" || accessRole === "writer",
 		});
@@ -300,14 +350,13 @@ export interface GoogleEvent {
 	allDay: boolean;
 }
 
-function readStamp(node: unknown): { date: Date; allDay: boolean } | null {
-	if (typeof node !== "object" || node === null) return null;
-	const n = node as Record<string, unknown>;
+function readStamp(node: z.infer<typeof Stamp> | undefined) {
+	if (!node) return null;
 
-	if (typeof n.dateTime === "string") return { date: new Date(n.dateTime), allDay: false };
+	if (node.dateTime !== undefined) return { date: new Date(node.dateTime), allDay: false };
 
-	if (typeof n.date === "string") {
-		const [y, m, d] = n.date.split("-").map(Number);
+	if (node.date !== undefined) {
+		const [y, m, d] = node.date.split("-").map(Number);
 
 		return { date: new Date(y, m - 1, d), allDay: true };
 	}
@@ -329,19 +378,18 @@ export async function listEvents(
 		`&timeMin=${encodeURIComponent(from.toISOString())}` +
 		`&timeMax=${encodeURIComponent(to.toISOString())}`;
 
-	const json = await apiGet(accessToken, path);
-	const items = Array.isArray(json.items) ? json.items : [];
+	const rows = await apiList(accessToken, path, EventRow);
 	const out: GoogleEvent[] = [];
 
-	for (const raw of items) {
-		const e = raw as Record<string, unknown>;
+	for (const e of rows) {
 		const start = readStamp(e.start);
-		const end = readStamp(e.end);
 
 		if (!start) continue;
+		const end = readStamp(e.end);
+
 		out.push({
-			summary: typeof e.summary === "string" ? e.summary : "(no title)",
-			location: typeof e.location === "string" ? e.location : undefined,
+			summary: e.summary ?? "(no title)",
+			location: e.location,
 			start: start.date,
 			end: end?.date ?? new Date(start.date.getTime() + 3600000),
 			allDay: start.allDay,
