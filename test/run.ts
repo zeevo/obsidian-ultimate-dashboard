@@ -12,6 +12,7 @@ import { parseICS } from "../src/ics";
 import { serializeDashboard } from "../src/serialize";
 import { newNode } from "../src/editor";
 import { SPANS, WEATHER_MODES, WeatherError, describeWeather, parseForecast, parsePlaces, toWeatherMode } from "../src/weather";
+import { isComplete, missingField } from "../src/schema";
 import { CONTAINER_KINDS, WIDGET_KINDS } from "../src/kinds";
 import { Widget, specFor } from "../src/widgets";
 import { DEFAULT_CONFIG, activeDashboard, defaultSettings, findAccount, makeDashboard, migrate, uniqueName } from "../src/store";
@@ -1265,7 +1266,8 @@ console.log("\nweather");
 	const host = new El();
 	const shell = renderWeather(host, widget);
 
-	check("the shell carries the typed place", host.all.some((e) => e.text === "Denver"));
+	// the heading is a fixed name; the place it resolved to sits on the right
+	check("the shell is headed Weather", host.all.some((e) => e.text === "Weather"));
 
 	fillWeather(shell as never, { place: places[0], forecast }, widget);
 
@@ -1389,7 +1391,10 @@ console.log("\ndefault titles");
 	check("a month falls back to the month it draws",
 		specFor("calendar").title(named.calendar) === "February 2026",
 		specFor("calendar").title(named.calendar));
-	check("weather falls back to the place", specFor("weather").title(named.weather) === "Denver");
+	// the resolved place already sits on the right of the header
+	check("weather is called Weather, not the place",
+		specFor("weather").title(named.weather) === "Weather",
+		specFor("weather").title(named.weather));
 	check("an agenda has a fixed name", specFor("upcoming").title(named.upcoming) === "Upcoming");
 
 	// an explicit title always wins
@@ -1511,6 +1516,44 @@ console.log("\nclock");
 	fillClock(dialBody as never, { ...plain, analog: true, date: true }, at(10, 10));
 
 	check("a face can still carry the date", dialBody.byClass("udash-clock-date").length === 1);
+}
+
+console.log("\nrequired fields");
+
+{
+	// the form blocks on these, so it has to name the one that is missing
+	for (const kind of WIDGET_KINDS) {
+		const spec = specFor(kind);
+		const fresh = newNode(kind);
+		const missing = missingField(spec.fields, fresh as never);
+		const required = spec.fields.filter((f) => f.required);
+
+		check(`a fresh ${kind} reports its missing field`,
+			(missing === null) === (required.length === 0),
+			missing ? `${missing.label} is required.` : "nothing required");
+
+		if (missing) check(`${kind} names it`, missing.label.length > 0, missing.label);
+	}
+
+	// filling the field clears the complaint
+	const weatherWidget = { id: "t", type: "weather", place: "" } as const;
+	const weatherSpec = specFor("weather");
+
+	check("an empty place is caught", missingField(weatherSpec.fields, weatherWidget as never)?.key === "place");
+	check("a filled place passes",
+		isComplete(weatherSpec.fields, { ...weatherWidget, place: "Denver" } as never));
+
+	// whitespace is not a value
+	check("an unset property is caught",
+		missingField(specFor("stat").fields, { id: "t", type: "stat", property: "" } as never)?.label === "Property");
+
+	// a widget with nothing required never blocks
+	check("a clock blocks on nothing", missingField(specFor("clock").fields, newNode("clock") as never) === null);
+	check("a blank blocks on nothing", missingField(specFor("blank").fields, newNode("blank") as never) === null);
+
+	// cross-field rules still apply on top of the required ones
+	check("a range clash is still reported",
+		specFor("line").validate?.({ id: "t", type: "line", property: "w", months: 6, back: 7 } as never) !== null);
 }
 
 console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED"}`);

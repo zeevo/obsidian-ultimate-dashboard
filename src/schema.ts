@@ -208,14 +208,19 @@ export function parseFields<P>(
 	return out;
 }
 
-/** Whether every required field is present and non-empty. */
-export function isComplete<P>(fields: readonly Field<P>[], node: P): boolean {
+/** The first required field left empty, or null when nothing is missing. */
+export function missingField<P>(fields: readonly Field<P>[], node: P): Field<P> | null {
 	for (const field of fields) {
 		if (!field.required) continue;
 		const v = (node as Record<string, unknown>)[field.key];
 
-		if (v === undefined || v === null || v === "") return false;
+		if (v === undefined || v === null || v === "") return field;
 	}
 
-	return true;
+	return null;
+}
+
+/** Whether every required field is present and non-empty. */
+export function isComplete<P>(fields: readonly Field<P>[], node: P): boolean {
+	return missingField(fields, node) === null;
 }

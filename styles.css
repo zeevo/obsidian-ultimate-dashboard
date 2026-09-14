@@ -832,3 +832,20 @@
 	text-align: center;
 	margin-top: 6px;
 }
+
+/* ------------------------------------------------------------------- form */
+
+.udash-required {
+	color: var(--text-error);
+	margin-left: 3px;
+}
+
+.udash-form-status {
+	min-height: 1.2em;
+	font-size: 0.85em;
+	margin: 4px 0 2px;
+}
+
+.udash-form-status.is-error {
+	color: var(--text-error);
+}

@@ -104,12 +104,20 @@ what you will get instead of nothing at all.
 | `stat` | Its property, e.g. `weight` |
 | `line`, `heatmap` | Their property |
 | `note` | The note's name, without the folder or the `.md` |
-| `weather` | The place you typed |
+| `weather` | `Weather`. The place it resolved to is shown on the right of the header |
 | `calendar` | The month it draws, e.g. `February 2026` |
 | `upcoming` | `Upcoming` |
 
 A widget still half configured falls back again, to its type name, so a fresh
 tile reads `Line chart` rather than an empty bar.
+
+## Required fields
+
+A field marked `required` in the registry is marked with a red asterisk in the
+form, and **Done** stays disabled until it is filled, with the missing field
+named underneath. Cross-field rules declared in `validate` block the same way,
+so a line chart given two overlapping ranges says so there rather than failing
+later as a parse error on the whole layout.
 
 ## Adding a widget type
 

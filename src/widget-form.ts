@@ -1,8 +1,8 @@
-import { App, Modal, Setting } from "obsidian";
+import { App, ButtonComponent, Modal, Setting } from "obsidian";
 import { LayoutNode, isContainer } from "./layout-tree";
 import { ContainerKind, assertNever } from "./kinds";
 import { specFor } from "./widgets";
-import { Field, FieldKind, FieldValue } from "./schema";
+import { Field, FieldKind, FieldValue, missingField } from "./schema";
 
 /**
  * The configuration form, generated from a widget's declared fields.
@@ -19,6 +19,9 @@ export interface FormContext {
 
 export class WidgetForm extends Modal {
 	onDismiss: (() => void) | null = null;
+	/** Held so every edit can re-check whether the widget is savable yet. */
+	private done: ButtonComponent | null = null;
+	private status: HTMLElement | null = null;
 
 	constructor(
 		app: App,
@@ -45,15 +48,49 @@ export class WidgetForm extends Modal {
 
 		}
 
-		new Setting(contentEl).addButton((b) =>
-			b
-				.setButtonText("Done")
+		this.status = contentEl.createDiv({ cls: "udash-form-status" });
+
+		new Setting(contentEl).addButton((b) => {
+			this.done = b;
+			b.setButtonText("Done")
 				.setCta()
 				.onClick(() => {
+					if (this.problem() !== null) return;
 					this.close();
 					this.onSave();
-				}),
-		);
+				});
+		});
+
+		this.revalidate();
+	}
+
+	/**
+	 * What is wrong with the widget as configured, or null.
+	 *
+	 * A widget missing a required field cannot render, and saving one used to
+	 * fail later as a parse error on the whole layout. Catching it here names
+	 * the field instead.
+	 */
+	private problem(): string | null {
+		const node = this.node;
+
+		if (isContainer(node)) return null;
+		const spec = specFor(node.type);
+		const missing = missingField(spec.fields, node);
+
+		if (missing) return `${missing.label} is required.`;
+
+		// SAFETY: the spec is this node's own, so its validator accepts it.
+		return spec.validate?.(node as never) ?? null;
+	}
+
+	/** Reflects the current state into the status line and the Done button. */
+	private revalidate(): void {
+		const problem = this.problem();
+
+		this.done?.setDisabled(problem !== null);
+		this.status?.setText(problem ?? "");
+		this.status?.toggleClass("is-error", problem !== null);
 	}
 
 	onClose(): void {
@@ -101,9 +138,12 @@ export class WidgetForm extends Modal {
 		const put = (v: FieldValue | undefined) => {
 			if (v === undefined || v === "") delete bag[field.key];
 			else bag[field.key] = v;
+			this.revalidate();
 		};
 
 		const setting = new Setting(this.contentEl).setName(field.label);
+
+		if (field.required) setting.nameEl.createSpan({ cls: "udash-required", text: "*" });
 
 		if (field.hint) setting.setDesc(field.hint);
 

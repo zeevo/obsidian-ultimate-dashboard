@@ -418,7 +418,7 @@ const weather: WidgetSpec<WeatherWidget> = {
 		{ key: "sun", kind: FieldKind.Toggle, label: "Show sunrise and sunset" },
 	],
 	blank: () => ({ type: WidgetKind.Weather, place: "" }),
-	title: (w) => w.title || w.place || "Weather",
+	title: (w) => w.title || "Weather",
 	summary: (w) => w.place || "not configured",
 };
 
