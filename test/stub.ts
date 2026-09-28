@@ -54,8 +54,13 @@ export class Setting {
 	addExtraButton(): this { return this; }
 }
 
-export function requestUrl(): Promise<{ text: string }> {
-	throw new Error("requestUrl is not available in the harness");
+/** Set by a check that needs a canned network answer; unset, requests throw. */
+export const network: { answer?: (req: { url: string; body?: string }) => unknown } = {};
+
+export async function requestUrl(req: { url: string; body?: string }): Promise<unknown> {
+	if (!network.answer) throw new Error("requestUrl is not available in the harness");
+
+	return network.answer(req);
 }
 
 export const Platform = { isDesktopApp: true, isMobile: false };

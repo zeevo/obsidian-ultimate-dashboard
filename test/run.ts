@@ -6,7 +6,9 @@ import { join } from "node:path";
 import { load } from "js-yaml";
 import { ConfigError, ContainerNode, countWidgets, isContainer, needsSetup, parseDashboard } from "../src/layout-tree";
 import { DayRecord, shiftDate, stripFrontmatter, today } from "../src/data";
-import { currentStreak, fillMonth, monthWindow, renderBlank, renderHeatmap, renderLine, renderMonth, renderNote, renderStat, clockLabel, fillWeather, hourLabel, renderWeather, clockText, fillClock, handAngles, renderClock } from "../src/render";
+import { CalendarService } from "../src/calendar";
+import { network } from "./stub";
+import { currentStreak, fillMonth, fillSignInExpired, monthWindow, renderBlank, renderHeatmap, renderLine, renderMonth, renderNote, renderStat, clockLabel, fillWeather, hourLabel, renderWeather, clockText, fillClock, handAngles, renderClock } from "../src/render";
 import { renderNode } from "../src/layout";
 import { parseICS } from "../src/ics";
 import { serializeDashboard } from "../src/serialize";
@@ -56,6 +58,8 @@ class El {
 	appendChild(e: El) { this.children.push(e);
 
  return e; }
+	listeners: Record<string, () => void> = {};
+	addEventListener(type: string, fn: () => void) { this.listeners[type] = fn; }
 	empty() { this.children = []; }
 	get all(): El[] { return this.children.flatMap((c) => [c, ...c.all]); }
 	byClass(c: string) { return this.all.filter((e) => e.classes.has(c)); }
@@ -1576,6 +1580,64 @@ console.log("\nrequired fields");
 	// cross-field rules still apply on top of the required ones
 	check("a range clash is still reported",
 		specFor("line").validate?.({ id: "t", type: "line", property: "w", months: 6, back: 7 } as never) !== null);
+}
+
+console.log("\nexpired google sign in");
+
+{
+	// Google's answer to a refresh with a revoked or 7 day old token
+	network.answer = () => ({
+		status: 400,
+		json: { error: "invalid_grant", error_description: "Token has been expired or revoked." },
+	});
+
+	const service = new CalendarService();
+	const account = { id: "acc1", accessToken: "", refreshToken: "r", expiresAt: 0 };
+
+	service.useGoogle(() => ({
+		config: { clientId: "c", clientSecret: "s", port: 1, accounts: [account] } as never,
+		saveTokens: async () => {},
+	}));
+
+	const google = { id: "g", name: "Work", type: "google", accountId: "acc1", calendarId: "primary" } as never;
+	const result = await service.events([google], new Date(), new Date());
+
+	check("invalid_grant marks the account expired", result.expired.length === 1 && result.expired[0] === "acc1");
+	check("an expired sign in is not also an error", result.errors.length === 0);
+
+	// any other refusal stays an ordinary error
+	network.answer = () => ({ status: 400, json: { error: "invalid_client", error_description: "bad client" } });
+
+	const other = await service.events([google], new Date(), new Date());
+
+	check("another token error is still reported", other.expired.length === 0 && other.errors.length === 1);
+	network.answer = undefined;
+
+	const wrap = new El();
+
+	wrap.createDiv({ cls: "udash-calendar-body" });
+
+	let clicked = false;
+
+	fillSignInExpired(wrap as never, "Upcoming", undefined, "me@x.com", () => (clicked = true));
+
+	const button = wrap.all.find((e) => e.tag === "button");
+
+	check("the old body is gone, one button stands in", wrap.byClass("udash-calendar-body").length === 0
+		&& wrap.all.filter((e) => e.tag === "button").length === 1);
+	check("the title sits in the corner", wrap.byClass("udash-signin-expired-title")[0]?.children[0]?.text === "Upcoming");
+	check("no month beside a title that needs none", wrap.byClass("udash-signin-expired-meta").length === 0);
+	check("the account email is named", wrap.byClass("udash-signin-expired-email")[0]?.text === "me@x.com");
+
+	const bare = new El();
+
+	fillSignInExpired(bare as never, "Full", "September 2026", undefined, () => {});
+	check("no email line without an email", bare.byClass("udash-signin-expired-email").length === 0);
+	check("a month shows beside a custom title", bare.byClass("udash-signin-expired-meta")[0]?.text === "September 2026");
+	check("the widget takes the bordered, centered style", wrap.classes.has("udash-signin-expired"));
+	check("the button reads Google Sign-in expired", button?.text === "Google Sign-in expired");
+	button?.listeners.click?.();
+	check("clicking the button reconnects", clicked);
 }
 
 console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED"}`);

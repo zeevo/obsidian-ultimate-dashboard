@@ -1,15 +1,16 @@
-import { Component, ItemView, MarkdownRenderer, WorkspaceLeaf, setIcon, setTooltip } from "obsidian";
+import { Component, ItemView, MarkdownRenderer, Notice, WorkspaceLeaf, setIcon, setTooltip } from "obsidian";
 import { ConfigError, countWidgets, parseDashboard } from "./layout-tree";
 import { readDays, stripFrontmatter } from "./data";
 import { CalendarFiller, ClockFiller, DEFAULT_GAP, NoteFiller, WeatherFiller, renderNode } from "./layout";
 import { CalendarService } from "./calendar";
 import { WeatherMode, WeatherQuery, WeatherService, WeatherUnit } from "./weather";
-import { CalendarWidget, ClockWidget, NoteWidget, UpcomingWidget, WeatherWidget } from "./widgets";
-import { fillCalendar, fillClock, fillMonth, fillWeather, monthWindow } from "./render";
+import { CalendarWidget, ClockWidget, NoteWidget, UpcomingWidget, WeatherWidget, monthName, specFor } from "./widgets";
+import { fillCalendar, fillClock, fillMonth, fillSignInExpired, fillWeather, monthWindow } from "./render";
+import { connect } from "./google";
 import { EventModal, NameModal } from "./modal";
 import { VisualEditor } from "./editor";
 import { serializeDashboard } from "./serialize";
-import { CalendarSource, DashboardSettings, activeDashboard, makeDashboard, uniqueName } from "./store";
+import { CalendarSource, DashboardSettings, activeDashboard, findAccount, makeDashboard, uniqueName } from "./store";
 
 export const VIEW_TYPE_DASHBOARD = "ultimate-dashboard-view";
 
@@ -220,9 +221,16 @@ export class DashboardView extends ItemView {
 
 				this.addEventButton(shell, wanted);
 
-				void this.host.calendars.events(wanted, from, to).then(({ events, errors }) => {
+				void this.host.calendars.events(wanted, from, to).then(({ events, errors, expired }) => {
 					// the view may have re-rendered while the fetch was in flight
 					if (!shell.isConnected) return;
+
+					if (expired.length > 0) {
+						this.showSignInExpired(shell, widget, expired[0]);
+
+						return;
+					}
+
 					fillMonth(
 						shell,
 						widget,
@@ -243,8 +251,15 @@ export class DashboardView extends ItemView {
 			if (!widget.past) from.setHours(0, 0, 0, 0);
 			const to = new Date(from.getTime() + (widget.ahead ?? 14) * 86400000);
 
-			void this.host.calendars.events(wanted, from, to).then(({ events, errors }) => {
+			void this.host.calendars.events(wanted, from, to).then(({ events, errors, expired }) => {
 				if (!shell.isConnected) return;
+
+				if (expired.length > 0) {
+					this.showSignInExpired(shell, widget, expired[0]);
+
+					return;
+				}
+
 				const now = new Date();
 
 				const visible = events
@@ -342,6 +357,37 @@ export class DashboardView extends ItemView {
 				}
 			})();
 		};
+	}
+
+	private showSignInExpired(shell: HTMLElement, widget: CalendarWidget | UpcomingWidget, accountId: string): void {
+		const email = findAccount(this.host.settings.google, accountId)?.email;
+		// a custom title replaces the month name, so bring the month back beside it
+		const month = widget.type === "calendar" && widget.title ? monthName(widget.month) : undefined;
+
+		fillSignInExpired(
+			shell,
+			specFor(widget.type).title(widget),
+			month,
+			email,
+			() => void this.reconnectGoogle(accountId),
+		);
+	}
+
+	/** Signs a Google account in again, keeping its id so its calendars stay attached. */
+	private async reconnectGoogle(accountId: string): Promise<void> {
+		const g = this.host.settings.google;
+		const account = findAccount(g, accountId);
+
+		if (!account) return;
+
+		try {
+			Object.assign(account, await connect(g, g.port));
+			await this.host.saveSettings();
+			this.host.invalidateCalendars();
+		} catch (e) {
+			// SAFETY: connect() throws Errors; a non-Error still stringifies.
+			new Notice(`Google sign in failed: ${(e as Error).message}`, 8000);
+		}
 	}
 
 	/** Only Google calendars marked writable can take a new event. */

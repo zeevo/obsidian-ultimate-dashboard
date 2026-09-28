@@ -38,6 +38,18 @@ export interface GoogleClient {
 	clientSecret: string;
 }
 
+/**
+ * The refresh token no longer works, so only a fresh sign in will. Google
+ * answers `invalid_grant` when the user revoked access, or after 7 days when
+ * the OAuth client is still in Testing.
+ */
+export class GoogleAuthExpired extends Error {
+	constructor() {
+		super("Google sign in expired");
+		this.name = "GoogleAuthExpired";
+	}
+}
+
 /* ------------------------------------------------------------------ PKCE */
 
 function randomVerifier(): string {
@@ -159,6 +171,7 @@ const TokenResponse = z.object({
 	access_token: z.optional(z.string()),
 	refresh_token: z.optional(z.string()),
 	expires_in: z.optional(z.number()),
+	error: z.optional(z.string()),
 	error_description: z.optional(z.string()),
 });
 
@@ -206,6 +219,10 @@ async function postForm(body: Record<string, string>): Promise<z.infer<typeof To
 	const json = readOr(TokenResponse, res.json, {});
 
 	if (res.status < 200 || res.status >= 300) {
+		if (body.grant_type === "refresh_token" && json.error === "invalid_grant") {
+			throw new GoogleAuthExpired();
+		}
+
 		throw new Error(`Google rejected the request: ${json.error_description ?? res.status}`);
 	}
 

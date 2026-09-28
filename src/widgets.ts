@@ -213,7 +213,7 @@ const MONTHS = [
 ];
 
 /** "2026-02" as "February 2026", or the current month when unset. */
-function monthName(month?: string): string {
+export function monthName(month?: string): string {
 	const date = month
 		? new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1, 1)
 		: new Date();

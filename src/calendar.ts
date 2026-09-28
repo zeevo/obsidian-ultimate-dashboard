@@ -1,7 +1,7 @@
 import { requestUrl } from "obsidian";
 import { CalEvent, parseICS } from "./ics";
 import { GoogleAccountRecord, GoogleConfig, CalendarSource, findAccount } from "./store";
-import { NewEvent, insertEvent, listEvents, validToken } from "./google";
+import { GoogleAuthExpired, NewEvent, insertEvent, listEvents, validToken } from "./google";
 
 export interface DatedEvent extends CalEvent {
 	calendar: string;
@@ -73,15 +73,17 @@ export class CalendarService {
 	/**
 	 * Events from the named sources between two dates. A source that fails to
 	 * load is reported rather than throwing, so one broken feed cannot blank a
-	 * widget that also draws working ones.
+	 * widget that also draws working ones. Google accounts whose sign in has
+	 * expired are listed in `expired` instead, so the widget can offer a reconnect.
 	 */
 	async events(
 		sources: CalendarSource[],
 		from: Date,
 		to: Date,
-	): Promise<{ events: DatedEvent[]; errors: string[] }> {
+	): Promise<{ events: DatedEvent[]; errors: string[]; expired: string[] }> {
 		const events: DatedEvent[] = [];
 		const errors: string[] = [];
+		const expired = new Set<string>();
 
 		await Promise.all(
 			sources.map(async (source) => {
@@ -100,6 +102,15 @@ export class CalendarService {
 						events.push({ ...e, calendar: source.name, color: source.color });
 					}
 				} catch (e) {
+					if (e instanceof GoogleAuthExpired) {
+						// SAFETY: only tokenFor throws this, and it needs google set first.
+						const account = findAccount(this.google!().config, source.accountId);
+
+						if (account) expired.add(account.id);
+
+						return;
+					}
+
 					// SAFETY: requestUrl rejects with an Error; the fallback below covers
 					// anything else that reaches here without a message.
 					errors.push(`${source.name}: ${(e as Error).message || "could not load"}`);
@@ -109,7 +120,7 @@ export class CalendarService {
 
 		events.sort((a, b) => a.start.getTime() - b.start.getTime());
 
-		return { events, errors };
+		return { events, errors, expired: [...expired] };
 	}
 
 	/** Google expands recurrence server-side, so nothing needs parsing here. */
