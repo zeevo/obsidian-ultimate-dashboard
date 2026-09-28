@@ -1,19 +1,20 @@
 import { App, Notice, setIcon, setTooltip } from "obsidian";
 import { ConfigError, ContainerNode, Dashboard, LayoutNode, isContainer, needsSetup, nextId, parseDashboard } from "./layout-tree";
-import { Widget, WIDGETS, specFor } from "./widgets";
+import { WIDGETS, specFor } from "./widgets";
 import { ContainerKind, WidgetKind, toContainerKind, toWidgetKind } from "./kinds";
 import { serializeDashboard } from "./serialize";
 import { FormContext, WidgetForm } from "./widget-form";
 
 /**
- * The visual editor: a palette you drag from, and a canvas of drop zones that
- * mirrors the layout tree. Every edit mutates the tree and hands it back, so
- * the text editor and this one are two views of the same document.
+ * The layout editor. Edit mode draws the real dashboard, and this adds handles
+ * to it: a grip on every widget, an outlined tab on every row and column, and a
+ * palette to drag new pieces from. Every edit mutates the tree and hands it
+ * back, so the YAML editor and this one are two views of the same document.
  */
 
 const DIVIDERS = [
-	{ type: ContainerKind.Row, label: "Columns", hint: "Split into columns, side by side" },
-	{ type: ContainerKind.Column, label: "Rows", hint: "Split into rows, stacked" },
+	{ type: ContainerKind.Row, label: "Columns", icon: "columns-3", hint: "Split into columns, side by side" },
+	{ type: ContainerKind.Column, label: "Rows", icon: "rows-3", hint: "Split into rows, stacked" },
 ] as const;
 
 /**
@@ -36,7 +37,7 @@ export function newNode(type: WidgetKind | ContainerKind): LayoutNode {
 	return { id, ...specFor(widget).blank() };
 }
 
-/** The label shown on a card and in the palette. */
+/** The label shown on a handle and in the palette. */
 function label(type: WidgetKind | ContainerKind): string {
 	const divider = DIVIDERS.find((d) => d.type === type);
 
@@ -46,19 +47,108 @@ function label(type: WidgetKind | ContainerKind): string {
 	return widget ? specFor(widget).label : type;
 }
 
-/** Where a dragged item is headed: into `parent` at `index`. */
-interface Target {
-	parent: ContainerNode;
-	index: number;
+/* ---------------------------------------------------------- tree edits */
+
+/** The node a path of child indexes leads to from `root`, or null. */
+export function nodeAt(root: ContainerNode, path: number[]): LayoutNode | null {
+	let node: LayoutNode = root;
+
+	for (const i of path) {
+		if (!isContainer(node)) return null;
+		const next: LayoutNode | undefined = node.children[i];
+
+		if (!next) return null;
+		node = next;
+	}
+
+	return node;
 }
+
+/** Whether `haystack` is `needle` or contains it anywhere below. */
+function contains(haystack: ContainerNode, needle: LayoutNode): boolean {
+	if (haystack === needle) return true;
+
+	for (const child of haystack.children) {
+		if (child === needle) return true;
+
+		if (isContainer(child) && contains(child, needle)) return true;
+	}
+
+	return false;
+}
+
+/**
+ * Moves the node at `from` into `parent` at `index`, where `index` counts the
+ * parent's children as they were before the move. Returns false, changing
+ * nothing, when the move is impossible: a missing node, the root, or a
+ * container dropped inside itself.
+ */
+export function moveNode(root: ContainerNode, from: number[], parent: ContainerNode, index: number): boolean {
+	if (from.length === 0) return false;
+
+	const moving = nodeAt(root, from);
+	const source = nodeAt(root, from.slice(0, -1));
+
+	if (!moving || !source || !isContainer(source)) return false;
+
+	if (isContainer(moving) && contains(moving, parent)) return false;
+
+	const oldIndex = from[from.length - 1];
+	let at = index;
+
+	// removing first would shift a later index in the same parent
+	if (source === parent && oldIndex < at) at--;
+	source.children.splice(oldIndex, 1);
+	parent.children.splice(at, 0, moving);
+
+	return true;
+}
+
+export interface Box {
+	left: number;
+	top: number;
+	right: number;
+	bottom: number;
+}
+
+/**
+ * Where a drop at (x, y) lands among a container's children, given their boxes
+ * in order. Columns split each child at its vertical midpoint. Rows split at the
+ * horizontal midpoint, line by line, since a row can wrap: a pointer above a
+ * line goes before it, and one inside a line picks a gap within it.
+ */
+export function insertionIndex(boxes: Box[], x: number, y: number, horizontal: boolean): number {
+	for (let i = 0; i < boxes.length; i++) {
+		const b = boxes[i];
+
+		if (!horizontal) {
+			if (y < (b.top + b.bottom) / 2) return i;
+			continue;
+		}
+
+		// children of a row align to the top, so one line shares a top edge; the
+		// line reaches as low as its tallest child
+		let lineBottom = b.bottom;
+
+		for (const o of boxes) {
+			if (Math.abs(o.top - b.top) < 1) lineBottom = Math.max(lineBottom, o.bottom);
+		}
+
+		if (y < b.top) return i;
+
+		if (y <= lineBottom && x < (b.left + b.right) / 2) return i;
+	}
+
+	return boxes.length;
+}
+
+/* -------------------------------------------------------------- editor */
 
 type DragPayload = { kind: "new"; type: LayoutNode["type"] } | { kind: "move"; path: number[] };
 
-const pathOf = (path: number[]) => path.join(".");
-
-export class VisualEditor {
+export class LayoutEditor {
 	private dragging: DragPayload | null = null;
-	/** The editor root, so a drag can widen every drop zone at once. */
+	/** The dashboard's root element, so a drag can clear every marker at once. */
 	private hostEl: HTMLElement | null = null;
 	/** The last layout that parsed, to fall back to if an edit produces one that does not. */
 	private lastGood: string;
@@ -72,43 +162,39 @@ export class VisualEditor {
 		this.lastGood = serializeDashboard(config);
 	}
 
-	render(host: HTMLElement): void {
-		host.empty();
-		host.addClass("udash-editor");
+	/** Whether a drag is under way, when a redraw would drop it. */
+	get isDragging(): boolean {
+		return this.dragging !== null;
+	}
+
+	/** Marks the element the dashboard is drawn into. */
+	attach(host: HTMLElement): void {
+		host.addClass("udash-editing");
 		this.hostEl = host;
-
-		this.renderPalette(host.createDiv({ cls: "udash-palette" }));
-
-		const canvas = host.createDiv({ cls: "udash-canvas" });
-
-		this.renderContainer(canvas, this.config.root, []);
 	}
 
 	/* ------------------------------------------------------------ palette */
 
-	private renderPalette(el: HTMLElement): void {
-		el.createDiv({ cls: "udash-palette-label", text: "Widgets" });
+	renderPalette(el: HTMLElement): void {
+		const widgets = el.createDiv({ cls: "udash-palette-group" });
 
-		const widgets = el.createDiv({ cls: "udash-palette-row" });
+		widgets.createSpan({ cls: "udash-palette-label", text: "Widgets" });
 
 		for (const spec of Object.values(WIDGETS)) this.chip(widgets, spec.type, spec.hint);
 
-		el.createDiv({ cls: "udash-palette-label", text: "Dividers" });
+		const dividers = el.createDiv({ cls: "udash-palette-group" });
 
-		const dividers = el.createDiv({ cls: "udash-palette-row" });
+		dividers.createSpan({ cls: "udash-palette-label", text: "Layout" });
 
-		for (const item of DIVIDERS) this.chip(dividers, item.type, item.hint);
-
-		el.createDiv({
-			cls: "udash-palette-hint",
-			text: "Drag onto the canvas. Drag a widget already there to move it.",
-		});
+		for (const item of DIVIDERS) this.chip(dividers, item.type, item.hint, item.icon);
 	}
 
-	private chip(parent: HTMLElement, type: WidgetKind | ContainerKind, hint: string): void {
-		const chip = parent.createDiv({ cls: "udash-chip", text: label(type) });
+	private chip(parent: HTMLElement, type: WidgetKind | ContainerKind, hint: string, icon?: string): void {
+		const chip = parent.createDiv({ cls: "udash-chip" });
 
-		setTooltip(chip, hint);
+		if (icon) setIcon(chip.createSpan({ cls: "udash-chip-icon" }), icon);
+		chip.createSpan({ text: label(type) });
+		setTooltip(chip, `${hint}. Drag onto the dashboard.`);
 		chip.draggable = true;
 		chip.addEventListener("dragstart", (e) => {
 			this.dragging = { kind: "new", type };
@@ -120,87 +206,92 @@ export class VisualEditor {
 		chip.addEventListener("dragend", () => this.endDrag());
 	}
 
-	/* ------------------------------------------------------------- canvas */
+	/* --------------------------------------------------------- decoration */
 
-	private renderContainer(el: HTMLElement, node: ContainerNode, path: number[]): void {
-		const box = el.createDiv({ cls: `udash-node udash-node-${node.type}` });
+	/** Passed to renderNode: adds handles to each node as it is drawn. */
+	decorate = (el: HTMLElement, node: LayoutNode, path: number[]): void => {
+		if (isContainer(node)) this.decorateContainer(el, node, path);
+		else this.decorateWidget(el, node, path);
+	};
 
-		if (path.length > 0) this.makeDraggable(box, path);
+	private decorateContainer(el: HTMLElement, node: ContainerNode, path: number[]): void {
+		const isRoot = path.length === 0;
+		const divider = DIVIDERS.find((d) => d.type === node.type);
 
-		const head = box.createDiv({ cls: "udash-node-head" });
+		el.addClass("udash-edit-container");
 
-		head.createSpan({ cls: "udash-node-kind", text: label(node.type) });
+		const tab = el.createDiv({ cls: "udash-edit-tab" });
 
+		if (!isRoot) this.grip(tab, el, path);
+
+		if (divider) setIcon(tab.createSpan({ cls: "udash-edit-tab-icon" }), divider.icon);
+		tab.createSpan({ cls: "udash-edit-label", text: label(node.type) });
+		setTooltip(tab, divider ? divider.hint : "");
 		// the root cannot be moved or deleted, but it is still configurable
-		this.controls(head, node, path, path.length === 0);
-
-		const body = box.createDiv({ cls: "udash-node-body" });
-
-		this.acceptDrops(body, node);
+		this.actions(tab, node, path, isRoot);
 
 		if (node.children.length === 0) {
-			body.createDiv({ cls: "udash-empty-hint", text: "Drop a widget here" });
-
-			return;
+			el.createDiv({ cls: "udash-edit-empty", text: "Drop widgets here" });
 		}
 
-		node.children.forEach((child, i) => {
-			const childPath = [...path, i];
-
-			if (isContainer(child)) this.renderContainer(body, child, childPath);
-			else this.renderLeaf(body, child, childPath);
-		});
+		this.acceptDrops(el, node);
 	}
 
-	private renderLeaf(el: HTMLElement, node: Widget, path: number[]): void {
-		const box = el.createDiv({ cls: `udash-node udash-node-leaf udash-node-${node.type}` });
+	private decorateWidget(el: HTMLElement, node: LayoutNode, path: number[]): void {
+		if (isContainer(node)) return;
 
-		this.makeDraggable(box, path);
+		el.addClass("udash-edit-widget");
 
-		const head = box.createDiv({ cls: "udash-node-head" });
+		const handle = el.createDiv({ cls: "udash-edit-handle" });
 
-		head.createSpan({ cls: "udash-node-kind", text: label(node.type) });
-		head.createSpan({ cls: "udash-node-meta", text: specFor(node.type).summary(node) });
-		this.controls(head, node, path);
+		this.grip(handle, el, path);
+		handle.createSpan({ cls: "udash-edit-label", text: specFor(node.type).label });
+		this.actions(handle, node, path, false);
 	}
 
-	private makeDraggable(box: HTMLElement, path: number[]): void {
-		box.draggable = true;
-		box.addEventListener("dragstart", (e) => {
+	/** A grip that drags `el`, showing the whole element under the cursor. */
+	private grip(parent: HTMLElement, el: HTMLElement, path: number[]): void {
+		const grip = parent.createSpan({ cls: "udash-edit-grip" });
+
+		setIcon(grip, "grip-vertical");
+		setTooltip(grip, "Drag to move");
+		grip.draggable = true;
+		grip.addEventListener("dragstart", (e) => {
 			this.dragging = { kind: "move", path };
-			e.dataTransfer?.setData("text/plain", pathOf(path));
+			e.dataTransfer?.setData("text/plain", path.join("."));
 
-			if (e.dataTransfer) e.dataTransfer.effectAllowed = "copyMove";
+			if (e.dataTransfer) {
+				e.dataTransfer.effectAllowed = "move";
+				const box = el.getBoundingClientRect();
+
+				e.dataTransfer.setDragImage(el, e.clientX - box.left, e.clientY - box.top);
+			}
+
 			e.stopPropagation();
 			this.setDragging(true);
-			window.setTimeout(() => box.addClass("is-dragging-self"), 0);
+			// deferred, or the drag image would be taken already faded
+			window.setTimeout(() => el.addClass("is-dragging-self"), 0);
 		});
-		box.addEventListener("dragend", () => {
-			box.removeClass("is-dragging-self");
+		grip.addEventListener("dragend", () => {
+			el.removeClass("is-dragging-self");
 			this.endDrag();
 		});
 	}
 
-	private controls(head: HTMLElement, node: LayoutNode, path: number[], isRoot = false): void {
-		const actions = head.createDiv({ cls: "udash-node-actions" });
+	private actions(parent: HTMLElement, node: LayoutNode, path: number[], isRoot: boolean): void {
+		const edit = parent.createEl("button", { cls: "udash-icon-button" });
 
-		{
-			const edit = actions.createEl("button", { cls: "udash-icon-button" });
-
-			edit.draggable = false;
-			setIcon(edit, "pencil");
-			setTooltip(edit, "Configure");
-			edit.addEventListener("click", (e) => {
-				e.stopPropagation();
-				this.configure(node);
-			});
-		}
+		setIcon(edit, "pencil");
+		setTooltip(edit, "Configure");
+		edit.addEventListener("click", (e) => {
+			e.stopPropagation();
+			this.configure(node);
+		});
 
 		if (isRoot) return;
 
-		const remove = actions.createEl("button", { cls: "udash-icon-button" });
+		const remove = parent.createEl("button", { cls: "udash-icon-button" });
 
-		remove.draggable = false;
 		setIcon(remove, "trash-2");
 		setTooltip(remove, "Remove");
 		remove.addEventListener("click", (e) => {
@@ -210,6 +301,8 @@ export class VisualEditor {
 		});
 	}
 
+	/* ---------------------------------------------------------------- drag */
+
 	private setDragging(on: boolean): void {
 		this.hostEl?.toggleClass("is-dragging", on);
 	}
@@ -217,6 +310,7 @@ export class VisualEditor {
 	private endDrag(): void {
 		this.dragging = null;
 		this.setDragging(false);
+		this.clearMarks();
 
 		// Defensive: a re-render mid-drag can leave a detached card marked, and a
 		// stale mark means a permanently greyed out widget.
@@ -225,120 +319,93 @@ export class VisualEditor {
 		}
 	}
 
+	private clearMarks(): void {
+		for (const el of Array.from(this.hostEl?.querySelectorAll(".is-insert-before, .is-insert-end") ?? [])) {
+			el.removeClass("is-insert-before");
+			el.removeClass("is-insert-end");
+		}
+	}
+
 	/**
-	 * One drop target per container, rather than a strip between every pair of
-	 * children plus the children themselves. The insertion point comes from where
-	 * the cursor sits relative to each child's midpoint, which is how sortable
-	 * lists normally work: nothing thin to hit, and the card being dragged does
-	 * not have to hide from the pointer to stay out of the way.
+	 * One drop target per container. The innermost container under the cursor
+	 * takes the drop, and the insertion point comes from where the cursor sits
+	 * among its children, so there is nothing thin to aim for.
 	 */
-	private acceptDrops(body: HTMLElement, node: ContainerNode): void {
-		const indexAt = (e: DragEvent): number => {
-			const cards = cardsIn(body);
-			const horizontal = node.type === "row";
-			const pos = horizontal ? e.clientX : e.clientY;
+	private acceptDrops(el: HTMLElement, node: ContainerNode): void {
+		const indexAt = (e: DragEvent): number =>
+			insertionIndex(
+				childrenOf(el).map((c) => c.getBoundingClientRect()),
+				e.clientX,
+				e.clientY,
+				node.type === ContainerKind.Row,
+			);
 
-			for (let i = 0; i < cards.length; i++) {
-				const r = cards[i].getBoundingClientRect();
-				const mid = horizontal ? r.left + r.width / 2 : r.top + r.height / 2;
-
-				if (pos < mid) return i;
-			}
-
-			return cards.length;
-		};
-
-		const mark = (index: number): void => {
-			const cards = cardsIn(body);
-
-			for (const c of cards) c.removeClass("is-insert-before");
-			body.removeClass("is-insert-end");
-
-			if (index < cards.length) cards[index].addClass("is-insert-before");
-			else body.addClass("is-insert-end");
-		};
-
-		const clear = (): void => {
-			for (const c of cardsIn(body)) c.removeClass("is-insert-before");
-			body.removeClass("is-insert-end");
-		};
-
-		body.addEventListener("dragover", (e) => {
+		el.addEventListener("dragover", (e) => {
 			if (!this.dragging) return;
 			e.preventDefault();
 			e.stopPropagation();
 
-			if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-			mark(indexAt(e));
+			if (e.dataTransfer) e.dataTransfer.dropEffect = this.dragging.kind === "new" ? "copy" : "move";
+
+			const index = indexAt(e);
+			const children = childrenOf(el);
+
+			// cleared everywhere, since an outer container keeps its mark when the
+			// cursor moves into an inner one
+			this.clearMarks();
+
+			if (index < children.length) children[index].addClass("is-insert-before");
+			else el.addClass("is-insert-end");
 		});
-		body.addEventListener("dragleave", (e) => {
+		el.addEventListener("dragleave", (e) => {
 			// SAFETY: relatedTarget is the element being entered, or null when the
 			// cursor leaves the window; contains() accepts both.
 			const entering = e.relatedTarget as globalThis.Node | null;
 
-			if (!body.contains(entering)) clear();
+			if (!el.contains(entering)) this.clearMarks();
 		});
-		body.addEventListener("drop", (e) => {
+		el.addEventListener("drop", (e) => {
 			e.preventDefault();
 			e.stopPropagation();
-			const index = indexAt(e);
-
-			clear();
-			this.drop({ parent: node, index });
+			this.drop(node, indexAt(e));
 		});
 	}
 
 	/* -------------------------------------------------------------- edits */
 
-	private drop(target: Target): void {
+	private drop(parent: ContainerNode, index: number): void {
 		const payload = this.dragging;
 
 		this.endDrag();
 
 		if (!payload) return;
 
-		if (payload.kind === "new") {
-			const node = newNode(payload.type);
-
-			target.parent.children.splice(target.index, 0, node);
-
-			if (!isContainer(node) && needsSetup(node)) {
-				// Cancelling must not leave a half-made widget behind: it would be
-				// serialised without its required fields and fail to parse.
-				this.configure(node, () => {
-					if (needsSetup(node)) {
-						const at = target.parent.children.indexOf(node);
-
-						if (at >= 0) target.parent.children.splice(at, 1);
-					}
-
-					this.commit();
-				});
-
-				return;
-			}
-
-			this.commit();
+		if (payload.kind === "move") {
+			if (moveNode(this.config.root, payload.path, parent, index)) this.commit();
 
 			return;
 		}
 
-		const moving = this.nodeAt(payload.path);
+		const node = newNode(payload.type);
 
-		if (!moving) return;
+		parent.children.splice(index, 0, node);
 
-		// a container cannot be dropped inside itself
-		if (isContainer(moving) && contains(moving, target.parent)) return;
-		const from = this.parentOf(payload.path);
+		if (!isContainer(node) && needsSetup(node)) {
+			// Cancelling must not leave a half-made widget behind: it would be
+			// serialised without its required fields and fail to parse.
+			this.configure(node, () => {
+				if (needsSetup(node)) {
+					const at = parent.children.indexOf(node);
 
-		if (!from) return;
-		const oldIndex = payload.path[payload.path.length - 1];
-		let index = target.index;
+					if (at >= 0) parent.children.splice(at, 1);
+				}
 
-		// removing first would shift a later index in the same parent
-		if (from === target.parent && oldIndex < index) index--;
-		from.children.splice(oldIndex, 1);
-		target.parent.children.splice(index, 0, moving);
+				this.commit();
+			});
+
+			return;
+		}
+
 		this.commit();
 	}
 
@@ -350,37 +417,16 @@ export class VisualEditor {
 	}
 
 	private removeAt(path: number[]): void {
-		const parent = this.parentOf(path);
+		const parent = nodeAt(this.config.root, path.slice(0, -1));
 
-		if (!parent) return;
+		if (!parent || !isContainer(parent) || path.length === 0) return;
 		parent.children.splice(path[path.length - 1], 1);
-	}
-
-	private nodeAt(path: number[]): LayoutNode | null {
-		let node: LayoutNode = this.config.root;
-
-		for (const i of path) {
-			if (!isContainer(node)) return null;
-			const next: LayoutNode | undefined = node.children[i];
-
-			if (!next) return null;
-			node = next;
-		}
-
-		return node;
-	}
-
-	private parentOf(path: number[]): ContainerNode | null {
-		if (path.length === 0) return null;
-		const parent = this.nodeAt(path.slice(0, -1));
-
-		return parent && isContainer(parent) ? parent : null;
 	}
 
 	/**
 	 * Saves, but only a layout that can be read back. The editor must never write
 	 * a config it cannot itself load: that strands you with an error and no way
-	 * back to the canvas.
+	 * back to the dashboard. A refused edit restores the last good layout.
 	 */
 	private commit(): void {
 		const text = serializeDashboard(this.config);
@@ -394,8 +440,7 @@ export class VisualEditor {
 				}`,
 				8000,
 			);
-			this.config = parseDashboard(this.lastGood);
-			this.rerender();
+			this.onChange(parseDashboard(this.lastGood));
 
 			return;
 		}
@@ -403,31 +448,13 @@ export class VisualEditor {
 		this.lastGood = text;
 		this.onChange(this.config);
 	}
-
-	private rerender(): void {
-		if (this.hostEl) this.render(this.hostEl);
-	}
 }
 
-/** Whether `haystack` contains `needle` anywhere below it. */
-function contains(haystack: ContainerNode, needle: LayoutNode): boolean {
-	if (haystack === needle) return true;
-
-	for (const child of haystack.children) {
-		if (child === needle) return true;
-
-		if (isContainer(child) && contains(child, needle)) return true;
-	}
-
-	return false;
-}
-
-
-/** The child cards of a container body, ignoring hints and indicators. */
-function cardsIn(body: HTMLElement): HTMLElement[] {
+/** The child node elements of a container, ignoring handles and hints. */
+function childrenOf(el: HTMLElement): HTMLElement[] {
 	const out: HTMLElement[] = [];
 
-	for (const child of Array.from(body.children)) {
+	for (const child of Array.from(el.children)) {
 		if (child instanceof HTMLElement && child.hasClass("udash-node")) out.push(child);
 	}
 

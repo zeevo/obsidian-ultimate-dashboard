@@ -19,6 +19,8 @@ function applySizing(el: HTMLElement, node: LayoutNode): void {
 function applyContainer(el: HTMLElement, node: ContainerNode, inheritedGap: number): number {
 	const gap = node.gap ?? inheritedGap;
 	el.style.gap = `${gap}px`;
+	// read by the editor, to centre its drop line in the gap
+	el.style.setProperty("--udash-gap", `${gap}px`);
 
 	el.style.display = "flex";
 	el.style.flexDirection = node.type === ContainerKind.Row ? "row" : "column";
@@ -60,6 +62,13 @@ export interface Fillers {
 	clock?: ClockFiller;
 }
 
+/**
+ * Called with every node's element once it is drawn, and the path of child
+ * indexes that reaches it from the root. Edit mode uses it to add handles to
+ * the real dashboard rather than drawing a separate canvas.
+ */
+export type NodeDecorator = (el: HTMLElement, node: LayoutNode, path: number[]) => void;
+
 export function renderNode(
 	parent: HTMLElement,
 	node: LayoutNode,
@@ -67,6 +76,20 @@ export function renderNode(
 	inheritedGap: number,
 	onError: (el: HTMLElement, message: string) => void,
 	fillers: Fillers = {},
+	decorate?: NodeDecorator,
+): void {
+	renderAt(parent, node, days, inheritedGap, onError, fillers, decorate, []);
+}
+
+function renderAt(
+	parent: HTMLElement,
+	node: LayoutNode,
+	days: DayRecord[],
+	inheritedGap: number,
+	onError: (el: HTMLElement, message: string) => void,
+	fillers: Fillers,
+	decorate: NodeDecorator | undefined,
+	path: number[],
 ): void {
 	const el = parent.createDiv({ cls: `udash-node udash-${node.type}` });
 	applySizing(el, node);
@@ -74,9 +97,10 @@ export function renderNode(
 	if (isContainer(node)) {
 		const gap = applyContainer(el, node, inheritedGap);
 
-		for (const child of node.children) {
-			renderNode(el, child, days, gap, onError, fillers);
-		}
+		node.children.forEach((child, i) => {
+			renderAt(el, child, days, gap, onError, fillers, decorate, [...path, i]);
+		});
+		decorate?.(el, node, path);
 
 		return;
 	}
@@ -154,6 +178,8 @@ export function renderNode(
 		// the only thing they construct, and a non-Error still stringifies here.
 		onError(el, `${node.type} widget failed: ${(e as Error).message}`);
 	}
+
+	decorate?.(el, node, path);
 }
 
 export { DEFAULT_GAP };

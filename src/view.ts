@@ -1,5 +1,5 @@
 import { Component, ItemView, MarkdownRenderer, Notice, WorkspaceLeaf, setIcon, setTooltip } from "obsidian";
-import { ConfigError, countWidgets, parseDashboard } from "./layout-tree";
+import { ConfigError, Dashboard, countWidgets, parseDashboard } from "./layout-tree";
 import { readDays, stripFrontmatter } from "./data";
 import { CalendarFiller, ClockFiller, DEFAULT_GAP, NoteFiller, WeatherFiller, renderNode } from "./layout";
 import { CalendarService } from "./calendar";
@@ -8,7 +8,7 @@ import { CalendarWidget, ClockWidget, NoteWidget, UpcomingWidget, WeatherWidget,
 import { addMonthArrows, fillCalendar, fillClock, fillMonth, fillSignInExpired, fillWeather, labelMonth, monthWindow, shiftMonth } from "./render";
 import { connect } from "./google";
 import { EventDetailsModal, EventModal, NameModal } from "./modal";
-import { VisualEditor } from "./editor";
+import { LayoutEditor } from "./editor";
 import { serializeDashboard } from "./serialize";
 import { CalendarSource, DashboardSettings, activeDashboard, findAccount, makeDashboard, uniqueName } from "./store";
 
@@ -46,6 +46,8 @@ export class DashboardView extends ItemView {
 	 * scrolled would jump back to the top as you typed elsewhere.
 	 */
 	private scrolled = new Map<string, number>();
+	/** The layout editor for the current draw, while in edit mode. */
+	private editor: LayoutEditor | null = null;
 	/**
 	 * How many months each full calendar has been paged from its configured
 	 * month, by dashboard and position. Per tab and never saved, so a redraw
@@ -75,11 +77,13 @@ export class DashboardView extends ItemView {
 	}
 
 	async onOpen(): Promise<void> {
-		// Skip the redraw while editing: it would rebuild the textarea and drop
-		// the cursor mid-keystroke.
+		// Skip the redraw in the YAML editor, where it would rebuild the textarea
+		// and drop the cursor mid-keystroke, and mid-drag, where it would drop
+		// the thing being dragged.
 		this.registerEvent(
 			this.app.metadataCache.on("changed", () => {
-				if (this.mode === "dashboard") this.render();
+				if (this.mode === "edit" && (this.editorTab === "yaml" || this.editor?.isDragging)) return;
+				this.render();
 			}),
 		);
 		this.render();
@@ -87,19 +91,29 @@ export class DashboardView extends ItemView {
 
 	render(): void {
 		const host = this.contentEl;
+		// emptying the view collapses it for a moment, which would scroll it back
+		// to the top on every edit and every redraw
+		const scrollTop = host.scrollTop;
 
+		this.draw(host);
+		host.scrollTop = scrollTop;
+	}
+
+	private draw(host: HTMLElement): void {
 		// the markdown children own event handlers and child components of their
 		// own; emptying the DOM under them is not enough to release those
 		for (const embed of this.embeds) this.removeChild(embed);
 		this.embeds = [];
+		this.editor = null;
 
 		host.empty();
 		host.addClass("udash-view");
 
 		this.renderHeader(host);
 
-		const root = host.createDiv({ cls: "lifedash" });
 		const current = activeDashboard(this.host.settings);
+		const toolbar = current && this.mode === "edit" ? this.renderToolbar(host) : null;
+		const root = host.createDiv({ cls: "lifedash" });
 
 		if (!current) {
 			this.error(root, "No dashboards yet. Use the + button to make one.");
@@ -107,8 +121,8 @@ export class DashboardView extends ItemView {
 			return;
 		}
 
-		if (this.mode === "edit") {
-			this.renderEditor(root, current);
+		if (this.mode === "edit" && this.editorTab === "yaml") {
+			this.renderYamlEditor(root, current);
 
 			return;
 		}
@@ -118,7 +132,9 @@ export class DashboardView extends ItemView {
 		try {
 			config = parseDashboard(current.config);
 		} catch (e) {
-			this.error(root, e instanceof ConfigError ? e.message : String(e));
+			const message = e instanceof ConfigError ? e.message : String(e);
+
+			this.error(root, this.mode === "edit" ? `${message}. Fix it in the YAML tab.` : message);
 
 			return;
 		}
@@ -134,6 +150,12 @@ export class DashboardView extends ItemView {
 			return;
 		}
 
+		if (toolbar) {
+			this.editor = this.makeEditor(current, config);
+			this.editor.attach(root);
+			this.editor.renderPalette(toolbar.createDiv({ cls: "udash-palette" }));
+		}
+
 		renderNode(
 			root,
 			config.root,
@@ -146,6 +168,7 @@ export class DashboardView extends ItemView {
 				weather: this.makeWeatherFiller(),
 				clock: this.makeClockFiller(),
 			},
+			this.editor?.decorate,
 		);
 	}
 
@@ -178,8 +201,8 @@ export class DashboardView extends ItemView {
 		spacer.setAttr("aria-hidden", "true");
 
 		const toggle = bar.createEl("button", { cls: "udash-bar-button" });
-		setIcon(toggle, this.mode === "edit" ? "eye" : "pencil");
-		setTooltip(toggle, this.mode === "edit" ? "Back to the dashboard" : "Edit this layout");
+		setIcon(toggle, this.mode === "edit" ? "check" : "pencil");
+		setTooltip(toggle, this.mode === "edit" ? "Done editing" : "Edit this layout");
 		toggle.toggleClass("is-active", this.mode === "edit");
 		toggle.addEventListener("click", () => {
 			this.mode = this.mode === "edit" ? "dashboard" : "edit";
@@ -461,9 +484,13 @@ export class DashboardView extends ItemView {
 		button.addEventListener("click", () => this.createEvent(targets));
 	}
 
-	/** Edit mode: a visual canvas, or the raw YAML behind it. */
-	private renderEditor(root: HTMLElement, current: { config: string }): void {
-		const tabs = root.createDiv({ cls: "udash-editor-tabs" });
+	/**
+	 * The strip above the dashboard in edit mode: the palette to drag new pieces
+	 * from, and a switch to the raw YAML behind the layout.
+	 */
+	private renderToolbar(host: HTMLElement): HTMLElement {
+		const toolbar = host.createDiv({ cls: "udash-edit-toolbar" });
+		const tabs = toolbar.createDiv({ cls: "udash-editor-tabs" });
 
 		for (const tab of ["visual", "yaml"] as const) {
 			const button = tabs.createEl("button", {
@@ -478,30 +505,15 @@ export class DashboardView extends ItemView {
 			});
 		}
 
-		if (this.editorTab === "yaml") {
-			this.renderYamlEditor(root, current);
+		return toolbar;
+	}
 
-			return;
-		}
-
-		let parsed;
-
-		try {
-			parsed = parseDashboard(current.config);
-		} catch (e) {
-			this.error(
-				root,
-				`${e instanceof ConfigError ? e.message : String(e)} \u2014 fix it in the YAML tab.`,
-			);
-
-			return;
-		}
-
-		const editor = new VisualEditor(
+	private makeEditor(current: { config: string }, config: Dashboard): LayoutEditor {
+		return new LayoutEditor(
 			this.app,
-			parsed,
+			config,
 			{
-				properties: this.knownProperties(parsed.folder),
+				properties: this.knownProperties(config.folder),
 				calendars: this.host.settings.calendars.map((c) => c.name),
 				notes: this.app.vault.getMarkdownFiles().map((f) => f.path).sort(),
 			},
@@ -511,8 +523,6 @@ export class DashboardView extends ItemView {
 				this.render();
 			},
 		);
-
-		editor.render(root.createDiv());
 	}
 
 	/** Frontmatter keys actually present, to offer while configuring a widget. */

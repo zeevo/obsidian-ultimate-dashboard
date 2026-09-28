@@ -34,14 +34,21 @@ were reading.
 
 The pencil opens edit mode, which has two tabs.
 
-**Visual** is a palette and a canvas. Drag a widget type onto a drop zone to add
-it; drag one already on the canvas to move it anywhere, including into a
-divider. Dropping a type that needs settings, like a heatmap with no property
-yet, opens its configuration straight away.
+**Visual** edits the dashboard in place: every widget stays rendered, with live
+data, while you rearrange it. A toolbar across the top holds the palette. Drag a
+widget type onto the dashboard to add it; dropping a type that needs settings,
+like a heatmap with no property yet, opens its configuration straight away.
 
-Each card carries a pencil to reconfigure and a bin to remove. Dropping is
-handled per container rather than per gap: the whole container is a target, and
-a line shows which side of a card the widget will land on.
+Every widget gets a handle pill on its top right: drag the grip to move the
+widget anywhere, including into another row or column, and use the pencil to
+reconfigure it or the bin to remove it. Widgets ignore clicks while editing, so
+a drag cannot open an event or follow a link by mistake.
+
+Every row and column is outlined, blue for *Columns* and purple for *Rows*, with
+a tab on its top left naming it. The tab carries the same grip, pencil and bin,
+so a whole group moves as one. Dropping is handled per container rather than per
+gap: the innermost container under the cursor takes the drop, and a line shows
+where the widget will land.
 
 The palette's **dividers** are containers: *Columns* lays its children out side
 by side, *Rows* stacks them. Drop widgets inside one to segment the dashboard,
@@ -61,10 +68,10 @@ The tab has a small bar across the top:
 | Control | Does |
 |---------|------|
 | dropdown | Switches dashboards. Only shown once you have more than one |
-| pencil | Toggles between the rendered dashboard and its YAML |
+| pencil | Enters edit mode; the tick leaves it |
 | plus | Creates a dashboard, asking for a name first |
 
-Edit mode validates as you type and saves continuously; click the eye to go
+Edit mode validates as you type and saves continuously; click the tick to go
 back. The same editor, plus rename, duplicate and delete, lives in Settings →
 Community plugins → Ultimate Dashboard.
 

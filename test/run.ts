@@ -4,7 +4,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { load } from "js-yaml";
-import { ConfigError, ContainerNode, countWidgets, isContainer, needsSetup, parseDashboard } from "../src/layout-tree";
+import { ConfigError, ContainerNode, LayoutNode, countWidgets, isContainer, needsSetup, parseDashboard } from "../src/layout-tree";
 import { DayRecord, shiftDate, stripFrontmatter, today } from "../src/data";
 import { CalendarService } from "../src/calendar";
 import { network } from "./stub";
@@ -13,7 +13,7 @@ import { currentStreak, fillMonth, fillSignInExpired, monthWindow, renderBlank, 
 import { renderNode } from "../src/layout";
 import { parseICS } from "../src/ics";
 import { serializeDashboard } from "../src/serialize";
-import { newNode } from "../src/editor";
+import { LayoutEditor, insertionIndex, moveNode, newNode, nodeAt } from "../src/editor";
 import { SPANS, WEATHER_MODES, WeatherError, describeWeather, parseForecast, parsePlaces, toWeatherMode } from "../src/weather";
 import { isComplete, missingField } from "../src/schema";
 import { CONTAINER_KINDS, WIDGET_KINDS } from "../src/kinds";
@@ -1739,6 +1739,96 @@ console.log("\nevent details");
 
 	fillMonth(wrap as never, cal, new Date(2026, 8, 1), [{ summary: "Standup", start: at(15, 9), end: at(15, 10), allDay: false }], []);
 	check("without a handler a chip is not clickable", !wrap.byClass("udash-month-chip")[0]?.classes.has("is-clickable"));
+}
+
+console.log("\nlive layout editor");
+
+{
+	const layout = () => parseDashboard(`
+folder: Daily
+layout:
+  type: column
+  children:
+    - { type: heatmap, property: a }
+    - type: row
+      children:
+        - { type: heatmap, property: b }
+        - { type: heatmap, property: c }
+    - { type: heatmap, property: d }
+`);
+
+	const props = (n: LayoutNode): string =>
+		isContainer(n) ? `[${n.children.map(props).join(",")}]` : String((n as { property?: string }).property);
+
+	const down = layout();
+
+	check("moving later in the same parent accounts for the gap it leaves",
+		moveNode(down.root, [0], down.root, 2) && props(down.root) === "[[b,c],a,d]", props(down.root));
+
+	const into = layout();
+	const row = nodeAt(into.root, [1]) as ContainerNode;
+
+	check("a widget moves into a nested row",
+		moveNode(into.root, [0], row, 1) && props(into.root) === "[[b,a,c],d]", props(into.root));
+
+	const out = layout();
+
+	check("a widget moves out of a row to the top level",
+		moveNode(out.root, [1, 1], out.root, 0) && props(out.root) === "[c,a,[b],d]", props(out.root));
+
+	const self = layout();
+	const selfRow = nodeAt(self.root, [1]) as ContainerNode;
+
+	check("a row cannot drop inside itself",
+		!moveNode(self.root, [1], selfRow, 0) && props(self.root) === "[a,[b,c],d]", props(self.root));
+	check("the root cannot move", !moveNode(self.root, [], self.root, 0));
+	check("a missing path moves nothing", !moveNode(self.root, [9], self.root, 0) && props(self.root) === "[a,[b,c],d]");
+
+	const box = (left: number, top: number, w: number, h: number) => ({ left, top, right: left + w, bottom: top + h });
+	const column = [box(0, 0, 100, 40), box(0, 60, 100, 40)];
+
+	check("a column inserts above a midpoint", insertionIndex(column, 50, 10, false) === 0);
+	check("a column inserts between children", insertionIndex(column, 50, 50, false) === 1);
+	check("a column appends past the last midpoint", insertionIndex(column, 50, 95, false) === 2);
+
+	// two lines: [A tall, B short] then [C]
+	const wrapped = [box(0, 0, 100, 80), box(120, 0, 100, 30), box(0, 100, 100, 30)];
+
+	check("a row inserts left of a midpoint", insertionIndex(wrapped, 10, 10, true) === 0);
+	check("a row inserts between neighbours", insertionIndex(wrapped, 150, 10, true) === 1);
+	check("below a short card but within its line still counts as that line",
+		insertionIndex(wrapped, 150, 60, true) === 1, String(insertionIndex(wrapped, 150, 60, true)));
+	check("the end of a line inserts before the next line", insertionIndex(wrapped, 300, 10, true) === 2);
+	check("a wrapped line is reached by its own position", insertionIndex(wrapped, 10, 110, true) === 2);
+	check("past everything appends", insertionIndex(wrapped, 300, 200, true) === 3);
+
+	// decoration: drawn onto the real render, with a handle per node
+	const cfg = layout();
+
+	cfg.root.children.push({ id: "e", type: "row", children: [] });
+
+	const editor = new LayoutEditor({} as never, cfg, { properties: [], calendars: [], notes: [] }, () => {});
+	const host = new El();
+
+	editor.attach(host as never);
+	renderNode(host as never, cfg.root, days, 20, () => {}, {}, editor.decorate);
+
+	const tabs = host.byClass("udash-edit-tab");
+	const handles = host.byClass("udash-edit-handle");
+	const labelOf = (e: El) => e.children.find((c) => c.classes.has("udash-edit-label"))?.text;
+
+	check("the host is marked as editing", host.classes.has("udash-editing"));
+	check("every row and column gets a tab", tabs.length === 3, String(tabs.length));
+	check("every widget gets a handle", handles.length === 4, String(handles.length));
+	// containers are decorated after their children, so the root comes last
+	check("tabs name the container", tabs.map(labelOf).join() === "Columns,Columns,Rows", tabs.map(labelOf).join());
+	check("handles name the widget", handles.every((h) => labelOf(h) === "Heatmap"));
+	check("the root tab has no grip, others do",
+		tabs.map((t) => t.byClass("udash-edit-grip").length).join() === "1,1,0");
+	check("every widget handle has a grip", handles.every((h) => h.byClass("udash-edit-grip").length === 1));
+	check("an empty row offers a drop target", host.byClass("udash-edit-empty").length === 1);
+	check("the rendered widgets are still drawn", host.byClass("udash-edit-widget").length === 4
+		&& host.byClass("udash-heatmap").length >= 4);
 }
 
 console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED"}`);

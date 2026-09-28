@@ -484,139 +484,85 @@
 	padding-left: 4px;
 }
 
-/* ---------------------------------------------------------- visual editor */
+/* ------------------------------------------------------------ edit mode */
 
-.udash-editor {
-	display: flex;
-	gap: 20px;
-	align-items: flex-start;
-}
+/* Edit mode draws the real dashboard and decorates it: rows and columns get a
+   dashed outline and a tab naming them, widgets get a grip pill. Rows are blue
+   and columns purple, so nesting reads at a glance. */
 
-.udash-editor .udash-palette {
-	flex: 0 0 190px;
+.udash-edit-toolbar {
 	position: sticky;
 	top: 0;
+	z-index: 10;
+	display: flex;
+	align-items: flex-start;
+	gap: 16px;
+	margin: 0 -20px 22px;
+	padding: 10px 20px;
+	background: var(--background-primary);
+	border-bottom: 1px solid var(--background-modifier-border);
 }
 
-.udash-editor .udash-palette-label {
+.udash-palette {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 18px;
+	min-width: 0;
+}
+
+.udash-palette-group {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+}
+
+.udash-palette-label {
 	font-size: 0.72em;
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
 	color: var(--text-muted);
-	margin: 10px 0 4px;
+	margin-right: 2px;
 }
 
-.udash-editor .udash-palette-row {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 6px;
-}
-
-.udash-editor .udash-chip {
+.udash-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: 6px;
-	padding: 4px 9px;
+	padding: 3px 9px;
 	font-size: 0.82em;
 	background: var(--background-secondary);
 	cursor: grab;
 	user-select: none;
 }
 
-.udash-editor .udash-chip:active {
+.udash-chip:hover {
+	border-color: var(--interactive-accent);
+}
+
+.udash-chip:active {
 	cursor: grabbing;
 }
 
-.udash-editor .udash-palette-hint {
-	font-size: 0.72em;
-	color: var(--text-muted);
-	margin-top: 10px;
-	line-height: 1.4;
+.udash-chip-icon,
+.udash-edit-tab-icon,
+.udash-edit-grip {
+	display: inline-flex;
 }
 
-.udash-editor .udash-canvas {
-	flex: 1;
-	min-width: 0;
-}
-
-.udash-editor .udash-node {
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 8px;
-	background: var(--background-primary);
-	/* Without this, mousedown on a card's label starts a text selection and the
-	   browser drags the text instead of the card. Only the palette chips had it,
-	   which is why they dragged and canvas cards did not. */
-	user-select: none;
-	-webkit-user-select: none;
-}
-
-.udash-editor .udash-node-leaf {
-	cursor: grab;
-	background: var(--background-secondary);
-}
-
-.udash-editor .udash-node-leaf:active {
-	cursor: grabbing;
-}
-
-.udash-editor .udash-node-head {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	padding: 5px 8px;
-}
-
-.udash-editor .udash-node-kind {
-	font-weight: 600;
-	font-size: 0.84em;
-}
-
-.udash-editor .udash-node-meta {
-	font-size: 0.76em;
-	color: var(--text-muted);
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.udash-editor .udash-node-actions {
-	margin-left: auto;
-	display: flex;
-	gap: 2px;
-}
-
-.udash-editor .udash-icon-button {
-	background: none;
-	border: none;
-	padding: 2px 4px;
-	cursor: pointer;
-	color: var(--text-muted);
-	box-shadow: none;
-}
-
-.udash-editor .udash-icon-button:hover {
-	color: var(--text-normal);
-}
-
-.udash-editor .udash-node-body {
-	padding: 0 8px 6px;
-}
-
-/* a row lays its children out side by side, mirroring what it renders */
-.udash-editor .udash-node-row > .udash-node-body {
-	display: flex;
-	align-items: flex-start;
-	gap: 4px;
-}
-
-.udash-editor .udash-node-row > .udash-node-body > .udash-node {
-	flex: 1;
-	min-width: 0;
+.udash-chip svg,
+.udash-edit-tab svg,
+.udash-edit-handle svg {
+	width: 13px;
+	height: 13px;
 }
 
 .udash-editor-tabs {
 	display: flex;
 	gap: 4px;
-	margin-bottom: 12px;
+	flex: 0 0 auto;
 }
 
 .udash-editor-tab {
@@ -635,39 +581,182 @@
 	color: var(--text-normal);
 }
 
-
-/* A card is itself a drop target: the edge you are nearest shows where it lands. */
-/* Only a fade. `pointer-events: none` here also stops the card receiving
-   dragend, so the class was never cleared and widgets stayed greyed out. */
-.udash-editor .udash-node.is-dragging-self {
-	opacity: 0.4;
+/* Every node is a positioning context for its tab, pill and drop line. Text
+   selection is off, or a drag that starts on a label selects text instead. */
+.udash-editing .udash-node {
+	position: relative;
+	/* the outline's padding must not push a full width child past its parent */
+	box-sizing: border-box;
+	user-select: none;
+	-webkit-user-select: none;
 }
 
-/* Where the drop will land: a line before the card that gets pushed along, or
-   at the end of the container when the cursor is past the last one. */
-.udash-editor .udash-node.is-insert-before {
-	box-shadow: 0 -3px 0 0 var(--interactive-accent);
+.udash-edit-container {
+	--udash-edit-color: var(--color-blue);
+	--udash-edit-rgb: var(--color-blue-rgb);
+	border: 1.5px dashed rgba(var(--udash-edit-rgb), 0.55);
+	border-radius: 10px;
+	padding: 26px 10px 10px;
+	background: rgba(var(--udash-edit-rgb), 0.03);
 }
 
-.udash-editor .udash-node-row > .udash-node-body > .udash-node.is-insert-before {
-	box-shadow: -3px 0 0 0 var(--interactive-accent);
+.udash-edit-container.udash-column {
+	--udash-edit-color: var(--color-purple);
+	--udash-edit-rgb: var(--color-purple-rgb);
 }
 
-.udash-editor .udash-node-body.is-insert-end {
-	box-shadow: inset 0 -3px 0 0 var(--interactive-accent);
+.udash-edit-tab,
+.udash-edit-handle {
+	position: absolute;
+	z-index: 3;
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	padding: 0 5px;
+	font-size: 0.7em;
+	line-height: 1.5;
+	background: var(--background-primary);
+	white-space: nowrap;
 }
 
-.udash-editor .udash-empty-hint {
-	min-height: 54px;
+.udash-edit-tab {
+	top: -11px;
+	left: 10px;
+	border: 1px solid rgba(var(--udash-edit-rgb), 0.7);
+	border-radius: 6px;
+	color: var(--udash-edit-color);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	font-weight: 600;
+}
+
+.udash-edit-tab-icon {
+	margin-right: 2px;
+}
+
+/* Widgets: a pill on the top right, clear of the tab on the top left of the
+   container they sit in. Their own content ignores the pointer, so a click
+   meant for a handle cannot open an event or follow a link. */
+.udash-edit-widget {
+	outline: 1.5px solid transparent;
+	outline-offset: 3px;
+	border-radius: 8px;
+}
+
+.udash-edit-widget:hover {
+	outline-color: var(--interactive-accent);
+}
+
+.udash-edit-widget > :not(.udash-edit-handle) {
+	pointer-events: none;
+}
+
+.udash-edit-handle {
+	/* in the gap above the widget, so it covers none of the widget's header */
+	top: -19px;
+	right: 8px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 999px;
+	color: var(--text-muted);
+}
+
+.udash-edit-widget:hover > .udash-edit-handle {
+	border-color: var(--interactive-accent);
+	color: var(--text-normal);
+}
+
+.udash-edit-label {
+	margin: 0 3px;
+}
+
+.udash-edit-grip {
+	cursor: grab;
+	color: var(--text-muted);
+}
+
+.udash-edit-grip:active {
+	cursor: grabbing;
+}
+
+.udash-edit-tab .udash-edit-grip {
+	color: inherit;
+}
+
+.udash-icon-button {
+	display: inline-flex;
+	align-items: center;
+	height: auto;
+	background: none;
+	border: none;
+	padding: 1px 2px;
+	cursor: pointer;
+	color: inherit;
+	box-shadow: none;
+	opacity: 0.7;
+}
+
+.udash-icon-button:hover {
+	opacity: 1;
+	background: none;
+}
+
+.udash-edit-empty {
+	flex: 1 1 auto;
+	min-height: 60px;
+	min-width: 140px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	padding: 14px 12px;
-	margin: 2px 0 6px;
 	font-size: 0.76em;
 	color: var(--text-muted);
 	border: 1px dashed var(--background-modifier-border);
 	border-radius: 6px;
+}
+
+/* Only a fade. `pointer-events: none` here also stops the element receiving
+   dragend, so the class was never cleared and widgets stayed greyed out. */
+.udash-editing .is-dragging-self {
+	opacity: 0.35;
+}
+
+/* Where a drop will land: a line centred in the gap before the child that gets
+   pushed along, or along the far edge when past the last one. */
+.udash-editing .is-insert-before::before,
+.udash-editing .is-insert-end::after {
+	content: "";
+	position: absolute;
+	z-index: 4;
+	background: var(--interactive-accent);
+	border-radius: 2px;
+	pointer-events: none;
+}
+
+.udash-editing .udash-column > .is-insert-before::before {
+	left: 0;
+	right: 0;
+	height: 3px;
+	top: calc(var(--udash-gap, 20px) / -2 - 1.5px);
+}
+
+.udash-editing .udash-row > .is-insert-before::before {
+	top: 0;
+	bottom: 0;
+	width: 3px;
+	left: calc(var(--udash-gap, 20px) / -2 - 1.5px);
+}
+
+.udash-editing .udash-column.is-insert-end::after {
+	left: 10px;
+	right: 10px;
+	height: 3px;
+	bottom: 3px;
+}
+
+.udash-editing .udash-row.is-insert-end::after {
+	top: 26px;
+	bottom: 10px;
+	width: 3px;
+	right: 3px;
 }
 
 /* A day accepts a click only when a writable calendar is in scope. */
