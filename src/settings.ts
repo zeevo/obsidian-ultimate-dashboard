@@ -5,7 +5,6 @@ import { ConfigError, countWidgets, parseDashboard } from "./layout-tree";
 import { RANGE_KEYS } from "./widgets";
 import { ConfirmModal, NameModal } from "./modal";
 import {
-	DEFAULT_CONFIG,
 	DashboardSettings,
 	activeDashboard,
 	makeDashboard,
@@ -141,18 +140,7 @@ export class DashboardSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Layout")
-			.setDesc("YAML describing the widgets. Saved as you type. The dashboard tab has the same editor behind its pencil button.")
-			.addExtraButton((b) =>
-				b
-					.setIcon("rotate-ccw")
-					.setTooltip("Restore the default layout")
-					.onClick(async () => {
-						current.config = DEFAULT_CONFIG;
-						await this.host.saveSettings();
-						this.host.refreshViews();
-						this.display();
-					}),
-			);
+			.setDesc("YAML describing the widgets. Saved as you type. The dashboard tab has the same editor behind its pencil button.");
 
 		const editor = containerEl.createEl("textarea", { cls: "udash-config-editor" });
 		editor.value = current.config;
