@@ -1822,7 +1822,11 @@ layout:
 	check("every widget gets a handle", handles.length === 4, String(handles.length));
 	// containers are decorated after their children, so the root comes last
 	check("tabs name the container", tabs.map(labelOf).join() === "Columns,Columns,Rows", tabs.map(labelOf).join());
-	check("handles name the widget", handles.every((h) => labelOf(h) === "Heatmap"));
+	const types = host.byClass("udash-edit-type");
+
+	check("every widget gets a type tab", types.length === 4 && types.every((t) => t.text === "Heatmap"),
+		types.map((t) => t.text).join());
+	check("the handle no longer repeats the type", handles.every((h) => labelOf(h) === undefined));
 	check("the root tab has no grip, others do",
 		tabs.map((t) => t.byClass("udash-edit-grip").length).join() === "1,1,0");
 	check("every widget handle has a grip", handles.every((h) => h.byClass("udash-edit-grip").length === 1));

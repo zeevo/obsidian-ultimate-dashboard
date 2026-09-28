@@ -260,11 +260,11 @@ export class LayoutEditor {
 		if (isContainer(node)) return;
 
 		el.addClass("udash-edit-widget");
+		el.createDiv({ cls: "udash-edit-type", text: specFor(node.type).label });
 
 		const handle = el.createDiv({ cls: "udash-edit-handle" });
 
 		this.grip(handle, el, path);
-		handle.createSpan({ cls: "udash-edit-label", text: specFor(node.type).label });
 		this.actions(handle, node, path, false);
 	}
 

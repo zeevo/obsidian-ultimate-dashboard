@@ -596,7 +596,7 @@
 	--udash-edit-rgb: var(--color-blue-rgb);
 	border: 1.5px dashed rgba(var(--udash-edit-rgb), 0.55);
 	border-radius: 10px;
-	padding: 26px 10px 10px;
+	padding: 30px 10px 10px;
 	background: rgba(var(--udash-edit-rgb), 0.03);
 }
 
@@ -606,6 +606,7 @@
 }
 
 .udash-edit-tab,
+.udash-edit-type,
 .udash-edit-handle {
 	position: absolute;
 	z-index: 3;
@@ -648,6 +649,20 @@
 }
 
 .udash-edit-widget > :not(.udash-edit-handle) {
+	pointer-events: none;
+}
+
+/* The widget's type, above its top left corner. */
+.udash-edit-type {
+	top: -19px;
+	left: 8px;
+	padding: 0 6px;
+	border: 1px solid var(--interactive-accent);
+	border-radius: 6px;
+	color: var(--text-accent);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	font-weight: 600;
 	pointer-events: none;
 }
 
