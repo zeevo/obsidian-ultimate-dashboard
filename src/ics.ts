@@ -7,6 +7,9 @@
 export interface CalEvent {
 	summary: string;
 	location?: string;
+	description?: string;
+	/** A web page for the event, where the feed gives one. */
+	url?: string;
 	/** Local start. For all-day events the time is midnight. */
 	start: Date;
 	end: Date;
@@ -52,9 +55,10 @@ function parseLine(line: string): Prop | null {
 	return { name: parts[0].toUpperCase(), params, value };
 }
 
-function unescapeText(v: string): string {
+/** Descriptions keep their line breaks; one-line fields fold them to spaces. */
+function unescapeText(v: string, breaks = " "): string {
 	return v
-		.replace(/\\n/gi, " ")
+		.replace(/\\n/gi, breaks)
 		.replace(/\\,/g, ",")
 		.replace(/\\;/g, ";")
 		.replace(/\\\\/g, "\\");
@@ -227,6 +231,8 @@ export function parseICS(text: string, from: Date, to: Date): CalEvent[] {
 				const base: CalEvent = {
 					summary: cur.summary,
 					location: cur.location,
+					description: cur.description,
+					url: cur.url,
 					start: cur.start,
 					end: cur.end ?? new Date(cur.start.getTime() + (cur.allDay ? DAY_MS : 3600000)),
 					allDay: cur.allDay ?? false,
@@ -258,6 +264,12 @@ export function parseICS(text: string, from: Date, to: Date): CalEvent[] {
 				break;
 			case "LOCATION":
 				cur.location = unescapeText(prop.value);
+				break;
+			case "DESCRIPTION":
+				cur.description = unescapeText(prop.value, "\n");
+				break;
+			case "URL":
+				cur.url = prop.value;
 				break;
 			case "DTSTART": {
 				const d = parseDate(prop.value, prop.params);

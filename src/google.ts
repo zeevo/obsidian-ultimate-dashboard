@@ -196,6 +196,8 @@ const Stamp = z.object({
 const EventRow = z.object({
 	summary: z.optional(z.string()),
 	location: z.optional(z.string()),
+	description: z.optional(z.string()),
+	htmlLink: z.optional(z.string()),
 	start: z.optional(Stamp),
 	end: z.optional(Stamp),
 });
@@ -364,6 +366,10 @@ export async function listCalendars(accessToken: string): Promise<GoogleCalendar
 export interface GoogleEvent {
 	summary: string;
 	location?: string;
+	/** May carry HTML, since Google's own editor writes it. */
+	description?: string;
+	/** The event in Google Calendar's web app. */
+	url?: string;
 	start: Date;
 	end: Date;
 	allDay: boolean;
@@ -409,6 +415,8 @@ export async function listEvents(
 		out.push({
 			summary: e.summary ?? "(no title)",
 			location: e.location,
+			description: e.description,
+			url: e.htmlLink,
 			start: start.date,
 			end: end?.date ?? new Date(start.date.getTime() + 3600000),
 			allDay: start.allDay,

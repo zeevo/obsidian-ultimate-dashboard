@@ -1,5 +1,7 @@
-import { App, Modal, Notice, Setting } from "obsidian";
+import { App, Modal, Notice, Setting, sanitizeHTMLToDom } from "obsidian";
 import { NewEvent } from "./google";
+import { DatedEvent } from "./calendar";
+import { eventWhen } from "./render";
 
 /** Asks for a dashboard name. Resolves with the name, or null if cancelled. */
 export class NameModal extends Modal {
@@ -94,6 +96,63 @@ const toDateInput = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${
 const toTimeInput = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
 /** Collects a new event. Times are local; the caller converts for the API. */
+/** Read only details for one event, opened from a month grid chip. */
+export class EventDetailsModal extends Modal {
+	constructor(
+		app: App,
+		private event: DatedEvent,
+	) {
+		super(app);
+	}
+
+	onOpen(): void {
+		const { contentEl } = this;
+		const e = this.event;
+
+		contentEl.addClass("udash-event-details");
+		contentEl.createEl("h3", { text: e.summary });
+
+		const calendar = contentEl.createDiv({ cls: "udash-event-details-calendar" });
+
+		if (e.color) {
+			const dot = calendar.createSpan({ cls: "udash-agenda-dot" });
+
+			dot.style.backgroundColor = e.color;
+		}
+
+		calendar.createSpan({ text: e.calendar });
+
+		contentEl.createDiv({ cls: "udash-event-details-row", text: eventWhen(e) });
+
+		if (e.location) contentEl.createDiv({ cls: "udash-event-details-row", text: e.location });
+
+		if (e.description) {
+			const body = contentEl.createDiv({ cls: "udash-event-details-description" });
+
+			// Google's editor writes HTML; ICS feeds send plain text with line breaks
+			if (/<[a-z][^>]*>/i.test(e.description)) body.appendChild(sanitizeHTMLToDom(e.description));
+			else {
+				body.addClass("is-plain");
+				body.setText(e.description);
+			}
+		}
+
+		if (e.url) {
+			const url = e.url;
+
+			new Setting(contentEl).addButton((b) =>
+				b
+					.setButtonText(url.includes("google.com/calendar") ? "Open in Google Calendar" : "Open link")
+					.onClick(() => window.open(url, "_blank")),
+			);
+		}
+	}
+
+	onClose(): void {
+		this.contentEl.empty();
+	}
+}
+
 export class EventModal extends Modal {
 	private summary = "";
 	private date: string;

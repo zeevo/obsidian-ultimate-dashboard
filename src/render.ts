@@ -593,15 +593,42 @@ export interface MonthEvent {
 
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 
+/** When an event happens, in words, for its details popup. */
+export function eventWhen(e: { start: Date; end: Date; allDay: boolean }): string {
+	const long: Intl.DateTimeFormatOptions = { weekday: "long", month: "long", day: "numeric", year: "numeric" };
+	const short: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+	const time = (d: Date) => d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+	if (e.allDay) {
+		// an all day event ends at midnight after its last day
+		const last = new Date(e.end.getTime() - 1);
+
+		if (last <= e.start || sameDay(e.start, last)) return `${e.start.toLocaleDateString([], long)}, all day`;
+
+		return `${e.start.toLocaleDateString([], short)} \u2013 ${last.toLocaleDateString([], { ...short, year: "numeric" })}, all day`;
+	}
+
+	if (sameDay(e.start, e.end)) {
+		return `${e.start.toLocaleDateString([], long)}, ${time(e.start)} \u2013 ${time(e.end)}`;
+	}
+
+	return (
+		`${e.start.toLocaleDateString([], short)}, ${time(e.start)} \u2013 ` +
+		`${e.end.toLocaleDateString([], short)}, ${time(e.end)}`
+	);
+}
+
 /** Fills a shell from `renderMonth`. */
-export function fillMonth(
+export function fillMonth<E extends MonthEvent>(
 	wrap: HTMLElement,
 	widget: CalendarWidget,
 	first: Date,
-	events: MonthEvent[],
+	events: E[],
 	errors: string[],
 	/** Supplied when a writable calendar is in scope, so a day can be clicked. */
 	onPickDay?: (day: Date) => void,
+	/** Supplied to open an event's details when its chip is clicked. */
+	onPickEvent?: (event: E) => void,
 ): void {
 	// SAFETY: a div created by renderMonth on this same element; the early return
 	// below covers its absence if the shell was replaced.
@@ -665,6 +692,15 @@ export function fillMonth(
 			}
 
 			chip.createSpan({ cls: "udash-month-chip-text", text: e.summary });
+
+			if (onPickEvent) {
+				chip.addClass("is-clickable");
+				chip.addEventListener("click", (ev) => {
+					// the day cell underneath would otherwise open the new event form
+					ev.stopPropagation();
+					onPickEvent(e);
+				});
+			}
 		}
 
 		if (onDay.length > maxPerDay) {

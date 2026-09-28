@@ -7,7 +7,7 @@ import { WeatherMode, WeatherQuery, WeatherService, WeatherUnit } from "./weathe
 import { CalendarWidget, ClockWidget, NoteWidget, UpcomingWidget, WeatherWidget, monthName, specFor } from "./widgets";
 import { addMonthArrows, fillCalendar, fillClock, fillMonth, fillSignInExpired, fillWeather, labelMonth, monthWindow, shiftMonth } from "./render";
 import { connect } from "./google";
-import { EventModal, NameModal } from "./modal";
+import { EventDetailsModal, EventModal, NameModal } from "./modal";
 import { VisualEditor } from "./editor";
 import { serializeDashboard } from "./serialize";
 import { CalendarSource, DashboardSettings, activeDashboard, findAccount, makeDashboard, uniqueName } from "./store";
@@ -256,6 +256,7 @@ export class DashboardView extends ItemView {
 							events,
 							errors,
 							targets.length > 0 ? (day) => this.createEvent(targets, day) : undefined,
+							(event) => new EventDetailsModal(this.app, event).open(),
 						);
 					});
 				};

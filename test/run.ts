@@ -8,7 +8,7 @@ import { ConfigError, ContainerNode, countWidgets, isContainer, needsSetup, pars
 import { DayRecord, shiftDate, stripFrontmatter, today } from "../src/data";
 import { CalendarService } from "../src/calendar";
 import { network } from "./stub";
-import { addMonthArrows, labelMonth, shiftMonth } from "../src/render";
+import { addMonthArrows, eventWhen, labelMonth, shiftMonth } from "../src/render";
 import { currentStreak, fillMonth, fillSignInExpired, monthWindow, renderBlank, renderHeatmap, renderLine, renderMonth, renderNote, renderStat, clockLabel, fillWeather, hourLabel, renderWeather, clockText, fillClock, handAngles, renderClock } from "../src/render";
 import { renderNode } from "../src/layout";
 import { parseICS } from "../src/ics";
@@ -59,8 +59,16 @@ class El {
 	appendChild(e: El) { this.children.push(e);
 
  return e; }
-	listeners: Record<string, () => void> = {};
-	addEventListener(type: string, fn: () => void) { this.listeners[type] = fn; }
+	listeners: Record<string, (ev: { stopPropagation(): void }) => void> = {};
+	/** Stands in for a real click; records whether the handler stopped it bubbling. */
+	click() {
+		let stopped = false;
+
+		this.listeners.click?.({ stopPropagation: () => (stopped = true) });
+
+		return stopped;
+	}
+	addEventListener(type: string, fn: (ev: { stopPropagation(): void }) => void) { this.listeners[type] = fn; }
 	empty() { this.children = []; }
 	get all(): El[] { return this.children.flatMap((c) => [c, ...c.all]); }
 	byClass(c: string) { return this.all.filter((e) => e.classes.has(c)); }
@@ -1637,7 +1645,7 @@ console.log("\nexpired google sign in");
 	check("a month shows beside a custom title", bare.byClass("udash-signin-expired-meta")[0]?.text === "September 2026");
 	check("the widget takes the bordered, centered style", wrap.classes.has("udash-signin-expired"));
 	check("the button reads Google Sign-in expired", button?.text === "Google Sign-in expired");
-	button?.listeners.click?.();
+	button?.click();
 	check("clicking the button reconnects", clicked);
 }
 
@@ -1664,8 +1672,8 @@ console.log("\nmonth paging");
 
 	const buttons = wrap.byClass("udash-calendar-actions")[0].children.filter((e) => e.tag === "button");
 
-	buttons[0].listeners.click?.();
-	buttons[1].listeners.click?.();
+	buttons[0].click();
+	buttons[1].click();
 	check("the arrows step back then forward", steps.join() === "-1,1");
 
 	labelMonth(wrap as never, shiftMonth(cal, 1));
@@ -1681,6 +1689,55 @@ console.log("\nmonth paging");
 	fillMonth(wrap as never, cal, new Date(2026, 11, 1), [], ["b"]);
 	check("refilling replaces errors", wrap.byClass("udash-error").length === 1);
 	check("refilling keeps one grid of 42 days", wrap.byClass("udash-month-cell").length === 42);
+}
+
+console.log("\nevent details");
+
+{
+	const feed = [
+		"BEGIN:VCALENDAR",
+		"BEGIN:VEVENT",
+		"SUMMARY:Standup",
+		"DESCRIPTION:Agenda:\\n1. blockers\\, then demos",
+		"URL:https://example.com/standup",
+		"DTSTART:20260915T090000",
+		"DTEND:20260915T091500",
+		"END:VEVENT",
+		"END:VCALENDAR",
+	].join("\r\n");
+	const [standup] = parseICS(feed, new Date(2026, 8, 1), new Date(2026, 9, 1));
+
+	check("an ICS description keeps its line breaks", standup?.description === "Agenda:\n1. blockers, then demos");
+	check("an ICS url is read", standup?.url === "https://example.com/standup");
+
+	const at = (d: number, h: number, m = 0) => new Date(2026, 8, d, h, m);
+	const oneDay = eventWhen({ start: at(15, 0), end: at(16, 0), allDay: true });
+	const span = eventWhen({ start: at(15, 0), end: at(18, 0), allDay: true });
+	const timed = eventWhen({ start: at(15, 9), end: at(15, 10, 30), allDay: false });
+	const overnight = eventWhen({ start: at(15, 22), end: at(16, 2), allDay: false });
+
+	check("a one day all day event names one day", oneDay.endsWith("all day") && !oneDay.includes("\u2013"), oneDay);
+	check("a multi day all day event ends on its last day, not the day after",
+		span.includes("\u2013") && span.includes("17") && !span.includes("18"), span);
+	check("a timed event shows a time range", timed.includes("\u2013") && !timed.includes("all day"), timed);
+	check("an overnight event names both days", overnight.includes("15") && overnight.includes("16"), overnight);
+
+	const cal = { id: "c", type: "calendar", month: "2026-09" } as never;
+	const wrap = renderMonth(new El() as never, cal) as unknown as El;
+	const picked: string[] = [];
+	const days: Date[] = [];
+
+	fillMonth(wrap as never, cal, new Date(2026, 8, 1), [{ summary: "Standup", start: at(15, 9), end: at(15, 10), allDay: false }],
+		[], (d) => days.push(d), (e) => picked.push(e.summary));
+
+	const chip = wrap.byClass("udash-month-chip")[0];
+
+	check("a chip is marked clickable", chip?.classes.has("is-clickable") === true);
+	check("clicking a chip stops the day cell's new event form", chip?.click() === true);
+	check("clicking a chip picks that event", picked.join() === "Standup" && days.length === 0);
+
+	fillMonth(wrap as never, cal, new Date(2026, 8, 1), [{ summary: "Standup", start: at(15, 9), end: at(15, 10), allDay: false }], []);
+	check("without a handler a chip is not clickable", !wrap.byClass("udash-month-chip")[0]?.classes.has("is-clickable"));
 }
 
 console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED"}`);

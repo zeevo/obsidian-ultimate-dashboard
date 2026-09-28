@@ -198,6 +198,30 @@
 	color: var(--text-muted);
 }
 
+.udash-event-details-calendar {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 0.85em;
+	color: var(--text-muted);
+	margin-bottom: 10px;
+}
+
+.udash-event-details-row {
+	margin-bottom: 4px;
+}
+
+.udash-event-details-description {
+	margin-top: 12px;
+	padding-top: 12px;
+	border-top: 1px solid var(--background-modifier-border);
+	overflow-wrap: anywhere;
+}
+
+.udash-event-details-description.is-plain {
+	white-space: pre-wrap;
+}
+
 /* ------------------------------------------------------------------- view */
 
 /* The standalone tab needs its own padding; a code block inherits the note's. */
@@ -434,6 +458,14 @@
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
+}
+
+.udash-month-chip.is-clickable {
+	cursor: pointer;
+}
+
+.udash-month-chip.is-clickable:hover {
+	background: var(--background-modifier-hover);
 }
 
 .udash-month-chip-time {
