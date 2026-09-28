@@ -242,8 +242,6 @@ export class LayoutEditor {
 		const tab = el.createDiv({ cls: "udash-edit-tab" });
 
 		if (!isRoot) this.grip(tab, el, path);
-
-		if (divider) setIcon(tab.createSpan({ cls: "udash-edit-tab-icon" }), divider.icon);
 		tab.createSpan({ cls: "udash-edit-label", text: label(node.type) });
 		setTooltip(tab, divider ? divider.hint : "");
 		// the root cannot be moved or deleted, but it is still configurable

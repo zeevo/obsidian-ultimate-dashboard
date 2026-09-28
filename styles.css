@@ -547,7 +547,6 @@
 }
 
 .udash-chip-icon,
-.udash-edit-tab-icon,
 .udash-edit-grip {
 	display: inline-flex;
 }
@@ -629,10 +628,6 @@
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
 	font-weight: 600;
-}
-
-.udash-edit-tab-icon {
-	margin-right: 2px;
 }
 
 /* Widgets: a pill on the top right, clear of the tab on the top left of the
