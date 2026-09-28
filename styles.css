@@ -342,8 +342,18 @@
 
 .udash-calendar-actions {
 	display: flex;
+	align-items: center;
 	gap: 4px;
 	margin-left: 8px;
+}
+
+.udash-month-label {
+	font-weight: normal;
+	white-space: nowrap;
+}
+
+.udash-month-label:empty {
+	display: none;
 }
 
 .is-hidden {

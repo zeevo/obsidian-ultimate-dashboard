@@ -8,6 +8,7 @@ import { ConfigError, ContainerNode, countWidgets, isContainer, needsSetup, pars
 import { DayRecord, shiftDate, stripFrontmatter, today } from "../src/data";
 import { CalendarService } from "../src/calendar";
 import { network } from "./stub";
+import { addMonthArrows, labelMonth, shiftMonth } from "../src/render";
 import { currentStreak, fillMonth, fillSignInExpired, monthWindow, renderBlank, renderHeatmap, renderLine, renderMonth, renderNote, renderStat, clockLabel, fillWeather, hourLabel, renderWeather, clockText, fillClock, handAngles, renderClock } from "../src/render";
 import { renderNode } from "../src/layout";
 import { parseICS } from "../src/ics";
@@ -1638,6 +1639,48 @@ console.log("\nexpired google sign in");
 	check("the button reads Google Sign-in expired", button?.text === "Google Sign-in expired");
 	button?.listeners.click?.();
 	check("clicking the button reconnects", clicked);
+}
+
+console.log("\nmonth paging");
+
+{
+	const cal = { id: "c", type: "calendar", month: "2026-12" } as never;
+
+	check("next month rolls into the new year", (shiftMonth(cal, 1) as { month: string }).month === "2027-01");
+	check("previous month rolls back a year", (shiftMonth({ id: "c", type: "calendar", month: "2026-01" } as never, -1) as { month: string }).month === "2025-12");
+	check("no shift leaves the widget alone", shiftMonth(cal, 0) === cal);
+
+	const now = new Date();
+	const unset = shiftMonth({ id: "c", type: "calendar" } as never, 1) as { month: string };
+	const expected = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+	check("an unset month pages from this month",
+		unset.month === `${expected.getFullYear()}-${String(expected.getMonth() + 1).padStart(2, "0")}`);
+
+	const wrap = renderMonth(new El() as never, cal) as unknown as El;
+	const steps: number[] = [];
+
+	addMonthArrows(wrap as never, (by) => steps.push(by));
+
+	const buttons = wrap.byClass("udash-calendar-actions")[0].children.filter((e) => e.tag === "button");
+
+	buttons[0].listeners.click?.();
+	buttons[1].listeners.click?.();
+	check("the arrows step back then forward", steps.join() === "-1,1");
+
+	labelMonth(wrap as never, shiftMonth(cal, 1));
+	check("an untitled calendar retitles to the shown month", wrap.byClass("udash-month-title")[0].text === "January 2027");
+	check("no extra month label without a custom title", wrap.byClass("udash-month-label")[0].text === "");
+
+	labelMonth(wrap as never, { id: "c", type: "calendar", title: "Full", month: "2027-01" } as never);
+	check("a custom title keeps its name", wrap.byClass("udash-month-title")[0].text === "Full");
+	check("and the month shows beside it", wrap.byClass("udash-month-label")[0].text === "January 2027");
+
+	// paging refills the same shell, which must not stack up old errors
+	fillMonth(wrap as never, cal, new Date(2026, 11, 1), [], ["a"]);
+	fillMonth(wrap as never, cal, new Date(2026, 11, 1), [], ["b"]);
+	check("refilling replaces errors", wrap.byClass("udash-error").length === 1);
+	check("refilling keeps one grid of 42 days", wrap.byClass("udash-month-cell").length === 42);
 }
 
 console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED"}`);

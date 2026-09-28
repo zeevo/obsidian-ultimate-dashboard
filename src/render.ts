@@ -1,4 +1,4 @@
-import { Agg, BlankWidget, ClockWidget, CalendarWidget, HeatmapWidget, LineWidget, NoteWidget, StatWidget, UpcomingWidget, WeatherWidget, specFor } from "./widgets";
+import { Agg, BlankWidget, ClockWidget, CalendarWidget, HeatmapWidget, LineWidget, NoteWidget, StatWidget, UpcomingWidget, WeatherWidget, monthName, specFor } from "./widgets";
 import { Weather, describeWeather } from "./weather";
 import { assertNever } from "./kinds";
 import { DayRecord, daysBetween, num, shiftDate, shiftMonths, toISO, today, truthy } from "./data";
@@ -520,6 +520,46 @@ export function monthWindow(widget: CalendarWidget): MonthWindow {
 	return { first, from, to };
 }
 
+/** The widget as if configured `by` months later, for paging without saving. */
+export function shiftMonth(widget: CalendarWidget, by: number): CalendarWidget {
+	if (by === 0) return widget;
+
+	const { first } = monthWindow(widget);
+	const shifted = new Date(first.getFullYear(), first.getMonth() + by, 1);
+	const month = `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, "0")}`;
+
+	return { ...widget, month };
+}
+
+/**
+ * Previous and next buttons in a month shell's header, with a month label
+ * between them that only fills when a custom title hides the month.
+ */
+export function addMonthArrows(wrap: HTMLElement, onStep: (by: number) => void): void {
+	// SAFETY: a div created by renderMonth on this same element; the early
+	// return below covers its absence if the shell was replaced.
+	const actions = wrap.querySelector(".udash-calendar-actions") as HTMLElement | null;
+
+	if (!actions) return;
+
+	const prev = actions.createEl("button", { cls: "udash-bar-button", text: "\u2039" });
+
+	actions.createSpan({ cls: "udash-month-label" });
+
+	const next = actions.createEl("button", { cls: "udash-bar-button", text: "\u203a" });
+
+	prev.setAttribute("aria-label", "Previous month");
+	next.setAttribute("aria-label", "Next month");
+	prev.addEventListener("click", () => onStep(-1));
+	next.addEventListener("click", () => onStep(1));
+}
+
+/** Points a month shell's header at the month now on show. */
+export function labelMonth(wrap: HTMLElement, shown: CalendarWidget): void {
+	wrap.querySelector(".udash-month-title")?.setText(specFor(shown.type).title(shown));
+	wrap.querySelector(".udash-month-label")?.setText(shown.title ? monthName(shown.month) : "");
+}
+
 /** The month shell: heading, weekday row, and 42 empty day cells. */
 export function renderMonth(el: HTMLElement, widget: CalendarWidget): HTMLElement {
 	const wrap = el.createDiv({ cls: "udash-month" });
@@ -570,8 +610,13 @@ export function fillMonth(
 	if (!grid) return;
 	grid.empty();
 
+	// the shell is refilled when paging months, so replace errors, never pile them up
+	const box = wrap.querySelector(".udash-month-errors") ?? wrap.createDiv({ cls: "udash-month-errors" });
+
+	box.empty();
+
 	for (const message of errors) {
-		const err = wrap.createDiv({ cls: "udash-error" });
+		const err = box.createDiv({ cls: "udash-error" });
 
 		err.createSpan({ cls: "udash-error-tag", text: "calendar" });
 		err.createSpan({ text: message });

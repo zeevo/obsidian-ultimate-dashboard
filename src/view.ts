@@ -5,7 +5,7 @@ import { CalendarFiller, ClockFiller, DEFAULT_GAP, NoteFiller, WeatherFiller, re
 import { CalendarService } from "./calendar";
 import { WeatherMode, WeatherQuery, WeatherService, WeatherUnit } from "./weather";
 import { CalendarWidget, ClockWidget, NoteWidget, UpcomingWidget, WeatherWidget, monthName, specFor } from "./widgets";
-import { fillCalendar, fillClock, fillMonth, fillSignInExpired, fillWeather, monthWindow } from "./render";
+import { addMonthArrows, fillCalendar, fillClock, fillMonth, fillSignInExpired, fillWeather, labelMonth, monthWindow, shiftMonth } from "./render";
 import { connect } from "./google";
 import { EventModal, NameModal } from "./modal";
 import { VisualEditor } from "./editor";
@@ -46,6 +46,12 @@ export class DashboardView extends ItemView {
 	 * scrolled would jump back to the top as you typed elsewhere.
 	 */
 	private scrolled = new Map<string, number>();
+	/**
+	 * How many months each full calendar has been paged from its configured
+	 * month, by dashboard and position. Per tab and never saved, so a redraw
+	 * keeps the month you browsed to but reopening starts over.
+	 */
+	private monthOffsets = new Map<string, number>();
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -198,7 +204,13 @@ export class DashboardView extends ItemView {
 
 		if (sources.length === 0) return undefined;
 
+		const dashboardId = activeDashboard(this.host.settings)?.id ?? "";
+		// widget ids are minted on every parse, so position is what stays stable
+		let calendarIndex = 0;
+
 		return (shell: HTMLElement, widget: CalendarWidget | UpcomingWidget) => {
+			const key = widget.type === "calendar" ? `${dashboardId}:${calendarIndex++}` : "";
+
 			const wanted = widget.calendars
 				? sources.filter((s) => widget.calendars!.includes(s.name))
 				: sources;
@@ -216,30 +228,44 @@ export class DashboardView extends ItemView {
 			}
 
 			if (widget.type === "calendar") {
-				const { first, from, to } = monthWindow(widget);
 				const targets = this.writableTargets(wanted);
+				let latest = 0;
 
-				this.addEventButton(shell, wanted);
+				const show = () => {
+					const shown = shiftMonth(widget, this.monthOffsets.get(key) ?? 0);
+					const { first, from, to } = monthWindow(shown);
+					const request = ++latest;
 
-				void this.host.calendars.events(wanted, from, to).then(({ events, errors, expired }) => {
-					// the view may have re-rendered while the fetch was in flight
-					if (!shell.isConnected) return;
+					labelMonth(shell, shown);
 
-					if (expired.length > 0) {
-						this.showSignInExpired(shell, widget, expired[0]);
+					void this.host.calendars.events(wanted, from, to).then(({ events, errors, expired }) => {
+						// the view may have re-rendered, or the month moved on, while
+						// the fetch was in flight
+						if (!shell.isConnected || request !== latest) return;
 
-						return;
-					}
+						if (expired.length > 0) {
+							this.showSignInExpired(shell, shown, expired[0]);
 
-					fillMonth(
-						shell,
-						widget,
-						first,
-						events,
-						errors,
-						targets.length > 0 ? (day) => this.createEvent(targets, day) : undefined,
-					);
+							return;
+						}
+
+						fillMonth(
+							shell,
+							shown,
+							first,
+							events,
+							errors,
+							targets.length > 0 ? (day) => this.createEvent(targets, day) : undefined,
+						);
+					});
+				};
+
+				addMonthArrows(shell, (by) => {
+					this.monthOffsets.set(key, (this.monthOffsets.get(key) ?? 0) + by);
+					show();
 				});
+				this.addEventButton(shell, wanted);
+				show();
 
 				return;
 			}
