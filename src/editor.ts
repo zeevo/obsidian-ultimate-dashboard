@@ -146,9 +146,24 @@ export function insertionIndex(boxes: Box[], x: number, y: number, horizontal: b
 
 type DragPayload = { kind: "new"; type: LayoutNode["type"] } | { kind: "move"; path: number[] };
 
+/** How long neighbours take to slide aside, and how long the drop point holds still meanwhile. */
+const SETTLE_MS = 150;
+
 export class LayoutEditor {
 	private dragging: DragPayload | null = null;
-	/** The dashboard's root element, so a drag can clear every marker at once. */
+	/**
+	 * What moves through the dashboard during a drag: the dragged widget or
+	 * group itself, or a placeholder for a new one from the palette. Where it
+	 * sits when the drag ends is where the drop lands.
+	 */
+	private dragEl: HTMLElement | null = null;
+	/** Whether the drag has moved anything, so a cancel knows to put it back. */
+	private shifted = false;
+	/** Until when the neighbours are still sliding, and their boxes are not yet final. */
+	private settleUntil = 0;
+	/** The container node each outlined element was drawn for. */
+	private containers = new WeakMap<HTMLElement, ContainerNode>();
+	/** The dashboard's root element, marked while a drag is under way. */
 	private hostEl: HTMLElement | null = null;
 	/** The last layout that parsed, to fall back to if an edit produces one that does not. */
 	private lastGood: string;
@@ -158,6 +173,8 @@ export class LayoutEditor {
 		private config: Dashboard,
 		private context: FormContext,
 		private onChange: (config: Dashboard) => void,
+		/** Redraws without saving, to undo what a cancelled drag moved. */
+		private redraw: () => void,
 	) {
 		this.lastGood = serializeDashboard(config);
 	}
@@ -198,12 +215,14 @@ export class LayoutEditor {
 		chip.draggable = true;
 		chip.addEventListener("dragstart", (e) => {
 			this.dragging = { kind: "new", type };
+			// held detached until the cursor first reaches a container
+			this.dragEl = createDiv({ cls: "udash-edit-placeholder", text: label(type) });
 			e.dataTransfer?.setData("text/plain", type);
 
 			if (e.dataTransfer) e.dataTransfer.effectAllowed = "copyMove";
 			this.setDragging(true);
 		});
-		chip.addEventListener("dragend", () => this.endDrag());
+		chip.addEventListener("dragend", () => this.cancelDrag());
 	}
 
 	/* --------------------------------------------------------- decoration */
@@ -258,6 +277,7 @@ export class LayoutEditor {
 		grip.draggable = true;
 		grip.addEventListener("dragstart", (e) => {
 			this.dragging = { kind: "move", path };
+			this.dragEl = el;
 			e.dataTransfer?.setData("text/plain", path.join("."));
 
 			if (e.dataTransfer) {
@@ -272,10 +292,9 @@ export class LayoutEditor {
 			// deferred, or the drag image would be taken already faded
 			window.setTimeout(() => el.addClass("is-dragging-self"), 0);
 		});
-		grip.addEventListener("dragend", () => {
-			el.removeClass("is-dragging-self");
-			this.endDrag();
-		});
+		// a drop redraws the dashboard, so this only fires on its own when the
+		// drag was abandoned
+		grip.addEventListener("dragend", () => this.cancelDrag());
 	}
 
 	private actions(parent: HTMLElement, node: LayoutNode, path: number[], isRoot: boolean): void {
@@ -307,81 +326,142 @@ export class LayoutEditor {
 		this.hostEl?.toggleClass("is-dragging", on);
 	}
 
+	/** Forgets the drag. The placeholder for a new widget goes with it. */
 	private endDrag(): void {
+		if (this.dragging?.kind === "new") this.dragEl?.remove();
+		this.dragEl?.removeClass("is-dragging-self");
 		this.dragging = null;
+		this.dragEl = null;
+		this.shifted = false;
 		this.setDragging(false);
-		this.clearMarks();
-
-		// Defensive: a re-render mid-drag can leave a detached card marked, and a
-		// stale mark means a permanently greyed out widget.
-		for (const el of Array.from(this.hostEl?.querySelectorAll(".is-dragging-self") ?? [])) {
-			el.removeClass("is-dragging-self");
-		}
 	}
 
-	private clearMarks(): void {
-		for (const el of Array.from(this.hostEl?.querySelectorAll(".is-insert-before, .is-insert-end") ?? [])) {
-			el.removeClass("is-insert-before");
-			el.removeClass("is-insert-end");
-		}
+	/** A drag that ended without a drop: puts back whatever it moved. */
+	private cancelDrag(): void {
+		if (!this.dragging) return;
+
+		const moved = this.shifted;
+
+		this.endDrag();
+
+		if (moved) this.redraw();
 	}
 
 	/**
-	 * One drop target per container. The innermost container under the cursor
-	 * takes the drop, and the insertion point comes from where the cursor sits
-	 * among its children, so there is nothing thin to aim for.
+	 * One drop target per container, and the innermost under the cursor wins.
+	 * As the cursor moves, the dragged element is moved to where it would land,
+	 * so the rest of the dashboard makes room for it in place.
 	 */
 	private acceptDrops(el: HTMLElement, node: ContainerNode): void {
-		const indexAt = (e: DragEvent): number =>
-			insertionIndex(
-				childrenOf(el).map((c) => c.getBoundingClientRect()),
-				e.clientX,
-				e.clientY,
-				node.type === ContainerKind.Row,
-			);
+		this.containers.set(el, node);
+
+		// a group cannot go inside itself; the event bubbles on to a container
+		// outside it instead
+		const within = (moving: HTMLElement) => moving === el || moving.contains(el);
 
 		el.addEventListener("dragover", (e) => {
-			if (!this.dragging) return;
+			const moving = this.dragEl;
+
+			if (!this.dragging || !moving || within(moving)) return;
 			e.preventDefault();
 			e.stopPropagation();
 
 			if (e.dataTransfer) e.dataTransfer.dropEffect = this.dragging.kind === "new" ? "copy" : "move";
 
-			const index = indexAt(e);
-			const children = childrenOf(el);
+			// mid-slide, the boxes are still animating and would give a wrong answer
+			if (performance.now() < this.settleUntil) return;
 
-			// cleared everywhere, since an outer container keeps its mark when the
-			// cursor moves into an inner one
-			this.clearMarks();
+			const others = childrenOf(el).filter((c) => c !== moving);
 
-			if (index < children.length) children[index].addClass("is-insert-before");
-			else el.addClass("is-insert-end");
-		});
-		el.addEventListener("dragleave", (e) => {
-			// SAFETY: relatedTarget is the element being entered, or null when the
-			// cursor leaves the window; contains() accepts both.
-			const entering = e.relatedTarget as globalThis.Node | null;
+			const index = insertionIndex(
+				others.map((c) => c.getBoundingClientRect()),
+				e.clientX,
+				e.clientY,
+				node.type === ContainerKind.Row,
+			);
 
-			if (!el.contains(entering)) this.clearMarks();
+			// past the last child means before the tab, which is drawn after them
+			const before = others[index] ?? el.querySelector(":scope > .udash-edit-tab");
+
+			if (moving.parentElement === el && moving.nextElementSibling === before) return;
+			this.shift(moving, el, before);
 		});
 		el.addEventListener("drop", (e) => {
+			const moving = this.dragEl;
+
+			if (!moving || within(moving)) return;
 			e.preventDefault();
 			e.stopPropagation();
-			this.drop(node, indexAt(e));
+			this.drop();
 		});
+	}
+
+	/**
+	 * Moves the dragged element to its new spot, then slides its neighbours from
+	 * where they were to where they now are, so the reflow reads as motion
+	 * rather than a jump.
+	 */
+	private shift(moving: HTMLElement, into: HTMLElement, before: Element | null): void {
+		const neighbours = new Map<HTMLElement, DOMRect>();
+
+		for (const parent of [into, moving.parentElement]) {
+			for (const child of Array.from(parent?.children ?? [])) {
+				if (child === moving || !(child instanceof HTMLElement)) continue;
+
+				if (child.hasClass("udash-node")) neighbours.set(child, child.getBoundingClientRect());
+			}
+		}
+
+		into.insertBefore(moving, before);
+		this.shifted = true;
+
+		const sliding: HTMLElement[] = [];
+
+		for (const [child, was] of neighbours) {
+			const now = child.getBoundingClientRect();
+			const dx = was.left - now.left;
+			const dy = was.top - now.top;
+
+			if (dx === 0 && dy === 0) continue;
+			child.style.transition = "none";
+			child.style.transform = `translate(${dx}px, ${dy}px)`;
+			sliding.push(child);
+		}
+
+		// one reflow with them back where they were, then let them go
+		void into.offsetWidth;
+
+		for (const child of sliding) {
+			child.style.transition = `transform ${SETTLE_MS}ms ease`;
+			child.style.transform = "";
+		}
+
+		this.settleUntil = performance.now() + SETTLE_MS;
 	}
 
 	/* -------------------------------------------------------------- edits */
 
-	private drop(parent: ContainerNode, index: number): void {
+	/** Saves the drag at wherever the dragged element has been moved to. */
+	private drop(): void {
 		const payload = this.dragging;
+		const moving = this.dragEl;
+		const at = moving ? placement(moving, this.containers) : null;
 
 		this.endDrag();
 
-		if (!payload) return;
+		if (!payload || !at) return;
+
+		const { parent, index } = at;
 
 		if (payload.kind === "move") {
-			if (moveNode(this.config.root, payload.path, parent, index)) this.commit();
+			const source = nodeAt(this.config.root, payload.path.slice(0, -1));
+			const oldIndex = payload.path[payload.path.length - 1];
+			// moveNode counts the parent's children from before the move, when the
+			// node itself still held a place ahead of the drop point
+			const before = source === parent && oldIndex <= index ? index + 1 : index;
+
+			if (moveNode(this.config.root, payload.path, parent, before)) this.commit();
+			else this.redraw();
 
 			return;
 		}
@@ -448,6 +528,30 @@ export class LayoutEditor {
 		this.lastGood = text;
 		this.onChange(this.config);
 	}
+}
+
+/**
+ * Where an element sits in the layout: the container node it was moved into,
+ * and its index among that container's other children.
+ */
+export function placement(
+	moving: HTMLElement,
+	containers: WeakMap<HTMLElement, ContainerNode>,
+): { parent: ContainerNode; index: number } | null {
+	const parentEl = moving.parentElement;
+	const parent = parentEl ? containers.get(parentEl) : undefined;
+
+	if (!parentEl || !parent) return null;
+
+	let index = 0;
+
+	for (const child of Array.from(parentEl.children)) {
+		if (child === moving) return { parent, index };
+
+		if (child instanceof HTMLElement && child.hasClass("udash-node")) index++;
+	}
+
+	return null;
 }
 
 /** The child node elements of a container, ignoring handles and hints. */

@@ -47,8 +47,10 @@ a drag cannot open an event or follow a link by mistake.
 Every row and column is outlined, blue for *Columns* and purple for *Rows*, with
 a tab on its top left naming it. The tab carries the same grip, pencil and bin,
 so a whole group moves as one. Dropping is handled per container rather than per
-gap: the innermost container under the cursor takes the drop, and a line shows
-where the widget will land.
+gap: the innermost container under the cursor takes the drop. While you drag,
+the widget moves to where it would land and the rest of the dashboard slides
+aside to make room, so what you see when you let go is what you get. Press
+Escape, or let go outside the dashboard, to put everything back.
 
 The palette's **dividers** are containers: *Columns* lays its children out side
 by side, *Rows* stacks them. Drop widgets inside one to segment the dashboard,

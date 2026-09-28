@@ -1807,7 +1807,7 @@ layout:
 
 	cfg.root.children.push({ id: "e", type: "row", children: [] });
 
-	const editor = new LayoutEditor({} as never, cfg, { properties: [], calendars: [], notes: [] }, () => {});
+	const editor = new LayoutEditor({} as never, cfg, { properties: [], calendars: [], notes: [] }, () => {}, () => {});
 	const host = new El();
 
 	editor.attach(host as never);

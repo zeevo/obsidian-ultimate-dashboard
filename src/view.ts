@@ -522,6 +522,7 @@ export class DashboardView extends ItemView {
 				void this.host.saveSettings();
 				this.render();
 			},
+			() => this.render(),
 		);
 	}
 

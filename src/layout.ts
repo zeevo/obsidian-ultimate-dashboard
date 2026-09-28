@@ -19,8 +19,6 @@ function applySizing(el: HTMLElement, node: LayoutNode): void {
 function applyContainer(el: HTMLElement, node: ContainerNode, inheritedGap: number): number {
 	const gap = node.gap ?? inheritedGap;
 	el.style.gap = `${gap}px`;
-	// read by the editor, to centre its drop line in the gap
-	el.style.setProperty("--udash-gap", `${gap}px`);
 
 	el.style.display = "flex";
 	el.style.flexDirection = node.type === ContainerKind.Row ? "row" : "column";

@@ -713,50 +713,44 @@
 	border-radius: 6px;
 }
 
-/* Only a fade. `pointer-events: none` here also stops the element receiving
-   dragend, so the class was never cleared and widgets stayed greyed out. */
+/* The dragged widget stays in the layout as its own placeholder, faded and
+   outlined, while the rest of the dashboard makes room around it. Only a fade:
+   `pointer-events: none` would also stop it receiving dragend. */
 .udash-editing .is-dragging-self {
 	opacity: 0.35;
+	outline: 2px dashed var(--interactive-accent);
+	outline-offset: 3px;
+	border-radius: 8px;
 }
 
-/* Where a drop will land: a line centred in the gap before the child that gets
-   pushed along, or along the far edge when past the last one. */
-.udash-editing .is-insert-before::before,
-.udash-editing .is-insert-end::after {
-	content: "";
-	position: absolute;
-	z-index: 4;
-	background: var(--interactive-accent);
-	border-radius: 2px;
+/* A new widget from the palette is a placeholder until dropped. It moves
+   through the dashboard like a real widget would, taking up room. */
+.udash-edit-placeholder {
+	box-sizing: border-box;
+	min-height: 80px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 0.8em;
+	color: var(--interactive-accent);
+	border: 2px dashed var(--interactive-accent);
+	border-radius: 8px;
+	background: rgba(var(--color-purple-rgb), 0.06);
 	pointer-events: none;
 }
 
-.udash-editing .udash-column > .is-insert-before::before {
-	left: 0;
-	right: 0;
-	height: 3px;
-	top: calc(var(--udash-gap, 20px) / -2 - 1.5px);
+.udash-row > .udash-edit-placeholder {
+	flex: 1 1 0;
+	min-width: 140px;
 }
 
-.udash-editing .udash-row > .is-insert-before::before {
-	top: 0;
-	bottom: 0;
-	width: 3px;
-	left: calc(var(--udash-gap, 20px) / -2 - 1.5px);
+.udash-column > .udash-edit-placeholder {
+	width: 100%;
 }
 
-.udash-editing .udash-column.is-insert-end::after {
-	left: 10px;
-	right: 10px;
-	height: 3px;
-	bottom: 3px;
-}
-
-.udash-editing .udash-row.is-insert-end::after {
-	top: 26px;
-	bottom: 10px;
-	width: 3px;
-	right: 3px;
+/* once something has been dragged in, an empty container's hint makes way */
+.udash-edit-container > :is(.udash-node, .udash-edit-placeholder) ~ .udash-edit-empty {
+	display: none;
 }
 
 /* A day accepts a click only when a writable calendar is in scope. */
