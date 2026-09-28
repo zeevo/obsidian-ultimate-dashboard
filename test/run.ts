@@ -18,7 +18,7 @@ import { SPANS, WEATHER_MODES, WeatherError, describeWeather, parseForecast, par
 import { isComplete, missingField } from "../src/schema";
 import { CONTAINER_KINDS, WIDGET_KINDS } from "../src/kinds";
 import { Widget, specFor } from "../src/widgets";
-import { DEFAULT_CONFIG, activeDashboard, defaultSettings, findAccount, makeDashboard, migrate, uniqueName } from "../src/store";
+import { BLANK_CONFIG, DEFAULT_CONFIG, activeDashboard, defaultSettings, findAccount, makeDashboard, migrate, uniqueName } from "../src/store";
 
 const VAULT = process.argv[2];
 
@@ -344,6 +344,12 @@ console.log("\ndashboard store");
 	check("a free name is left alone", uniqueName(s2, "Training") === "Training");
 	check("blank names get a fallback", uniqueName(s2, "   ") === "Untitled");
 	check("ids are unique", makeDashboard("a").id !== makeDashboard("b").id);
+
+	const created = parseDashboard(makeDashboard("New").config);
+
+	check("a new dashboard starts blank", created.root.children.length === 0 && created.folder === "Daily");
+	check("the blank layout is the default", makeDashboard("New").config === BLANK_CONFIG);
+	check("a first install still opens on the sample", defaultSettings().dashboards[0].config === DEFAULT_CONFIG);
 }
 
 console.log("\nshipped default config");

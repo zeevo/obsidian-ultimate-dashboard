@@ -65,6 +65,7 @@ export interface DashboardSettings {
 	google: GoogleConfig;
 }
 
+/** The sample a first install opens on, so the plugin does not start out empty. */
 export const DEFAULT_CONFIG = `folder: Daily
 layout:
   type: column
@@ -81,11 +82,18 @@ layout:
         - { type: heatmap, title: Lifting, property: lift, color: "#ef4444", months: 6, flex: 1 }
 `;
 
+/** What a dashboard you create starts as: nothing yet, ready for the editor. */
+export const BLANK_CONFIG = `folder: Daily
+layout:
+  type: column
+  children: []
+`;
+
 export function newId(): string {
 	return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
-export function makeDashboard(name: string, config = DEFAULT_CONFIG): Dashboard {
+export function makeDashboard(name: string, config = BLANK_CONFIG): Dashboard {
 	return { id: newId(), name, config };
 }
 
@@ -116,7 +124,7 @@ export function findAccount(
 }
 
 export function defaultSettings(): DashboardSettings {
-	const first = makeDashboard("Health");
+	const first = makeDashboard("Health", DEFAULT_CONFIG);
 
 	return { dashboards: [first], activeId: first.id, calendars: [], google: defaultGoogle() };
 }

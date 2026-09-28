@@ -71,7 +71,7 @@ The tab has a small bar across the top:
 |---------|------|
 | dropdown | Switches dashboards. Only shown once you have more than one |
 | pencil | Enters edit mode; the tick leaves it |
-| plus | Creates a dashboard, asking for a name first |
+| plus | Creates a blank dashboard, asking for a name first, and opens it in edit mode |
 
 Edit mode validates as you type and saves continuously; click the tick to go
 back. The same editor, plus rename, duplicate and delete, lives in Settings →
