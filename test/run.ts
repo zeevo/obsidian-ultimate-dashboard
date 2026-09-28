@@ -1705,6 +1705,7 @@ console.log("\nevent details");
 		"END:VEVENT",
 		"END:VCALENDAR",
 	].join("\r\n");
+
 	const [standup] = parseICS(feed, new Date(2026, 8, 1), new Date(2026, 9, 1));
 
 	check("an ICS description keeps its line breaks", standup?.description === "Agenda:\n1. blockers, then demos");
