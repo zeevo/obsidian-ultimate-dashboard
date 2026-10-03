@@ -77,6 +77,14 @@ function contains(haystack: ContainerNode, needle: LayoutNode): boolean {
 	return false;
 }
 
+/** Removes the node at `path`. The root has no parent, so it stays. */
+export function removeNode(root: ContainerNode, path: number[]): void {
+	const parent = nodeAt(root, path.slice(0, -1));
+
+	if (!parent || !isContainer(parent) || path.length === 0) return;
+	parent.children.splice(path[path.length - 1], 1);
+}
+
 /**
  * Moves the node at `from` into `parent` at `index`, where `index` counts the
  * parent's children as they were before the move. Returns false, changing
@@ -313,7 +321,7 @@ export class LayoutEditor {
 		setTooltip(remove, "Remove");
 		remove.addEventListener("click", (e) => {
 			e.stopPropagation();
-			this.removeAt(path);
+			removeNode(this.config.root, path);
 			this.commit();
 		});
 	}
@@ -494,11 +502,11 @@ export class LayoutEditor {
 		modal.open();
 	}
 
-	private removeAt(path: number[]): void {
-		const parent = nodeAt(this.config.root, path.slice(0, -1));
+	/** Opens the form for the node at `path`, as its pencil would. */
+	configureAt(path: number[]): void {
+		const node = nodeAt(this.config.root, path);
 
-		if (!parent || !isContainer(parent) || path.length === 0) return;
-		parent.children.splice(path[path.length - 1], 1);
+		if (node) this.configure(node);
 	}
 
 	/**

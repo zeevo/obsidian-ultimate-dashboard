@@ -1,7 +1,7 @@
 import { Component, ItemView, MarkdownRenderer, Menu, Notice, WorkspaceLeaf, setIcon, setTooltip } from "obsidian";
 import { ConfigError, DashboardConfig, countWidgets, parseDashboard } from "./layout-tree";
 import { readDays } from "./data";
-import { renderNode } from "./layout";
+import { FailedAt, renderNode } from "./layout";
 import { CalendarService } from "./calendar";
 import { WeatherService } from "./weather";
 import { EventTarget, WidgetHost } from "./widgets/host";
@@ -9,9 +9,9 @@ import { connect } from "./google";
 import { ConfirmModal, EventDetailsModal, EventModal, NameModal } from "./modal";
 import { CalendarsModal } from "./calendars-modal";
 import { CONTAINER_KINDS, WIDGET_KINDS } from "./kinds";
-import { RANGE_KEYS } from "./widgets";
+import { RANGE_KEYS, specFor } from "./widgets";
 import { IMAGE_EXTENSIONS } from "./widgets/image";
-import { LayoutEditor } from "./editor";
+import { LayoutEditor, removeNode } from "./editor";
 import { serializeDashboard } from "./serialize";
 import { Dashboard, DashboardSettings, activeDashboard, addDashboard, duplicateDashboard, findAccount, removeDashboard, uniqueName } from "./store";
 
@@ -128,7 +128,19 @@ export class DashboardView extends ItemView {
 		} catch (e) {
 			const message = e instanceof ConfigError ? e.message : String(e);
 
-			this.error(root, this.mode === "edit" ? `${message}. Fix it in the YAML tab.` : message);
+			if (this.mode === "edit") {
+				this.error(root, `${message}. Fix it in the YAML tab.`);
+
+				return;
+			}
+
+			const box = this.error(root, message);
+
+			this.errorAction(box, "Fix in YAML", () => {
+				this.mode = "edit";
+				this.editorTab = "yaml";
+				this.render();
+			});
 
 			return;
 		}
@@ -153,7 +165,7 @@ export class DashboardView extends ItemView {
 		renderNode(
 			root,
 			config.root,
-			{ days, error: (target, message) => this.error(target, message), host: this.widgetHost() },
+			{ days, error: (target, message, at) => void this.error(target, message, at), host: this.widgetHost() },
 			this.editor?.decorate,
 		);
 	}
@@ -488,9 +500,64 @@ export class DashboardView extends ItemView {
 		).open();
 	}
 
-	private error(el: HTMLElement, message: string): void {
-		const box = el.createDiv({ cls: "udash-error" });
-		box.createSpan({ cls: "udash-error-tag", text: "dashboard" });
+	/**
+	 * Draws an error and returns its box. A failed widget's error fills the
+	 * widget's space and, outside edit mode, offers to edit or remove it. In edit
+	 * mode the widget's own handle already does both, and its content ignores
+	 * clicks, so buttons there would be dead.
+	 */
+	private error(el: HTMLElement, message: string, at?: FailedAt): HTMLElement {
+		const box = el.createDiv({ cls: at ? "udash-error is-widget" : "udash-error" });
+		const tag = at ? specFor(at.node.type).label.toLowerCase() : "dashboard";
+
+		box.createSpan({ cls: "udash-error-tag", text: tag });
 		box.createSpan({ text: message });
+
+		if (at && this.mode === "dashboard") {
+			this.errorAction(box, "Edit", () => this.editWidget(at.path));
+			this.errorAction(box, "Remove", () => this.confirmRemove(at));
+		}
+
+		return box;
+	}
+
+	/** A button under an error, for the quickest way out of it. */
+	private errorAction(box: HTMLElement, text: string, onClick: () => void): void {
+		const actions = box.querySelector(".udash-error-actions") ?? box.createDiv({ cls: "udash-error-actions" });
+		const button = actions.createEl("button", { text });
+
+		button.addEventListener("click", onClick);
+	}
+
+	/** Switches to the visual editor with the widget's form open. */
+	private editWidget(path: number[]): void {
+		this.mode = "edit";
+		this.editorTab = "visual";
+		this.render();
+		this.editor?.configureAt(path);
+	}
+
+	private confirmRemove(at: FailedAt): void {
+		const label = specFor(at.node.type).label;
+
+		new ConfirmModal(
+			this.app,
+			{
+				title: `Remove this ${label.toLowerCase()} widget?`,
+				body: "It is taken out of the layout. Its settings cannot be brought back.",
+				cta: "Remove",
+			},
+			async () => {
+				const current = activeDashboard(this.host.settings);
+
+				if (!current) return;
+				const config = parseDashboard(current.config);
+
+				removeNode(config.root, at.path);
+				current.config = serializeDashboard(config);
+				await this.host.saveSettings();
+				this.host.refreshViews();
+			},
+		).open();
 	}
 }

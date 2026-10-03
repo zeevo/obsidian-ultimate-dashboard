@@ -37,13 +37,14 @@ async function fillNote(body: HTMLElement, widget: NoteWidget, host: NoteHost, c
 
 	// the view may have redrawn while the read was in flight
 	if (!body.isConnected) return;
-	body.empty();
 
 	if (!file) {
-		ctx.error(body, `No note called "${widget.path}"`);
+		ctx.fail(`No note called "${widget.path}"`);
 
 		return;
 	}
+
+	body.empty();
 
 	await host.renderMarkdown(stripFrontmatter(file.text), body, file.path, owner);
 

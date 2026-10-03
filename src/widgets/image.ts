@@ -25,7 +25,7 @@ export function renderImage(el: HTMLElement, widget: ImageWidget, ctx: RenderCon
 	if (src === undefined) return;
 
 	if (src === null) {
-		ctx.error(wrap, `No file called "${widget.src}"`);
+		ctx.fail(`No file called "${widget.src}"`);
 
 		return;
 	}
@@ -38,10 +38,7 @@ export function renderImage(el: HTMLElement, widget: ImageWidget, ctx: RenderCon
 	img.setAttribute("draggable", "false");
 
 	if (widget.height !== undefined) img.style.height = `${widget.height}px`;
-	img.addEventListener("error", () => {
-		wrap.empty();
-		ctx.error(wrap, `Could not load ${widget.src}`);
-	});
+	img.addEventListener("error", () => ctx.fail(`Could not load ${widget.src}`));
 }
 
 /** The last segment of a path or URL, for the editor's card. */

@@ -188,6 +188,27 @@
 	color: var(--text-error);
 }
 
+/* A failed widget's error takes the widget's whole space, so the layout keeps
+   its shape and the problem is plain where the widget should be. */
+.udash-error.is-widget {
+	box-sizing: border-box;
+	height: 100%;
+	min-height: 80px;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	gap: 6px;
+	border-radius: 8px;
+	padding: 10px 12px;
+	background: var(--background-secondary);
+}
+
+.udash-error-actions {
+	display: flex;
+	gap: 6px;
+	margin-top: 4px;
+}
+
 .udash-error-tag {
 	font-family: var(--font-monospace);
 	font-size: 0.85em;

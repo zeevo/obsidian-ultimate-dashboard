@@ -213,8 +213,11 @@ export interface WidgetSpec<P extends Widget = Widget> {
 export interface RenderContext {
 	/** Every daily note, oldest first. */
 	days: DayRecord[];
-	/** Draws an error inside `el`, for a widget that cannot show its content. */
-	error(el: HTMLElement, message: string): void;
+	/**
+	 * Gives up on drawing: the widget's content is replaced by an error tile
+	 * that says why and offers to fix it.
+	 */
+	fail(message: string): void;
 	/** The live plugin. Absent under the test harness. */
 	host?: WidgetHost;
 }

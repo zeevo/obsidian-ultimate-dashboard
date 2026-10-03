@@ -258,10 +258,12 @@ function renderMonthWidget(el: HTMLElement, widget: CalendarWidget, ctx: RenderC
 	const shell = renderMonth(el, widget);
 	const picked = pickSources(widget, ctx.host);
 
-	if ("missing" in picked) {
+	if ("missing" in picked && picked.missing !== NO_CALENDARS) {
+		// naming a calendar that does not exist is the widget's own mistake
+		ctx.fail(picked.missing);
+	} else if ("missing" in picked) {
 		fillMonth(shell, widget, monthWindow(widget).first, [], [picked.missing]);
-
-		if (picked.missing === NO_CALENDARS) offerCalendars(shell.querySelector(".udash-month-errors"), ctx.host);
+		offerCalendars(shell.querySelector(".udash-month-errors"), ctx.host);
 	} else {
 		pageMonths(shell, widget, picked.host, picked.sources, key);
 	}

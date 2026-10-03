@@ -2023,16 +2023,19 @@ console.log("\nwidgets through a host");
 		nextMonthKey: () => `d:${keys++}`,
 	};
 
-	const ctx = {
-		days,
-		error: (el: HTMLElement, m: string) => void (el as unknown as El).createDiv({ cls: "udash-error", text: m }),
-		host,
+	// the last failed widget the walker reported, and where it sits
+	let failedAt: { node: Widget; path: number[] } | undefined;
+
+	const error = (el: HTMLElement, m: string, at?: { node: Widget; path: number[] }) => {
+		failedAt = at;
+		(el as unknown as El).createDiv({ cls: "udash-error", text: m });
 	};
 
-	const draw = (widget: Widget, context: typeof ctx | Omit<typeof ctx, "host"> = ctx) => {
+	// through the walker, so a failure is handled the way the view sees it
+	const draw = (widget: Widget, withHost: WidgetHost | null = host, decorate?: (el: HTMLElement) => void) => {
 		const el = new El();
 
-		specFor(widget.type).render(el as never, widget, context);
+		renderNode(el as never, widget, { days, error, host: withHost ?? undefined }, decorate);
 
 		return el;
 	};
@@ -2050,6 +2053,29 @@ console.log("\nwidgets through a host");
 	await settle();
 	check("a missing note says so", missing.byClass("udash-error")[0]?.text === 'No note called "Nope"',
 		missing.byClass("udash-error")[0]?.text);
+	check("a failed note drops its loading tile", missing.byClass("udash-note").length === 0);
+
+	// a widget that fails after edit mode decorated it must get its handle back
+	let decorations = 0;
+
+	const late = draw({ id: "t", type: "note", path: "Nope" }, host, (el) => {
+		decorations++;
+		(el as unknown as El).createDiv({ cls: "udash-edit-handle" });
+	});
+
+	await settle();
+	check("a late failure redraws the edit handle", late.byClass("udash-edit-handle").length === 1 && decorations === 2,
+		`${late.byClass("udash-edit-handle").length} handles, ${decorations} decorations`);
+
+	const early = draw({ id: "t", type: "image", src: "dog.png" }, host, () => decorations++);
+
+	check("an immediate failure is decorated once", decorations === 3 && early.byClass("udash-error").length === 1, String(decorations));
+
+	const noted = draw({ id: "t", type: "note", path: "Health" });
+
+	await settle();
+	check("a widget's element does not take its tile's class", !noted.children[0]?.classes.has("udash-note")
+		&& noted.byClass("udash-note").length === 1, [...(noted.children[0]?.classes ?? [])].join(" "));
 
 	const clockEl = draw({ id: "t", type: "clock" });
 
@@ -2097,9 +2123,11 @@ console.log("\nwidgets through a host");
 
 	const nameless = draw({ id: "t", type: "upcoming", calendars: ["Gym"] });
 
-	check("an unknown calendar name says so", nameless.all.some((e) => e.text === "No calendar named Gym"));
+	check("an unknown calendar name fails the widget", nameless.byClass("udash-error")[0]?.text === "No calendar named Gym");
+	check("a failed widget is reported with where it sits", failedAt?.node.type === "upcoming" && failedAt.path.length === 0);
+	check("a failed widget keeps nothing of its own content", nameless.byClass("udash-calendar").length === 0);
 
-	const hostless = draw({ id: "t", type: "upcoming" }, { days, error: ctx.error });
+	const hostless = draw({ id: "t", type: "upcoming" }, null);
 
 	check("without a host an agenda says there are no calendars",
 		hostless.all.some((e) => e.text === "No calendars yet."));
@@ -2108,7 +2136,7 @@ console.log("\nwidgets through a host");
 	const empty = { ...host, sources: [] };
 
 	for (const widget of [{ id: "t", type: "upcoming" }, { id: "t", type: "calendar" }] as const) {
-		const el = draw(widget, { ...ctx, host: empty });
+		const el = draw(widget, empty);
 		const add = el.byClass("mod-cta").find((b) => b.text === "Add a calendar");
 
 		check(`an empty ${widget.type} offers to add a calendar`, add !== undefined);
@@ -2174,7 +2202,7 @@ console.log("\nwidgets through a host");
 		gone.byClass("udash-error")[0]?.text);
 	check("a missing vault image draws no picture", !gone.all.some((e) => e.tag === "img"));
 
-	const web = draw({ id: "t", type: "image", src: "https://example.com/a.png" }, { days, error: ctx.error });
+	const web = draw({ id: "t", type: "image", src: "https://example.com/a.png" }, null);
 	const webImg = web.all.find((e) => e.tag === "img");
 
 	check("a URL loads directly, without a host", webImg?.attrs.src === "https://example.com/a.png");
@@ -2184,7 +2212,7 @@ console.log("\nwidgets through a host");
 		web.byClass("udash-error")[0]?.text);
 	check("a failed image is removed", !web.all.some((e) => e.tag === "img"));
 
-	const offline = draw({ id: "t", type: "image", src: "cat.png" }, { days, error: ctx.error });
+	const offline = draw({ id: "t", type: "image", src: "cat.png" }, null);
 
 	check("without a host a vault image is left blank, not an error",
 		!offline.all.some((e) => e.tag === "img") && offline.byClass("udash-error").length === 0);

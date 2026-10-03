@@ -134,6 +134,18 @@ named underneath. Cross-field rules declared in `validate` block the same way,
 so a line chart given two overlapping ranges says so there rather than failing
 later as a parse error on the whole layout.
 
+## When a widget fails
+
+A widget that cannot show its content (a missing note or image, a place the
+forecast cannot find, a calendar name that matches nothing) is replaced by an
+error tile that fills its space, so the rest of the layout keeps its shape. The
+tile says what went wrong and offers **Edit**, which opens edit mode with that
+widget's form, and **Remove**. In edit mode a failed widget keeps its handle, so
+it can be moved, edited or deleted like any other.
+
+A layout whose YAML cannot be read at all shows one error with **Fix in YAML**,
+which opens the YAML tab.
+
 ## Adding a widget type
 
 Each widget type lives in its own module under `src/widgets/`, which holds its

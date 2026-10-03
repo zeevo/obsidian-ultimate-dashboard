@@ -1,5 +1,5 @@
 import { ContainerNode, LayoutNode, isContainer } from "./layout-tree";
-import { RenderContext, specFor } from "./widgets";
+import { RenderContext, Widget, specFor } from "./widgets";
 import { ContainerKind } from "./kinds";
 
 const DEFAULT_GAP = 20;
@@ -36,6 +36,23 @@ function applyContainer(el: HTMLElement, node: ContainerNode, inheritedGap: numb
  */
 export type NodeDecorator = (el: HTMLElement, node: LayoutNode, path: number[]) => void;
 
+/** Where a failed widget sits, so the view can offer to edit or remove it. */
+export interface FailedAt {
+	node: Widget;
+	path: number[];
+}
+
+/** What the walker needs: what widgets get, plus a way to show a failure. */
+export interface LayoutContext {
+	days: RenderContext["days"];
+	host?: RenderContext["host"];
+	/**
+	 * Draws an error into `el`. `at` is set when a widget failed, and names it;
+	 * without it the error belongs to the dashboard as a whole.
+	 */
+	error(el: HTMLElement, message: string, at?: FailedAt): void;
+}
+
 /**
  * Walks the layout tree, creating a div per node. Containers set their own
  * display mode; leaves render a widget. Errors are contained to the node that
@@ -44,7 +61,7 @@ export type NodeDecorator = (el: HTMLElement, node: LayoutNode, path: number[]) 
 export function renderNode(
 	parent: HTMLElement,
 	node: LayoutNode,
-	ctx: RenderContext,
+	ctx: LayoutContext,
 	decorate?: NodeDecorator,
 ): void {
 	renderAt(parent, node, ctx, decorate, DEFAULT_GAP, []);
@@ -53,12 +70,14 @@ export function renderNode(
 function renderAt(
 	parent: HTMLElement,
 	node: LayoutNode,
-	ctx: RenderContext,
+	ctx: LayoutContext,
 	decorate: NodeDecorator | undefined,
 	inheritedGap: number,
 	path: number[],
 ): void {
-	const el = parent.createDiv({ cls: `udash-node udash-${node.type}` });
+	// a widget's own type is left off: its tile already carries that class, and
+	// matching both drew every tile twice, one inside the other
+	const el = parent.createDiv({ cls: isContainer(node) ? `udash-node udash-${node.type}` : "udash-node udash-widget" });
 	applySizing(el, node);
 
 	if (isContainer(node)) {
@@ -72,15 +91,25 @@ function renderAt(
 		return;
 	}
 
-	el.addClass("udash-widget");
+	let decorated = false;
+
+	const fail = (message: string) => {
+		el.empty();
+		el.addClass("is-failed");
+		ctx.error(el, message, { node, path });
+
+		// failing after edit mode decorated the widget took its handle with it
+		if (decorated) decorate?.(el, node, path);
+	};
 
 	try {
-		specFor(node.type).render(el, node, ctx);
+		specFor(node.type).render(el, node, { days: ctx.days, host: ctx.host, fail });
 	} catch (e) {
 		// SAFETY: the catch binding is whatever a widget renderer threw; Error is
 		// the only thing they construct, and a non-Error still stringifies here.
-		ctx.error(el, `${node.type} widget failed: ${(e as Error).message}`);
+		fail(`${node.type} widget failed: ${(e as Error).message}`);
 	}
 
+	decorated = true;
 	decorate?.(el, node, path);
 }

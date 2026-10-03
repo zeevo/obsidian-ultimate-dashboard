@@ -187,10 +187,9 @@ async function loadWeather(shell: HTMLElement, widget: WeatherWidget, host: Weat
 		fillWeather(shell, forecast, widget);
 	} catch (e) {
 		if (!shell.isConnected) return;
-		shell.empty();
 		// SAFETY: the service throws WeatherError and requestUrl rejects with
 		// an Error; the fallback covers anything else that reaches here.
-		ctx.error(shell, `${widget.place}: ${(e as Error).message || "could not load"}`);
+		ctx.fail(`${widget.place}: ${(e as Error).message || "could not load"}`);
 	}
 }
 

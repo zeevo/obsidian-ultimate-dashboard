@@ -126,10 +126,12 @@ function renderUpcomingWidget(el: HTMLElement, widget: UpcomingWidget, ctx: Rend
 	const shell = renderUpcoming(el, widget);
 	const picked = pickSources(widget, ctx.host);
 
-	if ("missing" in picked) {
+	if ("missing" in picked && picked.missing !== NO_CALENDARS) {
+		// naming a calendar that does not exist is the widget's own mistake
+		ctx.fail(picked.missing);
+	} else if ("missing" in picked) {
 		fillCalendar(shell, [], [picked.missing], false);
-
-		if (picked.missing === NO_CALENDARS) offerCalendars(shell.querySelector(".udash-calendar-body"), ctx.host);
+		offerCalendars(shell.querySelector(".udash-calendar-body"), ctx.host);
 	} else {
 		void loadAgenda(shell, widget, picked.host, picked.sources);
 	}
