@@ -59,6 +59,8 @@ export interface NumberField<P> extends Common<P> {
 	/** Rejected below this. Defaults to 1, since every numeric option is a count. */
 	readonly min?: number;
 	readonly integer?: boolean;
+	/** Shown after the input, such as `px`, so the number's meaning is plain. */
+	readonly unit?: string;
 }
 
 export interface ToggleField<P> extends Common<P> {

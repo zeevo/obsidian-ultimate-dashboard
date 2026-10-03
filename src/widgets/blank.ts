@@ -19,7 +19,7 @@ export const blank: WidgetSpec<BlankWidget> = {
 	type: WidgetKind.Blank,
 	label: "Blank",
 	hint: "A placeholder that holds space",
-	fields: [{ key: "height", kind: FieldKind.Number, label: "Height (px)" }],
+	fields: [{ key: "height", kind: FieldKind.Number, label: "Height", unit: "px" }],
 	blank: () => ({ type: WidgetKind.Blank }),
 	title: () => "Blank",
 	summary: () => "placeholder",

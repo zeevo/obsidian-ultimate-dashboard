@@ -77,7 +77,7 @@ export const note: WidgetSpec<NoteWidget> = {
 			required: true,
 			placeholder: "0 All/Health.md",
 		},
-		{ key: "height", kind: FieldKind.Number, label: "Height (px)", min: 60 },
+		{ key: "height", kind: FieldKind.Number, label: "Height", unit: "px", min: 60 },
 	],
 	blank: () => ({ type: WidgetKind.Note, path: "" }),
 	title: (w) => w.title || basename(w.path) || "Note",

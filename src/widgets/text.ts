@@ -35,7 +35,8 @@ export const text: WidgetSpec<TextWidget> = {
 		{
 			key: "size",
 			kind: FieldKind.Number,
-			label: "Font size (px)",
+			label: "Font size",
+			unit: "px",
 			hint: "Defaults to the theme's text size",
 			// below this it stops being readable
 			min: 8,

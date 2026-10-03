@@ -120,7 +120,7 @@ export class WidgetForm extends Modal {
 				});
 			});
 
-		this.numberControl("Gap (px)", () => node.gap, (v) => (node.gap = v), 0);
+		this.numberControl("Gap", () => node.gap, (v) => (node.gap = v), 0, "px");
 
 		if (node.type === ContainerKind.Row) {
 			new Setting(this.contentEl)
@@ -236,6 +236,8 @@ export class WidgetForm extends Modal {
 					});
 				});
 
+				if (field.unit) unitAfter(setting, field.unit);
+
 				return;
 
 			case FieldKind.Toggle:
@@ -327,8 +329,9 @@ export class WidgetForm extends Modal {
 		get: () => number | undefined,
 		put: (v: number | undefined) => void,
 		min: number,
+		unit?: string,
 	): void {
-		new Setting(this.contentEl).setName(name).addText((t) => {
+		const setting = new Setting(this.contentEl).setName(name).addText((t) => {
 			t.inputEl.type = "number";
 			t.setValue(get() === undefined ? "" : String(get())).onChange((v) => {
 				const n = Number(v);
@@ -336,6 +339,8 @@ export class WidgetForm extends Modal {
 				put(v.trim() && Number.isFinite(n) && n >= min ? Math.round(n) : undefined);
 			});
 		});
+
+		if (unit) unitAfter(setting, unit);
 	}
 
 	private suggest(input: HTMLInputElement, options: string[]): void {
@@ -348,4 +353,9 @@ export class WidgetForm extends Modal {
 		for (const o of options) list.createEl("option", { value: o });
 	}
 
+}
+
+/** A unit after a number box, such as `px`. */
+function unitAfter(setting: Setting, unit: string): void {
+	setting.controlEl.createSpan({ cls: "udash-field-unit", text: unit });
 }

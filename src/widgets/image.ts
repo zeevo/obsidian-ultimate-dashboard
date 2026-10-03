@@ -59,7 +59,7 @@ export const image: WidgetSpec<ImageWidget> = {
 			required: true,
 			placeholder: "https://... or Attachments/photo.png",
 		},
-		{ key: "height", kind: FieldKind.Number, label: "Height (px)", hint: "Defaults to the image's own proportions" },
+		{ key: "height", kind: FieldKind.Number, label: "Height", unit: "px", hint: "Defaults to the image's own proportions" },
 	],
 	blank: () => ({ type: WidgetKind.Image, src: "" }),
 	title: () => "Image",
