@@ -1,8 +1,7 @@
 import { Plugin, WorkspaceLeaf } from "obsidian";
 import { CalendarService } from "./calendar";
 import { WeatherService } from "./weather";
-import { DashboardSettingTab } from "./settings";
-import { DashboardSettings, defaultSettings, makeDashboard, migrate, uniqueName } from "./store";
+import { DashboardSettings, addDashboard, defaultSettings, migrate } from "./store";
 import { DashboardView, VIEW_TYPE_DASHBOARD } from "./view";
 import { NameModal } from "./modal";
 
@@ -10,10 +9,6 @@ export default class UltimateDashboardPlugin extends Plugin {
 	settings: DashboardSettings = defaultSettings();
 	calendars = new CalendarService();
 	weather = new WeatherService();
-
-	get pluginId(): string {
-		return this.manifest.id;
-	}
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -61,8 +56,6 @@ export default class UltimateDashboardPlugin extends Plugin {
 				await this.saveSettings();
 			},
 		}));
-
-		this.addSettingTab(new DashboardSettingTab(this.app, this));
 
 		this.app.workspace.onLayoutReady(() => {
 			if (coldStart) void this.openStartupDashboard();
@@ -119,9 +112,7 @@ export default class UltimateDashboardPlugin extends Plugin {
 	/** Prompt for a name, create it, switch to it, and show it. */
 	promptNewDashboard(): void {
 		new NameModal(this.app, { title: "New dashboard", cta: "Create" }, async (name) => {
-			const created = makeDashboard(uniqueName(this.settings, name));
-			this.settings.dashboards.push(created);
-			this.settings.activeId = created.id;
+			addDashboard(this.settings, name);
 			await this.saveSettings();
 			await this.activateView();
 			this.refreshViews();

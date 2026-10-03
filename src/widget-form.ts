@@ -15,6 +15,8 @@ export interface FormContext {
 	properties: string[];
 	calendars: string[];
 	notes: string[];
+	/** Opens the calendar pool, then hands back the calendar names once it closes. */
+	manageCalendars?: (onDone: (calendars: string[]) => void) => void;
 }
 
 export class WidgetForm extends Modal {
@@ -221,7 +223,26 @@ export class WidgetForm extends Modal {
 			case FieldKind.Calendars: {
 				const chosen = new Set<string>(Array.isArray(get()) ? (get() as string[]) : []);
 
-				setting.setDesc("None selected means every configured calendar.");
+				setting.setDesc(
+					this.context.calendars.length > 0
+						? "None selected means every configured calendar."
+						: "No calendars yet.",
+				);
+
+				const manage = this.context.manageCalendars;
+
+				if (manage) {
+					setting.addButton((b) =>
+						b.setButtonText("Manage\u2026").onClick(() =>
+							manage((calendars) => {
+								// redraw with the new names; what is being edited lives on the node
+								this.context = { ...this.context, calendars };
+								this.contentEl.empty();
+								this.onOpen();
+							}),
+						),
+					);
+				}
 
 				for (const name of this.context.calendars) {
 					new Setting(this.contentEl).setName(name).addToggle((t) =>

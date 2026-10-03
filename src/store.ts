@@ -308,3 +308,34 @@ export function uniqueName(settings: DashboardSettings, wanted: string): string 
 		if (!taken.has(candidate)) return candidate;
 	}
 }
+
+/** Makes a new blank dashboard and switches to it. */
+export function addDashboard(settings: DashboardSettings, name: string): Dashboard {
+	const created = makeDashboard(uniqueName(settings, name));
+
+	settings.dashboards.push(created);
+	settings.activeId = created.id;
+
+	return created;
+}
+
+/** Copies a dashboard's layout under a fresh name and switches to the copy. */
+export function duplicateDashboard(settings: DashboardSettings, source: Dashboard): Dashboard {
+	const copy = makeDashboard(uniqueName(settings, source.name), source.config);
+
+	settings.dashboards.push(copy);
+	settings.activeId = copy.id;
+
+	return copy;
+}
+
+/**
+ * Deletes a dashboard. The view moves to the first one left, and a startup
+ * pick pointing at it is cleared rather than left dangling.
+ */
+export function removeDashboard(settings: DashboardSettings, id: string): void {
+	settings.dashboards = settings.dashboards.filter((d) => d.id !== id);
+	settings.activeId = settings.dashboards[0]?.id ?? "";
+
+	if (settings.startupId === id) settings.startupId = undefined;
+}

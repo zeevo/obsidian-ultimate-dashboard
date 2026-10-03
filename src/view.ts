@@ -1,4 +1,4 @@
-import { Component, ItemView, MarkdownRenderer, Notice, WorkspaceLeaf, setIcon, setTooltip } from "obsidian";
+import { Component, ItemView, MarkdownRenderer, Menu, Notice, WorkspaceLeaf, setIcon, setTooltip } from "obsidian";
 import { ConfigError, DashboardConfig, countWidgets, parseDashboard } from "./layout-tree";
 import { readDays } from "./data";
 import { renderNode } from "./layout";
@@ -6,25 +6,19 @@ import { CalendarService } from "./calendar";
 import { WeatherService } from "./weather";
 import { EventTarget, WidgetHost } from "./widgets/host";
 import { connect } from "./google";
-import { EventDetailsModal, EventModal, NameModal } from "./modal";
+import { ConfirmModal, EventDetailsModal, EventModal, NameModal } from "./modal";
+import { CalendarsModal } from "./calendars-modal";
+import { CONTAINER_KINDS, WIDGET_KINDS } from "./kinds";
+import { RANGE_KEYS } from "./widgets";
 import { LayoutEditor } from "./editor";
 import { serializeDashboard } from "./serialize";
-import { DashboardSettings, activeDashboard, findAccount, makeDashboard, uniqueName } from "./store";
+import { Dashboard, DashboardSettings, activeDashboard, addDashboard, duplicateDashboard, findAccount, removeDashboard, uniqueName } from "./store";
 
 export const VIEW_TYPE_DASHBOARD = "ultimate-dashboard-view";
-
-/** Obsidian's settings window, attached to app at runtime but not typed. */
-interface SettingsWindow {
-	open(): void;
-	openTabById(id: string): void;
-}
-
-type AppWithSettings = DashboardView["app"] & { setting?: SettingsWindow };
 
 /** What the view needs from the plugin, kept narrow so it stays testable. */
 export interface ViewHost {
 	settings: DashboardSettings;
-	pluginId: string;
 	calendars: CalendarService;
 	weather: WeatherService;
 	saveSettings(): Promise<void>;
@@ -196,6 +190,7 @@ export class DashboardView extends ItemView {
 			showEvent: (event) => new EventDetailsModal(this.app, event).open(),
 			accountEmail: (accountId) => findAccount(settings.google, accountId)?.email,
 			reconnectGoogle: (accountId) => void this.reconnectGoogle(accountId),
+			manageCalendars: () => this.manageCalendars(),
 			monthOffsets: this.monthOffsets,
 			nextMonthKey: () => `${dashboardId}:${monthIndex++}`,
 		};
@@ -243,11 +238,99 @@ export class DashboardView extends ItemView {
 		setTooltip(add, "New dashboard");
 		add.addEventListener("click", () => this.promptNew());
 
-		const cog = bar.createEl("button", { cls: "udash-bar-button" });
+		const more = bar.createEl("button", { cls: "udash-bar-button" });
 
-		setIcon(cog, "settings");
-		setTooltip(cog, "Ultimate Dashboard settings");
-		cog.addEventListener("click", () => this.openSettings());
+		setIcon(more, "more-horizontal");
+		setTooltip(more, "More");
+		more.addEventListener("click", (evt) => this.showMenu(evt));
+	}
+
+	/**
+	 * Everything that used to sit in a settings tab: what to do with this
+	 * dashboard, which one opens on startup, and the calendar pool.
+	 */
+	private showMenu(evt: MouseEvent): void {
+		const { settings } = this.host;
+		const current = activeDashboard(settings);
+		const menu = new Menu();
+
+		if (current) {
+			menu.addItem((item) =>
+				item.setTitle("Rename").setIcon("pencil").onClick(() => this.promptRename(current)),
+			);
+			menu.addItem((item) =>
+				item.setTitle("Duplicate").setIcon("copy").onClick(async () => {
+					duplicateDashboard(settings, current);
+					await this.host.saveSettings();
+					this.host.refreshViews();
+				}),
+			);
+			menu.addItem((item) =>
+				item
+					.setTitle("Delete")
+					.setIcon("trash-2")
+					.setWarning(true)
+					// the last dashboard stays, so the view always has something to show
+					.setDisabled(settings.dashboards.length <= 1)
+					.onClick(() => this.confirmDelete(current)),
+			);
+			menu.addSeparator();
+			menu.addItem((item) =>
+				item
+					.setTitle("Open on startup")
+					.setIcon("power")
+					.setChecked(settings.startupId === current.id)
+					.onClick(async () => {
+						// one dashboard at most opens on startup, so ticking this one moves it here
+						settings.startupId = settings.startupId === current.id ? undefined : current.id;
+						await this.host.saveSettings();
+					}),
+			);
+			menu.addSeparator();
+		}
+
+		menu.addItem((item) =>
+			item.setTitle("Manage calendars").setIcon("calendar").onClick(() => this.manageCalendars()),
+		);
+		menu.addItem((item) =>
+			item.setTitle("Refresh calendars").setIcon("refresh-cw").onClick(() => this.host.invalidateCalendars()),
+		);
+		menu.showAtMouseEvent(evt);
+	}
+
+	private promptRename(current: Dashboard): void {
+		new NameModal(
+			this.app,
+			{ title: "Rename dashboard", cta: "Rename", initial: current.name },
+			async (name) => {
+				// keeping its own name is not a clash with itself
+				if (name.trim() !== current.name) current.name = uniqueName(this.host.settings, name);
+				await this.host.saveSettings();
+				this.host.refreshViews();
+			},
+		).open();
+	}
+
+	private confirmDelete(current: Dashboard): void {
+		new ConfirmModal(
+			this.app,
+			{
+				title: `Delete "${current.name}"?`,
+				body: "This removes the dashboard and its layout. It cannot be undone.",
+				cta: "Delete",
+			},
+			async () => {
+				removeDashboard(this.host.settings, current.id);
+				this.mode = "dashboard";
+				await this.host.saveSettings();
+				this.host.refreshViews();
+			},
+		).open();
+	}
+
+	/** The calendar pool, shared by every dashboard. */
+	private manageCalendars(onDone?: () => void): void {
+		new CalendarsModal(this.app, this.host, onDone).open();
 	}
 
 	/** Signs a Google account in again, keeping its id so its calendars stay attached. */
@@ -312,6 +395,8 @@ export class DashboardView extends ItemView {
 				properties: this.knownProperties(config.folder),
 				calendars: this.host.settings.calendars.map((c) => c.name),
 				notes: this.app.vault.getMarkdownFiles().map((f) => f.path).sort(),
+				manageCalendars: (onDone) =>
+					this.manageCalendars(() => onDone(this.host.settings.calendars.map((c) => c.name))),
 			},
 			(next) => {
 				current.config = serializeDashboard(next);
@@ -341,6 +426,13 @@ export class DashboardView extends ItemView {
 		editor.spellcheck = false;
 
 		const status = root.createDiv({ cls: "udash-config-status" });
+
+		root.createDiv({
+			cls: "setting-item-description",
+			text:
+				`Widgets: ${WIDGET_KINDS.join(", ")}. Containers: ${CONTAINER_KINDS.join(", ")}. ` +
+				`Ranges: ${RANGE_KEYS.join(", ")}. See the plugin README for the full list.`,
+		});
 
 		const validate = (source: string): boolean => {
 			status.empty();
@@ -372,29 +464,12 @@ export class DashboardView extends ItemView {
 		window.setTimeout(() => editor.focus(), 0);
 	}
 
-	/**
-	 * Opens Obsidian's settings straight on this plugin's tab. `app.setting` is
-	 * how every plugin does this; it is real but absent from the typings.
-	 */
-	private openSettings(): void {
-		// SAFETY: Obsidian attaches the settings window to app at runtime; the
-		// guard below covers a future version moving it.
-		const setting = (this.app as AppWithSettings).setting;
-
-		if (!setting) return;
-		setting.open();
-		setting.openTabById(this.host.pluginId);
-	}
-
 	private promptNew(): void {
 		new NameModal(
 			this.app,
 			{ title: "New dashboard", cta: "Create" },
 			async (name) => {
-				const { settings } = this.host;
-				const created = makeDashboard(uniqueName(settings, name));
-				settings.dashboards.push(created);
-				settings.activeId = created.id;
+				addDashboard(this.host.settings, name);
 				this.mode = "edit";
 				await this.host.saveSettings();
 				this.host.refreshViews();

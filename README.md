@@ -21,9 +21,9 @@ second one.
 
 ### Opening one automatically
 
-**Settings > Ultimate Dashboard > Open on startup** picks a dashboard to open
-when Obsidian starts, the way the Homepage plugin opens a note. Leave it on
-`Nothing` and startup is untouched.
+**Open on startup** in a dashboard's **⋯** menu opens it when Obsidian starts,
+the way the Homepage plugin opens a note. At most one dashboard is ticked:
+ticking another moves it there, and unticking it leaves startup untouched.
 
 An existing dashboard tab is focused rather than duplicated, so a restored
 workspace stays as it was. Enabling or reloading the plugin by hand does not
@@ -72,10 +72,10 @@ The tab has a small bar across the top:
 | dropdown | Switches dashboards. Only shown once you have more than one |
 | pencil | Enters edit mode; the tick leaves it |
 | plus | Creates a blank dashboard, asking for a name first, and opens it in edit mode |
+| ⋯ | Rename, duplicate or delete this dashboard, open it on startup, and manage or refresh calendars |
 
 Edit mode validates as you type and saves continuously; click the tick to go
-back. The same editor, plus rename, duplicate and delete, lives in Settings →
-Community plugins → Ultimate Dashboard.
+back. There is no settings tab: everything lives in the dashboard itself.
 
 Layouts are stored in the plugin's `data.json`, not in your notes.
 
@@ -337,7 +337,7 @@ change height from month to month.
 ```
 
 An event spanning several days appears in every cell it covers. Both widgets
-refer to calendars by name, from the one pool configured in settings.
+refer to calendars by name, from one shared pool.
 
 ### Creating events
 
@@ -348,8 +348,10 @@ so a read-only dashboard stays inert.
 
 ### Calendars
 
-Two kinds of source, both configured under Settings → Community plugins → Life
-Dashboard and stored in `data.json` under `calendars`.
+Two kinds of source, both kept in one pool stored in `data.json` under
+`calendars`. Open the pool with **Manage calendars** in the **⋯** menu, the
+**Manage…** button beside a calendar widget's Calendars field, or the **Add a
+calendar** button a calendar widget shows when there are none yet.
 
 **ICS, read only.** A name, a feed URL and a colour. Any published calendar
 works, including Google's: Google Calendar → Settings → Settings for my
@@ -369,7 +371,7 @@ Setting up the OAuth client:
 3. OAuth consent screen → add yourself as a **test user**, or access lapses
    after seven days
 4. Credentials → OAuth client ID → type **Desktop app**
-5. Add the redirect URI the settings tab shows you, exactly
+5. Add the redirect URI the Add calendar form shows you, exactly
 6. Paste the client ID and secret, press **Connect**, then **Load calendars**
 
 Connecting opens your browser and catches the redirect on a loopback listener,
@@ -383,7 +385,7 @@ API is a better tool than XML over the same auth.
 Feeds are fetched with Obsidian's `requestUrl` rather than `fetch`, because the
 renderer enforces CORS and calendar hosts do not send the headers that would
 allow it, and cached for ten minutes. **Ultimate Dashboard: Refresh calendars**
-clears the cache.
+clears the cache, as does **Refresh calendars** in the **⋯** menu.
 
 The form asks for a title, date, times or all-day, and location, then writes
 straight to Google. ICS widgets have no button: the format has no write verb.

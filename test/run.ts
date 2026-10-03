@@ -28,7 +28,7 @@ import { isComplete, missingField } from "../src/schema";
 import { CONTAINER_KINDS, WIDGET_KINDS } from "../src/kinds";
 import { Widget, specFor } from "../src/widgets";
 import { WidgetHost } from "../src/widgets/host";
-import { BLANK_CONFIG, DEFAULT_CONFIG, activeDashboard, defaultSettings, findAccount, makeDashboard, migrate, uniqueName } from "../src/store";
+import { BLANK_CONFIG, DEFAULT_CONFIG, activeDashboard, addDashboard, defaultSettings, duplicateDashboard, findAccount, makeDashboard, migrate, removeDashboard, uniqueName } from "../src/store";
 
 const VAULT = process.argv[2];
 
@@ -362,6 +362,31 @@ console.log("\ndashboard store");
 	check("a new dashboard starts blank", created.root.children.length === 0 && created.folder === "Daily");
 	check("the blank layout is the default", makeDashboard("New").config === BLANK_CONFIG);
 	check("a first install still opens on the sample", defaultSettings().dashboards[0].config === DEFAULT_CONFIG);
+
+	const s3 = defaultSettings();
+	const first = s3.dashboards[0];
+	const added = addDashboard(s3, "Health");
+
+	check("a new dashboard is added and shown", s3.dashboards.length === 2 && s3.activeId === added.id);
+	check("a new dashboard starts blank", added.config === BLANK_CONFIG);
+
+	first.config = "folder: Elsewhere\nlayout: { type: column, children: [] }";
+
+	const copy = duplicateDashboard(s3, first);
+
+	check("a copy keeps the layout", copy.config === first.config);
+	check("a copy gets a fresh name", copy.name !== first.name, copy.name);
+	check("a copy is shown", s3.activeId === copy.id);
+
+	s3.startupId = copy.id;
+	removeDashboard(s3, copy.id);
+	check("a deleted dashboard is gone", !s3.dashboards.some((d) => d.id === copy.id));
+	check("deleting moves to the first left", s3.activeId === first.id);
+	check("deleting the startup pick clears it", s3.startupId === undefined);
+
+	s3.startupId = added.id;
+	removeDashboard(s3, first.id);
+	check("deleting another keeps the startup pick", s3.startupId === added.id);
 }
 
 console.log("\nshipped default config");
@@ -1902,6 +1927,7 @@ console.log("\nwidgets through a host");
 	const reconnected: string[] = [];
 	const asked: { from: Date; to: Date }[] = [];
 	let keys = 0;
+	let managed = 0;
 	let answer: { events: never[]; errors: string[]; expired: string[] } = { events: [], errors: [], expired: [] };
 
 	const owner = {
@@ -1941,6 +1967,7 @@ console.log("\nwidgets through a host");
 		showEvent: (e) => shown.push(e),
 		accountEmail: () => "me@example.com",
 		reconnectGoogle: (id) => reconnected.push(id),
+		manageCalendars: () => managed++,
 		monthOffsets: new Map(),
 		nextMonthKey: () => `d:${keys++}`,
 	};
@@ -2023,8 +2050,21 @@ console.log("\nwidgets through a host");
 
 	const hostless = draw({ id: "t", type: "upcoming" }, { days, error: ctx.error });
 
-	check("without a host an agenda says no calendars are configured",
-		hostless.all.some((e) => e.text === "No calendars configured. Add one in settings."));
+	check("without a host an agenda says there are no calendars",
+		hostless.all.some((e) => e.text === "No calendars yet."));
+	check("without a host there is nothing to open", hostless.byClass("mod-cta").length === 0);
+
+	const empty = { ...host, sources: [] };
+
+	for (const widget of [{ id: "t", type: "upcoming" }, { id: "t", type: "calendar" }] as const) {
+		const el = draw(widget, { ...ctx, host: empty });
+		const add = el.byClass("mod-cta").find((b) => b.text === "Add a calendar");
+
+		check(`an empty ${widget.type} offers to add a calendar`, add !== undefined);
+		add?.click();
+	}
+
+	check("adding a calendar opens the pool", managed === 2, String(managed));
 
 	answer = { events: [], errors: [], expired: ["acct"] };
 

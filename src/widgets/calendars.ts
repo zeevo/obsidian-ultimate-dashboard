@@ -4,7 +4,7 @@ import { CalendarHost, EventTarget } from "./host";
 import { CalendarWidget, UpcomingWidget } from "./types";
 
 /** Shown by a calendar widget when there are no feeds to draw from. */
-export const NO_CALENDARS = "No calendars configured. Add one in settings.";
+export const NO_CALENDARS = "No calendars yet.";
 
 /** One failed feed, listed above whatever did load. */
 export function calendarError(parent: Element, message: string): void {
@@ -12,6 +12,14 @@ export function calendarError(parent: Element, message: string): void {
 
 	err.createSpan({ cls: "udash-error-tag", text: "calendar" });
 	err.createSpan({ text: message });
+}
+
+/** Under the no-calendars message, a way to add one. */
+export function offerCalendars(container: Element | null, host: CalendarHost | undefined): void {
+	if (!container || !host) return;
+	const button = container.createEl("button", { cls: "mod-cta", text: "Add a calendar" });
+
+	button.addEventListener("click", () => host.manageCalendars());
 }
 
 /**

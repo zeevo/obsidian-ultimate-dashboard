@@ -56,6 +56,8 @@ export interface CalendarHost {
 	accountEmail(accountId: string): string | undefined;
 	/** Signs a Google account in again, keeping its calendars attached. */
 	reconnectGoogle(accountId: string): void;
+	/** Opens the calendar pool, to add or change feeds. */
+	manageCalendars(): void;
 	/**
 	 * How many months each month grid has been paged from its configured month.
 	 * Per tab and never saved, so a redraw keeps the month you browsed to but

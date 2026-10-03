@@ -2,7 +2,7 @@ import { WEEKDAYS, hhmm, monthName, sameDay } from "../dates";
 import { WidgetKind } from "../kinds";
 import { FieldKind } from "../schema";
 import { CalendarSource } from "../store";
-import { addEventButton, calendarError, pickSources, showSignInExpired, writableTargets } from "./calendars";
+import { NO_CALENDARS, addEventButton, calendarError, offerCalendars, pickSources, showSignInExpired, writableTargets } from "./calendars";
 import { CalendarHost } from "./host";
 import { CalendarWidget, RenderContext, WidgetSpec } from "./types";
 
@@ -258,8 +258,13 @@ function renderMonthWidget(el: HTMLElement, widget: CalendarWidget, ctx: RenderC
 	const shell = renderMonth(el, widget);
 	const picked = pickSources(widget, ctx.host);
 
-	if ("missing" in picked) fillMonth(shell, widget, monthWindow(widget).first, [], [picked.missing]);
-	else pageMonths(shell, widget, picked.host, picked.sources, key);
+	if ("missing" in picked) {
+		fillMonth(shell, widget, monthWindow(widget).first, [], [picked.missing]);
+
+		if (picked.missing === NO_CALENDARS) offerCalendars(shell.querySelector(".udash-month-errors"), ctx.host);
+	} else {
+		pageMonths(shell, widget, picked.host, picked.sources, key);
+	}
 }
 
 export const month: WidgetSpec<CalendarWidget> = {
