@@ -2,6 +2,9 @@ import { WidgetKind } from "../kinds";
 import { FieldKind } from "../schema";
 import { ImageWidget, RenderContext, WidgetSpec } from "./types";
 
+/** File types Obsidian displays as images, offered while typing a source. */
+export const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "bmp", "svg", "webp", "avif"]);
+
 /**
  * Whether a source is a URL rather than a vault path. Obsidian forbids `:` in
  * file names, so anything with a scheme in front cannot be a vault file.
@@ -53,7 +56,7 @@ export const image: WidgetSpec<ImageWidget> = {
 	fields: [
 		{
 			key: "src",
-			kind: FieldKind.Text,
+			kind: FieldKind.Image,
 			label: "Image",
 			hint: "A URL, or a file in the vault",
 			required: true,

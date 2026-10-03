@@ -15,6 +15,8 @@ export interface FormContext {
 	properties: string[];
 	calendars: string[];
 	notes: string[];
+	/** Image files in the vault, offered while typing an image source. */
+	images: string[];
 	/** Opens the calendar pool, then hands back the calendar names once it closes. */
 	manageCalendars?: (onDone: (calendars: string[]) => void) => void;
 }
@@ -222,6 +224,16 @@ export class WidgetForm extends Modal {
 						.setValue(String(get() ?? ""))
 						.onChange((v) => put(v.trim() || undefined));
 					this.suggest(t.inputEl, this.context.notes);
+				});
+
+				return;
+
+			case FieldKind.Image:
+				setting.addText((t) => {
+					t.setPlaceholder(field.placeholder ?? "")
+						.setValue(String(get() ?? ""))
+						.onChange((v) => put(v.trim() || undefined));
+					this.suggest(t.inputEl, this.context.images);
 				});
 
 				return;

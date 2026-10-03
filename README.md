@@ -559,7 +559,8 @@ A picture from the web or the vault.
 
 Anything with a scheme in front (`https:`, `data:`) is loaded as a URL. Anything
 else is a vault file, found the way a `[[link]]` is, so a bare file name works
-wherever the file lives. With a `height`, the whole picture still shows,
+wherever the file lives. In the configuration form, typing in the box suggests
+the vault's images. With a `height`, the whole picture still shows,
 letterboxed rather than cropped. A missing file or a URL that fails to load
 shows an error in the tile.
 

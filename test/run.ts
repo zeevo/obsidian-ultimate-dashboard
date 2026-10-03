@@ -1195,6 +1195,7 @@ console.log("\ntext widget");
 	check("an image parses and round trips",
 		JSON.stringify(strip(parseDashboard(serializeDashboard(parseDashboard("layout:\n  type: column\n  children: [{ type: image, src: \"https://example.com/a.png?x=1\", height: 120 }]"))).root.children[0]))
 			=== JSON.stringify({ type: "image", src: "https://example.com/a.png?x=1", height: 120 }));
+	check("an image source is offered vault images", specFor("image").fields[0]?.kind === "image");
 	check("an image without a source needs setup", needsSetup({ id: "t", type: "image", src: "" } as never));
 	check("text parses with its colours", strip(parsed) !== null
 		&& JSON.stringify(strip(parsed)) === JSON.stringify({ type: "text", text: "Two\nlines", color: "red", background: "#000" }),
@@ -1933,7 +1934,7 @@ layout:
 
 	cfg.root.children.push({ id: "e", type: "row", children: [] });
 
-	const editor = new LayoutEditor({} as never, cfg, { properties: [], calendars: [], notes: [] }, () => {}, () => {});
+	const editor = new LayoutEditor({} as never, cfg, { properties: [], calendars: [], notes: [], images: [] }, () => {}, () => {});
 	const host = new El();
 
 	editor.attach(host as never);

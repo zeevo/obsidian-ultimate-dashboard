@@ -10,6 +10,7 @@ import { ConfirmModal, EventDetailsModal, EventModal, NameModal } from "./modal"
 import { CalendarsModal } from "./calendars-modal";
 import { CONTAINER_KINDS, WIDGET_KINDS } from "./kinds";
 import { RANGE_KEYS } from "./widgets";
+import { IMAGE_EXTENSIONS } from "./widgets/image";
 import { LayoutEditor } from "./editor";
 import { serializeDashboard } from "./serialize";
 import { Dashboard, DashboardSettings, activeDashboard, addDashboard, duplicateDashboard, findAccount, removeDashboard, uniqueName } from "./store";
@@ -400,6 +401,11 @@ export class DashboardView extends ItemView {
 				properties: this.knownProperties(config.folder),
 				calendars: this.host.settings.calendars.map((c) => c.name),
 				notes: this.app.vault.getMarkdownFiles().map((f) => f.path).sort(),
+				images: this.app.vault
+					.getFiles()
+					.filter((f) => IMAGE_EXTENSIONS.has(f.extension.toLowerCase()))
+					.map((f) => f.path)
+					.sort(),
 				manageCalendars: (onDone) =>
 					this.manageCalendars(() => onDone(this.host.settings.calendars.map((c) => c.name))),
 			},

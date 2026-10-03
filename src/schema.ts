@@ -25,6 +25,8 @@ export const FieldKind = {
 	Calendars: "calendars",
 	/** A path to a note in the vault. */
 	Note: "note",
+	/** A URL, or a path to an image in the vault. */
+	Image: "image",
 	/** One of a fixed set of values. */
 	Choice: "choice",
 } as const;
@@ -48,7 +50,8 @@ export interface TextField<P> extends Common<P> {
 		| typeof FieldKind.Text
 		| typeof FieldKind.Property
 		| typeof FieldKind.Colour
-		| typeof FieldKind.Note;
+		| typeof FieldKind.Note
+		| typeof FieldKind.Image;
 	readonly placeholder?: string;
 	/** Edited in a text area, for prose that runs over several lines. */
 	readonly multiline?: boolean;
@@ -113,7 +116,8 @@ function readField<P>(field: Field<P>, raw: unknown, where: string): FieldValue 
 		case FieldKind.Text:
 		case FieldKind.Property:
 		case FieldKind.Colour:
-		case FieldKind.Note: {
+		case FieldKind.Note:
+		case FieldKind.Image: {
 			if (typeof raw !== "string" || !raw.trim()) {
 				throw new FieldError(`${at} must be a non-empty string`);
 			}
