@@ -68,7 +68,7 @@ export class DashboardView extends ItemView {
 	getDisplayText(): string {
 		const current = activeDashboard(this.host.settings);
 
-		return current ? `DashboardConfig: ${current.name}` : "Ultimate DashboardConfig";
+		return current ? `Dashboard: ${current.name}` : "Ultimate Dashboard";
 	}
 
 	getIcon(): string {
@@ -223,7 +223,7 @@ export class DashboardView extends ItemView {
 			});
 		} else {
 			const only = settings.dashboards[0];
-			bar.createSpan({ cls: "udash-bar-title", text: only ? only.name : "Ultimate DashboardConfig" });
+			bar.createSpan({ cls: "udash-bar-title", text: only ? only.name : "Ultimate Dashboard" });
 		}
 
 		const spacer = bar.createDiv({ cls: "udash-bar-spacer" });
@@ -246,7 +246,7 @@ export class DashboardView extends ItemView {
 		const cog = bar.createEl("button", { cls: "udash-bar-button" });
 
 		setIcon(cog, "settings");
-		setTooltip(cog, "Ultimate DashboardConfig settings");
+		setTooltip(cog, "Ultimate Dashboard settings");
 		cog.addEventListener("click", () => this.openSettings());
 	}
 
