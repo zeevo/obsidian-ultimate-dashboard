@@ -51,7 +51,7 @@ export default defineConfig({
 			 * before it can become a domain type, which is exactly what these rules
 			 * forbid. They stay on everywhere else so the narrowing cannot leak out.
 			 */
-			files: ["src/config.ts", "src/ics.ts", "src/data.ts", "src/kinds.ts", "src/schema.ts", "src/widgets.ts", "src/serialize.ts", "src/widget-form.ts", "src/layout-tree.ts"],
+			files: ["src/config.ts", "src/ics.ts", "src/data.ts", "src/kinds.ts", "src/schema.ts", "src/widgets/index.ts", "src/widgets/types.ts", "src/widgets/range.ts", "src/serialize.ts", "src/widget-form.ts", "src/layout-tree.ts"],
 			rules: {
 				"anti-slop/no-runtime-typeof": "off",
 				"anti-slop/no-unknown-parameters": "off",

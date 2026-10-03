@@ -136,10 +136,11 @@ later as a parse error on the whole layout.
 
 ## Adding a widget type
 
-Widgets are declared once, in `src/widgets.ts`:
+Each widget type lives in its own module under `src/widgets/`, which holds its
+spec, how it draws, and how it loads anything it fetches:
 
 ```ts
-const heatmap: WidgetSpec<HeatmapWidget> = {
+export const heatmap: WidgetSpec<HeatmapWidget> = {
   type: WidgetKind.Heatmap,
   label: "Heatmap",
   hint: "A year of activity",
@@ -152,11 +153,19 @@ const heatmap: WidgetSpec<HeatmapWidget> = {
   title: (w) => w.title || w.property || "Heatmap",
   summary: (w) => w.property || "not configured",
   validate: validateRange,
+  render: (el, widget, ctx) => renderHeatmap(el, ctx.days, widget),
 };
 ```
 
-Parsing, validation, serialising, the configuration form and the editor palette
-are all derived from that declaration. `fields` keys are typed against the widget
+Add the type to `WidgetKind` in `src/kinds.ts`, its interface to the `Widget`
+union in `src/widgets/types.ts`, and its spec to `WIDGETS` in
+`src/widgets/index.ts`; the compiler names any of the three you miss.
+
+Parsing, validation, serialising, the configuration form, the editor palette
+and rendering are all derived from that declaration. A widget that needs the
+live plugin (a forecast, a note, calendar feeds) reads it from `ctx.host`, typed
+as the narrow interface it needs from `src/widgets/host.ts`. Under the test
+harness there is no host, and such a widget keeps its placeholder. `fields` keys are typed against the widget
 interface, so a rename is a compile error rather than a field that silently
 stops loading. Cross-field rules that a per-field schema cannot see go in
 `validate`.

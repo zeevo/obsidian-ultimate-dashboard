@@ -1,17 +1,15 @@
 import { Component, ItemView, MarkdownRenderer, Notice, WorkspaceLeaf, setIcon, setTooltip } from "obsidian";
 import { ConfigError, DashboardConfig, countWidgets, parseDashboard } from "./layout-tree";
-import { readDays, stripFrontmatter } from "./data";
-import { CalendarFiller, ClockFiller, DEFAULT_GAP, NoteFiller, WeatherFiller, renderNode } from "./layout";
+import { readDays } from "./data";
+import { renderNode } from "./layout";
 import { CalendarService } from "./calendar";
-import { WeatherMode, WeatherQuery, WeatherService, WeatherUnit } from "./weather";
-import { CalendarWidget, ClockWidget, NoteWidget, UpcomingWidget, WeatherWidget, specFor } from "./widgets";
-import { monthName } from "./dates";
-import { addMonthArrows, fillCalendar, fillClock, fillMonth, fillSignInExpired, fillWeather, labelMonth, monthWindow, shiftMonth } from "./render";
+import { WeatherService } from "./weather";
+import { EventTarget, WidgetHost } from "./widgets/host";
 import { connect } from "./google";
 import { EventDetailsModal, EventModal, NameModal } from "./modal";
 import { LayoutEditor } from "./editor";
 import { serializeDashboard } from "./serialize";
-import { CalendarSource, DashboardSettings, activeDashboard, findAccount, makeDashboard, uniqueName } from "./store";
+import { DashboardSettings, activeDashboard, findAccount, makeDashboard, uniqueName } from "./store";
 
 export const VIEW_TYPE_DASHBOARD = "ultimate-dashboard-view";
 
@@ -39,7 +37,7 @@ export class DashboardView extends ItemView {
 	private mode: "dashboard" | "edit" = "dashboard";
 	/** Which editor the edit mode shows. */
 	private editorTab: "visual" | "yaml" = "visual";
-	/** Lifecycle owners for the markdown each note tile renders, dropped on redraw. */
+	/** Lifecycle owners widgets took for this draw (embedded notes, clocks), dropped on redraw. */
 	private embeds: Component[] = [];
 	/**
 	 * How far each embedded note is scrolled, by path. The whole view is rebuilt
@@ -160,17 +158,47 @@ export class DashboardView extends ItemView {
 		renderNode(
 			root,
 			config.root,
-			days,
-			DEFAULT_GAP,
-			(target, message) => this.error(target, message),
-			{
-				calendar: this.makeCalendarFiller(),
-				note: this.makeNoteFiller(),
-				weather: this.makeWeatherFiller(),
-				clock: this.makeClockFiller(),
-			},
+			{ days, error: (target, message) => this.error(target, message), host: this.widgetHost() },
 			this.editor?.decorate,
 		);
+	}
+
+	/**
+	 * What widgets may use from this view for one draw. Built per draw so month
+	 * keys count from zero each time and owners are released by the next one.
+	 */
+	private widgetHost(): WidgetHost {
+		const { settings, calendars, weather } = this.host;
+		const dashboardId = activeDashboard(settings)?.id ?? "";
+		let monthIndex = 0;
+
+		return {
+			own: () => {
+				const owner = new Component();
+
+				this.addChild(owner);
+				this.embeds.push(owner);
+
+				return owner;
+			},
+			readNote: async (path) => {
+				const file = this.app.metadataCache.getFirstLinkpathDest(path, "");
+
+				return file ? { path: file.path, text: await this.app.vault.cachedRead(file) } : null;
+			},
+			renderMarkdown: (markdown, el, sourcePath, owner) =>
+				MarkdownRenderer.render(this.app, markdown, el, sourcePath, owner),
+			scrolled: this.scrolled,
+			weather: (query) => weather.weather(query),
+			sources: settings.calendars,
+			events: (sources, from, to) => calendars.events(sources, from, to),
+			createEvent: (targets, on) => this.createEvent(targets, on),
+			showEvent: (event) => new EventDetailsModal(this.app, event).open(),
+			accountEmail: (accountId) => findAccount(settings.google, accountId)?.email,
+			reconnectGoogle: (accountId) => void this.reconnectGoogle(accountId),
+			monthOffsets: this.monthOffsets,
+			nextMonthKey: () => `${dashboardId}:${monthIndex++}`,
+		};
 	}
 
 	/** A switcher and a new-dashboard button. Hidden entirely when there is nothing to switch. */
@@ -222,208 +250,6 @@ export class DashboardView extends ItemView {
 		cog.addEventListener("click", () => this.openSettings());
 	}
 
-	/** Loads feeds in the background and fills each calendar widget when they land. */
-	private makeCalendarFiller(): CalendarFiller | undefined {
-		const sources = this.host.settings.calendars;
-
-		if (sources.length === 0) return undefined;
-
-		const dashboardId = activeDashboard(this.host.settings)?.id ?? "";
-		// widget ids are minted on every parse, so position is what stays stable
-		let calendarIndex = 0;
-
-		return (shell: HTMLElement, widget: CalendarWidget | UpcomingWidget) => {
-			const key = widget.type === "calendar" ? `${dashboardId}:${calendarIndex++}` : "";
-
-			const wanted = widget.calendars
-				? sources.filter((s) => widget.calendars!.includes(s.name))
-				: sources;
-
-			if (wanted.length === 0) {
-				const missing = `No calendar named ${(widget.calendars ?? []).join(", ")}`;
-
-				if (widget.type === "calendar") {
-					fillMonth(shell, widget, monthWindow(widget).first, [], [missing]);
-				} else {
-					fillCalendar(shell, [], [missing], false);
-				}
-
-				return;
-			}
-
-			if (widget.type === "calendar") {
-				const targets = this.writableTargets(wanted);
-				let latest = 0;
-
-				const show = () => {
-					const shown = shiftMonth(widget, this.monthOffsets.get(key) ?? 0);
-					const { first, from, to } = monthWindow(shown);
-					const request = ++latest;
-
-					labelMonth(shell, shown);
-
-					void this.host.calendars.events(wanted, from, to).then(({ events, errors, expired }) => {
-						// the view may have re-rendered, or the month moved on, while
-						// the fetch was in flight
-						if (!shell.isConnected || request !== latest) return;
-
-						if (expired.length > 0) {
-							this.showSignInExpired(shell, shown, expired[0]);
-
-							return;
-						}
-
-						fillMonth(
-							shell,
-							shown,
-							first,
-							events,
-							errors,
-							targets.length > 0 ? (day) => this.createEvent(targets, day) : undefined,
-							(event) => new EventDetailsModal(this.app, event).open(),
-						);
-					});
-				};
-
-				addMonthArrows(shell, (by) => {
-					this.monthOffsets.set(key, (this.monthOffsets.get(key) ?? 0) + by);
-					show();
-				});
-				this.addEventButton(shell, wanted);
-				show();
-
-				return;
-			}
-
-			this.addEventButton(shell, wanted);
-
-			const from = new Date();
-
-			if (!widget.past) from.setHours(0, 0, 0, 0);
-			const to = new Date(from.getTime() + (widget.ahead ?? 14) * 86400000);
-
-			void this.host.calendars.events(wanted, from, to).then(({ events, errors, expired }) => {
-				if (!shell.isConnected) return;
-
-				if (expired.length > 0) {
-					this.showSignInExpired(shell, widget, expired[0]);
-
-					return;
-				}
-
-				const now = new Date();
-
-				const visible = events
-					.filter((e) => (widget.past ? true : e.end >= now))
-					.slice(0, widget.limit ?? 25);
-
-				fillCalendar(shell, visible, errors, wanted.length > 1);
-			});
-		};
-	}
-
-	/**
-	 * Renders an embedded note through Obsidian's own markdown pipeline, so
-	 * wikilinks, embeds, tasks and other plugins' code blocks all behave as they
-	 * do in a normal note. The scroll offset is restored afterwards.
-	 */
-	private makeNoteFiller(): NoteFiller {
-		return (body: HTMLElement, widget: NoteWidget) => {
-			const file = this.app.metadataCache.getFirstLinkpathDest(widget.path, "");
-
-			if (!file) {
-				body.empty();
-				this.error(body, `No note called "${widget.path}"`);
-
-				return;
-			}
-
-			const owner = new Component();
-			this.addChild(owner);
-			this.embeds.push(owner);
-
-			void this.app.vault.cachedRead(file).then(async (raw) => {
-				// the view may have redrawn while the read was in flight
-				if (!body.isConnected) return;
-				body.empty();
-				await MarkdownRenderer.render(this.app, stripFrontmatter(raw), body, file.path, owner);
-
-				if (!body.isConnected) return;
-				body.scrollTop = this.scrolled.get(widget.path) ?? 0;
-				owner.registerDomEvent(body, "scroll", () =>
-					this.scrolled.set(widget.path, body.scrollTop),
-				);
-			});
-		};
-	}
-
-	/**
-	 * Keeps a clock ticking. The interval belongs to a child component so it is
-	 * cleared on the next redraw: registering it on the view itself would leave
-	 * one running per redraw, and this view redraws on every metadata change.
-	 */
-	private makeClockFiller(): ClockFiller {
-		return (body: HTMLElement, widget: ClockWidget) => {
-			const owner = new Component();
-			this.addChild(owner);
-			this.embeds.push(owner);
-
-			const tick = () => fillClock(body, widget, new Date());
-
-			tick();
-			// no point redrawing every second for a clock that hides them
-			owner.registerInterval(window.setInterval(tick, widget.seconds ? 1000 : 15000));
-		};
-	}
-
-	/**
-	 * Fetches a forecast in the background. The service caches, which matters
-	 * more here than it looks: this view redraws on every metadata change in the
-	 * vault, so an uncached widget would call out on every keystroke.
-	 */
-	private makeWeatherFiller(): WeatherFiller {
-		return (shell: HTMLElement, widget: WeatherWidget) => {
-			const query: WeatherQuery = {
-				place: widget.place,
-				unit: widget.units ?? WeatherUnit.Fahrenheit,
-				mode: widget.mode ?? WeatherMode.Today,
-				wind: widget.wind === true,
-				humidity: widget.humidity === true,
-				sun: widget.sun === true,
-			};
-
-			void (async () => {
-				try {
-					const weather = await this.host.weather.weather(query);
-
-					// the view may have redrawn while the request was in flight
-					if (!shell.isConnected) return;
-					fillWeather(shell, weather, widget);
-				} catch (e) {
-					if (!shell.isConnected) return;
-					shell.empty();
-					// SAFETY: the service throws WeatherError and requestUrl rejects with
-					// an Error; the fallback covers anything else that reaches here.
-					this.error(shell, `${widget.place}: ${(e as Error).message || "could not load"}`);
-				}
-			})();
-		};
-	}
-
-	private showSignInExpired(shell: HTMLElement, widget: CalendarWidget | UpcomingWidget, accountId: string): void {
-		const email = findAccount(this.host.settings.google, accountId)?.email;
-		// a custom title replaces the month name, so bring the month back beside it
-		const month = widget.type === "calendar" && widget.title ? monthName(widget.month) : undefined;
-
-		fillSignInExpired(
-			shell,
-			specFor(widget.type).title(widget),
-			month,
-			email,
-			() => void this.reconnectGoogle(accountId),
-		);
-	}
-
 	/** Signs a Google account in again, keeping its id so its calendars stay attached. */
 	private async reconnectGoogle(accountId: string): Promise<void> {
 		const g = this.host.settings.google;
@@ -441,26 +267,8 @@ export class DashboardView extends ItemView {
 		}
 	}
 
-	/** Only Google calendars marked writable can take a new event. */
-	private writableTargets(sources: CalendarSource[]): { id: string; accountId: string; name: string }[] {
-		const targets: { id: string; accountId: string; name: string }[] = [];
-
-		for (const source of sources) {
-			// narrowing in the loop avoids asserting the optional fields are present
-			if (source.type !== "google" || !source.writable) continue;
-
-			if (!source.calendarId || !source.accountId) continue;
-			targets.push({ id: source.calendarId, accountId: source.accountId, name: source.name });
-		}
-
-		return targets;
-	}
-
 	/** Opens the new-event form, optionally on a chosen day. */
-	private createEvent(
-		targets: { id: string; accountId: string; name: string }[],
-		on?: Date,
-	): void {
+	private createEvent(targets: EventTarget[], on?: Date): void {
 		new EventModal(
 			this.app,
 			targets,
@@ -470,19 +278,6 @@ export class DashboardView extends ItemView {
 			},
 			on,
 		).open();
-	}
-
-	private addEventButton(shell: HTMLElement, sources: CalendarSource[]): void {
-		const targets = this.writableTargets(sources);
-
-		if (targets.length === 0) return;
-		const actions = shell.querySelector(".udash-calendar-actions");
-
-		if (!actions) return;
-		const button = actions.createEl("button", { cls: "udash-bar-button", text: "+" });
-
-		setTooltip(button, "New event");
-		button.addEventListener("click", () => this.createEvent(targets));
 	}
 
 	/**

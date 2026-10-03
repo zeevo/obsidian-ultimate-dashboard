@@ -1,8 +1,6 @@
 import { ContainerNode, LayoutNode, isContainer } from "./layout-tree";
-import { CalendarWidget, ClockWidget, NoteWidget, UpcomingWidget, WeatherWidget } from "./widgets";
-import { ContainerKind, WidgetKind, assertNever } from "./kinds";
-import { DayRecord } from "./data";
-import { fillCalendar, fillMonth, monthWindow, renderBlank, renderClock, renderHeatmap, renderLine, renderMonth, renderNote, renderStat, renderUpcoming, renderWeather } from "./render";
+import { RenderContext, specFor } from "./widgets";
+import { ContainerKind } from "./kinds";
 
 const DEFAULT_GAP = 20;
 
@@ -32,61 +30,32 @@ function applyContainer(el: HTMLElement, node: ContainerNode, inheritedGap: numb
 }
 
 /**
- * Walks the layout tree, creating a div per node. Containers set their own
- * display mode; leaves render a widget. Errors are contained to the node that
- * caused them so one bad widget does not blank the dashboard.
- */
-/** Supplies calendar events; omitted when no feeds are configured. */
-export type CalendarFiller = (el: HTMLElement, widget: CalendarWidget | UpcomingWidget) => void;
-
-/** Renders an embedded note into the body a note tile made for it. */
-export type NoteFiller = (body: HTMLElement, widget: NoteWidget) => void;
-
-/** Fetches a forecast and fills the shell a weather tile made for it. */
-export type WeatherFiller = (shell: HTMLElement, widget: WeatherWidget) => void;
-
-/** Writes the time into a clock, and keeps writing it. */
-export type ClockFiller = (body: HTMLElement, widget: ClockWidget) => void;
-
-/**
- * Widgets whose content arrives from the network draw a shell first and are
- * filled in when it lands. Grouped rather than passed one positional argument
- * at a time, which was three parameters deep and still growing.
- */
-export interface Fillers {
-	calendar?: CalendarFiller;
-	note?: NoteFiller;
-	weather?: WeatherFiller;
-	clock?: ClockFiller;
-}
-
-/**
  * Called with every node's element once it is drawn, and the path of child
  * indexes that reaches it from the root. Edit mode uses it to add handles to
  * the real dashboard rather than drawing a separate canvas.
  */
 export type NodeDecorator = (el: HTMLElement, node: LayoutNode, path: number[]) => void;
 
+/**
+ * Walks the layout tree, creating a div per node. Containers set their own
+ * display mode; leaves render a widget. Errors are contained to the node that
+ * caused them so one bad widget does not blank the dashboard.
+ */
 export function renderNode(
 	parent: HTMLElement,
 	node: LayoutNode,
-	days: DayRecord[],
-	inheritedGap: number,
-	onError: (el: HTMLElement, message: string) => void,
-	fillers: Fillers = {},
+	ctx: RenderContext,
 	decorate?: NodeDecorator,
 ): void {
-	renderAt(parent, node, days, inheritedGap, onError, fillers, decorate, []);
+	renderAt(parent, node, ctx, decorate, DEFAULT_GAP, []);
 }
 
 function renderAt(
 	parent: HTMLElement,
 	node: LayoutNode,
-	days: DayRecord[],
-	inheritedGap: number,
-	onError: (el: HTMLElement, message: string) => void,
-	fillers: Fillers,
+	ctx: RenderContext,
 	decorate: NodeDecorator | undefined,
+	inheritedGap: number,
 	path: number[],
 ): void {
 	const el = parent.createDiv({ cls: `udash-node udash-${node.type}` });
@@ -96,7 +65,7 @@ function renderAt(
 		const gap = applyContainer(el, node, inheritedGap);
 
 		node.children.forEach((child, i) => {
-			renderAt(el, child, days, gap, onError, fillers, decorate, [...path, i]);
+			renderAt(el, child, ctx, decorate, gap, [...path, i]);
 		});
 		decorate?.(el, node, path);
 
@@ -105,79 +74,13 @@ function renderAt(
 
 	el.addClass("udash-widget");
 
-	const noCalendars = "No calendars configured. Add one in settings.";
-
 	try {
-		// a switch rather than a chain of ifs: the compiler then names any widget
-		// type nobody has handled, instead of it quietly rendering as the last one
-		switch (node.type) {
-			case WidgetKind.Blank:
-				renderBlank(el, node);
-				break;
-
-			case WidgetKind.Stat:
-				renderStat(el, days, node);
-				break;
-
-			case WidgetKind.Heatmap:
-				renderHeatmap(el, days, node);
-				break;
-
-			case WidgetKind.Line:
-				renderLine(el, days, node);
-				break;
-
-			case WidgetKind.Note: {
-				const body = renderNote(el, node);
-
-				// left showing its placeholder when no renderer is available, as in tests
-				fillers.note?.(body, node);
-				break;
-			}
-
-			case WidgetKind.Weather: {
-				const shell = renderWeather(el, node);
-
-				fillers.weather?.(shell, node);
-				break;
-			}
-
-			case WidgetKind.Clock: {
-				const body = renderClock(el, node);
-
-				fillers.clock?.(body, node);
-				break;
-			}
-
-			case WidgetKind.Upcoming: {
-				const shell = renderUpcoming(el, node);
-
-				if (fillers.calendar) fillers.calendar(shell, node);
-				else fillCalendar(shell, [], [noCalendars], false);
-
-				break;
-			}
-
-			case WidgetKind.Calendar: {
-				const { first } = monthWindow(node);
-				const shell = renderMonth(el, node);
-
-				if (fillers.calendar) fillers.calendar(shell, node);
-				else fillMonth(shell, node, first, [], [noCalendars]);
-
-				break;
-			}
-
-			default:
-				assertNever(node, "renderNode");
-		}
+		specFor(node.type).render(el, node, ctx);
 	} catch (e) {
 		// SAFETY: the catch binding is whatever a widget renderer threw; Error is
 		// the only thing they construct, and a non-Error still stringifies here.
-		onError(el, `${node.type} widget failed: ${(e as Error).message}`);
+		ctx.error(el, `${node.type} widget failed: ${(e as Error).message}`);
 	}
 
 	decorate?.(el, node, path);
 }
-
-export { DEFAULT_GAP };

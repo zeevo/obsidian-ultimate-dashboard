@@ -9,9 +9,16 @@ import { DayRecord, stripFrontmatter } from "../src/data";
 import { shiftDate, today } from "../src/dates";
 import { CalendarService } from "../src/calendar";
 import { network } from "./stub";
-import { addMonthArrows, labelMonth, shiftMonth } from "../src/render";
 import { eventWhen } from "../src/dates";
-import { currentStreak, fillMonth, fillSignInExpired, monthWindow, renderBlank, renderHeatmap, renderLine, renderMonth, renderNote, renderStat, clockLabel, fillWeather, hourLabel, renderWeather, clockText, fillClock, handAngles, renderClock } from "../src/render";
+import { addMonthArrows, fillMonth, labelMonth, monthWindow, renderMonth, shiftMonth } from "../src/widgets/month";
+import { fillSignInExpired } from "../src/widgets/calendars";
+import { currentStreak, renderHeatmap } from "../src/widgets/heatmap";
+import { renderBlank } from "../src/widgets/blank";
+import { renderLine } from "../src/widgets/line";
+import { renderNote } from "../src/widgets/note";
+import { renderStat } from "../src/widgets/stat";
+import { clockLabel, fillWeather, hourLabel, renderWeather } from "../src/widgets/weather";
+import { clockText, fillClock, handAngles, renderClock } from "../src/widgets/clock";
 import { renderNode } from "../src/layout";
 import { parseICS } from "../src/ics";
 import { serializeDashboard } from "../src/serialize";
@@ -20,6 +27,7 @@ import { SPANS, WEATHER_MODES, WeatherError, describeWeather, parseForecast, par
 import { isComplete, missingField } from "../src/schema";
 import { CONTAINER_KINDS, WIDGET_KINDS } from "../src/kinds";
 import { Widget, specFor } from "../src/widgets";
+import { WidgetHost } from "../src/widgets/host";
 import { BLANK_CONFIG, DEFAULT_CONFIG, activeDashboard, defaultSettings, findAccount, makeDashboard, migrate, uniqueName } from "../src/store";
 
 const VAULT = process.argv[2];
@@ -34,6 +42,8 @@ class El {
 	attrs: Record<string, string> = {};
 	style: Record<string, string> & { setProperty(k: string, v: string): void };
 	text = "";
+	isConnected = true;
+	scrollTop = 0;
 
 	constructor(public tag = "div", cls?: string) {
 		if (cls) cls.split(/\s+/).forEach((c) => this.classes.add(c));
@@ -362,7 +372,7 @@ console.log("\nshipped default config");
 	check("default folder is Daily", def.folder === "Daily");
 	const host = new El();
 	let errs = 0;
-	renderNode(host as never, def.root, days, 20, () => errs++);
+	renderNode(host as never, def.root, { days, error: () => errs++ });
 	check("default config renders without error", errs === 0, `${errs} errors`);
 	const drawn = host.all.filter((e) => e.classes.has("udash-widget")).length;
 
@@ -896,7 +906,7 @@ console.log("\ntree rendering");
 
 {
 	const host = new El();
-	renderNode(host as never, tree.root, days, 20, (el, m) => (el as unknown as El).setText("ERR " + m));
+	renderNode(host as never, tree.root, { days, error: (el, m) => (el as unknown as El).setText("ERR " + m) });
 	const rootEl = host.children[0];
 	check("root div created", !!rootEl && rootEl.classes.has("udash-column"));
 	check("root is flex column", rootEl.style["display"] === "flex" && rootEl.style["flexDirection"] === "column");
@@ -1853,7 +1863,7 @@ layout:
 	const host = new El();
 
 	editor.attach(host as never);
-	renderNode(host as never, cfg.root, days, 20, () => {}, {}, editor.decorate);
+	renderNode(host as never, cfg.root, { days, error: () => {} }, editor.decorate);
 
 	const tabs = host.byClass("udash-edit-tab");
 	const handles = host.byClass("udash-edit-handle");
@@ -1875,6 +1885,182 @@ layout:
 	check("an empty row offers a drop target", host.byClass("udash-edit-empty").length === 1);
 	check("the rendered widgets are still drawn", host.byClass("udash-edit-widget").length === 4
 		&& host.byClass("udash-heatmap").length >= 4);
+}
+
+console.log("\nwidgets through a host");
+
+{
+	(globalThis as { window?: unknown }).window = { setInterval: () => 7 };
+
+	// every load is a chain of promises; a macrotask lets them all settle
+	const settle = () => new Promise((r) => setTimeout(r, 0));
+	const intervals: number[] = [];
+	const domEvents: string[] = [];
+	const rendered: { markdown: string; sourcePath: string }[] = [];
+	const created: { targets: { id: string }[]; on?: Date }[] = [];
+	const shown: unknown[] = [];
+	const reconnected: string[] = [];
+	const asked: { from: Date; to: Date }[] = [];
+	let keys = 0;
+	let answer: { events: never[]; errors: string[]; expired: string[] } = { events: [], errors: [], expired: [] };
+
+	const owner = {
+		registerInterval: (id: number) => (intervals.push(id), id),
+		registerDomEvent: (_el: unknown, type: string) => domEvents.push(type),
+	};
+
+	const BARE = {
+		current: { temperature_2m: 5, apparent_temperature: 5, weather_code: 0, is_day: 1 },
+		current_units: { temperature_2m: "°C" },
+		daily: {
+			time: ["2026-01-01"], weather_code: [0], temperature_2m_max: [5],
+			temperature_2m_min: [1], precipitation_probability_max: [0],
+		},
+	};
+
+	const host: WidgetHost = {
+		own: () => owner as never,
+		readNote: async (path) => (path === "Health" ? { path: "0 All/Health.md", text: "---\na: 1\n---\nhello" } : null),
+		renderMarkdown: async (markdown, _el, sourcePath) => { rendered.push({ markdown, sourcePath }); },
+		scrolled: new Map([["Health", 42]]),
+		weather: async (q) => {
+			if (q.place === "Nowhere") throw new Error("no such place");
+
+			return { place: { name: "Denver, CO" }, forecast: parseForecast(BARE) } as never;
+		},
+		sources: [
+			{ id: "w", name: "Work", type: "google", accountId: "acct", calendarId: "cal", writable: true },
+			{ id: "h", name: "Home", type: "ics", url: "https://example.com/home.ics" },
+		],
+		events: async (_sources, from, to) => {
+			asked.push({ from, to });
+
+			return answer;
+		},
+		createEvent: (targets, on) => created.push({ targets, on }),
+		showEvent: (e) => shown.push(e),
+		accountEmail: () => "me@example.com",
+		reconnectGoogle: (id) => reconnected.push(id),
+		monthOffsets: new Map(),
+		nextMonthKey: () => `d:${keys++}`,
+	};
+
+	const ctx = {
+		days,
+		error: (el: HTMLElement, m: string) => void (el as unknown as El).createDiv({ cls: "udash-error", text: m }),
+		host,
+	};
+
+	const draw = (widget: Widget, context: typeof ctx | Omit<typeof ctx, "host"> = ctx) => {
+		const el = new El();
+
+		specFor(widget.type).render(el as never, widget, context);
+
+		return el;
+	};
+
+	const noteEl = draw({ id: "t", type: "note", path: "Health" });
+
+	await settle();
+	check("a note renders through the host, without its frontmatter",
+		rendered[0]?.markdown === "hello" && rendered[0]?.sourcePath === "0 All/Health.md", JSON.stringify(rendered[0]));
+	check("a note's scroll is restored", noteEl.byClass("udash-note-body")[0]?.scrollTop === 42);
+	check("a note keeps track of its scroll", domEvents.includes("scroll"));
+
+	const missing = draw({ id: "t", type: "note", path: "Nope" });
+
+	await settle();
+	check("a missing note says so", missing.byClass("udash-error")[0]?.text === 'No note called "Nope"',
+		missing.byClass("udash-error")[0]?.text);
+
+	const clockEl = draw({ id: "t", type: "clock" });
+
+	check("a clock draws the time straight away", clockEl.byClass("udash-clock-time").length === 1);
+	check("a clock ticks on an interval its owner releases", intervals.includes(7));
+
+	const sky = draw({ id: "t", type: "weather", place: "Denver" });
+
+	await settle();
+	check("weather fills in from the host", sky.byClass("udash-weather-where")[0]?.text === "Denver, CO",
+		sky.byClass("udash-weather-where")[0]?.text);
+
+	const lost = draw({ id: "t", type: "weather", place: "Nowhere" });
+
+	await settle();
+	check("a failed forecast shows an error", lost.byClass("udash-error")[0]?.text === "Nowhere: no such place",
+		lost.byClass("udash-error")[0]?.text);
+
+	const soon = new Date(Date.now() + 3600000);
+
+	answer = {
+		events: [{ summary: "Standup", start: soon, end: new Date(soon.getTime() + 3600000), allDay: false, calendar: "Work" }] as never[],
+		errors: [],
+		expired: [],
+	};
+
+	const agenda = draw({ id: "t", type: "upcoming" });
+
+	await settle();
+	check("an agenda lists what the host returns", agenda.byClass("udash-agenda-summary")[0]?.text === "Standup");
+	check("an agenda names the calendar when there are several", agenda.byClass("udash-agenda-meta")[0]?.text === "Work");
+
+	const span = asked[asked.length - 1];
+
+	check("an agenda looks 14 days ahead by default",
+		Math.round((span.to.getTime() - span.from.getTime()) / 86400000) === 14);
+
+	const nameless = draw({ id: "t", type: "upcoming", calendars: ["Gym"] });
+
+	check("an unknown calendar name says so", nameless.all.some((e) => e.text === "No calendar named Gym"));
+
+	const hostless = draw({ id: "t", type: "upcoming" }, { days, error: ctx.error });
+
+	check("without a host an agenda says no calendars are configured",
+		hostless.all.some((e) => e.text === "No calendars configured. Add one in settings."));
+
+	answer = { events: [], errors: [], expired: ["acct"] };
+
+	const expired = draw({ id: "t", type: "upcoming" });
+
+	await settle();
+
+	const reconnect = expired.byClass("mod-cta")[0];
+
+	check("an expired sign in offers a reconnect", reconnect?.text === "Google Sign-in expired");
+	check("the reconnect names the account", expired.byClass("udash-signin-expired-email")[0]?.text === "me@example.com");
+	reconnect?.click();
+	check("the reconnect signs that account in", reconnected.join() === "acct");
+
+	answer = {
+		events: [{ summary: "Trip", start: new Date(2026, 1, 10, 9), end: new Date(2026, 1, 10, 10), allDay: false, calendar: "Work" }] as never[],
+		errors: [],
+		expired: [],
+	};
+
+	const keysBefore = keys;
+	const grid = draw({ id: "t", type: "calendar", month: "2026-02" });
+
+	await settle();
+	check("a month grid takes one key", keys === keysBefore + 1);
+
+	const buttons = grid.byClass("udash-bar-button");
+
+	check("a writable calendar offers a new event", buttons.some((b) => b.text === "+"));
+
+	const chip = grid.byClass("udash-month-chip")[0];
+
+	check("a month shows the host's events", chip?.byClass("udash-month-chip-text")[0]?.text === "Trip");
+	check("an event chip opens its details without opening the day", chip?.click() === true && shown.length === 1);
+
+	grid.byClass("udash-month-cell")[0]?.click();
+	check("a day opens the new event form on a writable calendar",
+		created[0]?.targets[0]?.id === "cal" && created[0]?.on instanceof Date);
+
+	buttons.find((b) => b.attrs["aria-label"] === "Next month")?.click();
+	await settle();
+	check("paging remembers the offset", host.monthOffsets.get(`d:${keysBefore}`) === 1);
+	check("paging redraws the next month", grid.byClass("udash-month-title")[0]?.text === "March 2026",
+		grid.byClass("udash-month-title")[0]?.text);
 }
 
 console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED"}`);

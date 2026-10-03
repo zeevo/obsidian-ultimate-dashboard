@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { load } from "js-yaml";
 import { DayRecord } from "../src/data";
 import { LayoutNode, countWidgets, isContainer, parseDashboard } from "../src/layout-tree";
-import { DEFAULT_GAP, renderNode } from "../src/layout";
+import { renderNode } from "../src/layout";
 
 const VAULT = process.argv[2];
 
@@ -91,7 +91,7 @@ for (const dash of data.dashboards) {
     outline(cfg.root);
     const host = new El();
     let errors = 0;
-    renderNode(host as never, cfg.root, days, DEFAULT_GAP, () => errors++);
+    renderNode(host as never, cfg.root, { days, error: () => errors++ });
     const widgets = host.all.filter((e) => e.classes.has("udash-widget")).length;
     console.log(`  rendered ${widgets}/${countWidgets(cfg.root)} widgets, ${errors} errors`);
 
