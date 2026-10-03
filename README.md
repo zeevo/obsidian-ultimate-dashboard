@@ -529,12 +529,14 @@ use a `note` widget for that.
 | `text` | **Required.** What to show |
 | `color` | Text colour, any CSS colour. Defaults to the theme's text colour |
 | `background` | Background colour, any CSS colour. Defaults to the same tile background as the other widgets |
+| `size` | Font size in pixels, at least 8. Defaults to the theme's text size |
 
 ```yaml
 - type: text
   text: "Drink water.\nStretch at lunch."
   color: "#ffffff"
   background: "#1e3a8a"
+  size: 20
 ```
 
 The defaults follow the theme, so an unstyled text widget reads in light and

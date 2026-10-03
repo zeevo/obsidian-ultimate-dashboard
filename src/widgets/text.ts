@@ -4,8 +4,8 @@ import { TextWidget, WidgetSpec } from "./types";
 
 /**
  * Free text, as written. Line breaks are kept; markdown is not rendered. With
- * no colours set it takes the theme's text on the same tile background as the
- * other widgets, so it reads in light and dark themes alike.
+ * no colours or size set it takes the theme's text on the same tile background
+ * as the other widgets, so it reads in light and dark themes alike.
  */
 export function renderText(el: HTMLElement, widget: TextWidget): void {
 	const box = el.createDiv({ cls: "udash-text", text: widget.text });
@@ -13,6 +13,8 @@ export function renderText(el: HTMLElement, widget: TextWidget): void {
 	if (widget.color) box.style.color = widget.color;
 
 	if (widget.background) box.style.backgroundColor = widget.background;
+
+	if (widget.size !== undefined) box.style.fontSize = `${widget.size}px`;
 }
 
 /** The first line, shortened, so the editor's card says which text this is. */
@@ -30,6 +32,14 @@ export const text: WidgetSpec<TextWidget> = {
 		{ key: "text", kind: FieldKind.Text, label: "Text", required: true, multiline: true },
 		{ key: "color", kind: FieldKind.Colour, label: "Text color", placeholder: "Theme text" },
 		{ key: "background", kind: FieldKind.Colour, label: "Background", placeholder: "Theme background" },
+		{
+			key: "size",
+			kind: FieldKind.Number,
+			label: "Font size (px)",
+			hint: "Defaults to the theme's text size",
+			// below this it stops being readable
+			min: 8,
+		},
 	],
 	blank: () => ({ type: WidgetKind.Text, text: "" }),
 	title: () => "Text",

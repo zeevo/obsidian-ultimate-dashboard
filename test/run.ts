@@ -1168,6 +1168,16 @@ console.log("\ntext widget");
 
 	check("the text is drawn as written", box?.text === "Line one\nLine two", box?.text);
 	check("unset colours fall back to the theme", box?.style.color === undefined && box?.style.backgroundColor === undefined);
+	check("an unset size falls back to the theme", box?.style.fontSize === undefined);
+
+	const big = new El();
+
+	renderText(big, { id: "t", type: "text", text: "Big", size: 32 });
+	check("a font size applies in pixels", big.byClass("udash-text")[0]?.style.fontSize === "32px",
+		big.byClass("udash-text")[0]?.style.fontSize);
+	check("a font size parses and round trips",
+		(parseDashboard(serializeDashboard(parseDashboard("layout:\n  type: column\n  children: [{ type: text, text: Hi, size: 24 }]"))).root.children[0] as { size?: number }).size === 24);
+	rejects("layout:\n  type: column\n  children: [{ type: text, text: Hi, size: 4 }]", "a font size must be at least 8");
 
 	const painted = new El();
 

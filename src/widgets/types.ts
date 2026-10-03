@@ -148,6 +148,8 @@ export interface TextWidget extends NodeBase {
 	color?: string;
 	/** Any CSS colour. Defaults to the tile background the other widgets use. */
 	background?: string;
+	/** Font size in pixels. Defaults to the theme's text size. */
+	size?: number;
 }
 
 export type Widget =
