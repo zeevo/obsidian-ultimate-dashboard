@@ -1,5 +1,6 @@
 import { WidgetKind } from "./kinds";
 import { Field, FieldKind } from "./schema";
+import { monthName } from "./dates";
 import { WEATHER_UNITS, WeatherMode, WeatherUnit } from "./weather";
 
 /**
@@ -207,20 +208,6 @@ export interface WidgetSpec<P extends Widget = Widget> {
 	 * Returns a message, or null when the widget is coherent.
 	 */
 	validate?(widget: P): string | null;
-}
-
-const MONTHS = [
-	"January", "February", "March", "April", "May", "June",
-	"July", "August", "September", "October", "November", "December",
-];
-
-/** "2026-02" as "February 2026", or the current month when unset. */
-export function monthName(month?: string): string {
-	const date = month
-		? new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1, 1)
-		: new Date();
-
-	return `${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
 }
 
 /** The last segment of a vault path, without the extension. */

@@ -1,5 +1,5 @@
 import { ContainerKind } from "./kinds";
-import { Dashboard, LayoutNode, isContainer } from "./layout-tree";
+import { DashboardConfig, LayoutNode, isContainer } from "./layout-tree";
 import { specFor } from "./widgets";
 import { FieldValue } from "./schema";
 
@@ -80,7 +80,7 @@ function writeChildren(children: LayoutNode[], indent: string, lines: string[]):
 	for (const child of children) writeNode(child, `${indent}  `, lines);
 }
 
-export function serializeDashboard(dashboard: Dashboard): string {
+export function serializeDashboard(dashboard: DashboardConfig): string {
 	const lines: string[] = [`folder: ${scalar(dashboard.folder)}`, "layout:"];
 
 	lines.push(`  type: ${dashboard.root.type}`);

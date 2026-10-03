@@ -1,10 +1,11 @@
 import { Component, ItemView, MarkdownRenderer, Notice, WorkspaceLeaf, setIcon, setTooltip } from "obsidian";
-import { ConfigError, Dashboard, countWidgets, parseDashboard } from "./layout-tree";
+import { ConfigError, DashboardConfig, countWidgets, parseDashboard } from "./layout-tree";
 import { readDays, stripFrontmatter } from "./data";
 import { CalendarFiller, ClockFiller, DEFAULT_GAP, NoteFiller, WeatherFiller, renderNode } from "./layout";
 import { CalendarService } from "./calendar";
 import { WeatherMode, WeatherQuery, WeatherService, WeatherUnit } from "./weather";
-import { CalendarWidget, ClockWidget, NoteWidget, UpcomingWidget, WeatherWidget, monthName, specFor } from "./widgets";
+import { CalendarWidget, ClockWidget, NoteWidget, UpcomingWidget, WeatherWidget, specFor } from "./widgets";
+import { monthName } from "./dates";
 import { addMonthArrows, fillCalendar, fillClock, fillMonth, fillSignInExpired, fillWeather, labelMonth, monthWindow, shiftMonth } from "./render";
 import { connect } from "./google";
 import { EventDetailsModal, EventModal, NameModal } from "./modal";
@@ -69,7 +70,7 @@ export class DashboardView extends ItemView {
 	getDisplayText(): string {
 		const current = activeDashboard(this.host.settings);
 
-		return current ? `Dashboard: ${current.name}` : "Ultimate Dashboard";
+		return current ? `DashboardConfig: ${current.name}` : "Ultimate DashboardConfig";
 	}
 
 	getIcon(): string {
@@ -194,7 +195,7 @@ export class DashboardView extends ItemView {
 			});
 		} else {
 			const only = settings.dashboards[0];
-			bar.createSpan({ cls: "udash-bar-title", text: only ? only.name : "Ultimate Dashboard" });
+			bar.createSpan({ cls: "udash-bar-title", text: only ? only.name : "Ultimate DashboardConfig" });
 		}
 
 		const spacer = bar.createDiv({ cls: "udash-bar-spacer" });
@@ -217,7 +218,7 @@ export class DashboardView extends ItemView {
 		const cog = bar.createEl("button", { cls: "udash-bar-button" });
 
 		setIcon(cog, "settings");
-		setTooltip(cog, "Ultimate Dashboard settings");
+		setTooltip(cog, "Ultimate DashboardConfig settings");
 		cog.addEventListener("click", () => this.openSettings());
 	}
 
@@ -508,7 +509,7 @@ export class DashboardView extends ItemView {
 		return toolbar;
 	}
 
-	private makeEditor(current: { config: string }, config: Dashboard): LayoutEditor {
+	private makeEditor(current: { config: string }, config: DashboardConfig): LayoutEditor {
 		return new LayoutEditor(
 			this.app,
 			config,

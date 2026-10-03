@@ -1,5 +1,5 @@
 import { App, Notice, setIcon, setTooltip } from "obsidian";
-import { ConfigError, ContainerNode, Dashboard, LayoutNode, isContainer, needsSetup, nextId, parseDashboard } from "./layout-tree";
+import { ConfigError, ContainerNode, DashboardConfig, LayoutNode, isContainer, needsSetup, nextId, parseDashboard } from "./layout-tree";
 import { WIDGETS, specFor } from "./widgets";
 import { ContainerKind, WidgetKind, toContainerKind, toWidgetKind } from "./kinds";
 import { serializeDashboard } from "./serialize";
@@ -170,9 +170,9 @@ export class LayoutEditor {
 
 	constructor(
 		private app: App,
-		private config: Dashboard,
+		private config: DashboardConfig,
 		private context: FormContext,
-		private onChange: (config: Dashboard) => void,
+		private onChange: (config: DashboardConfig) => void,
 		/** Redraws without saving, to undo what a cancelled drag moved. */
 		private redraw: () => void,
 	) {

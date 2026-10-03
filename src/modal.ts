@@ -1,7 +1,7 @@
 import { App, Modal, Notice, Setting, sanitizeHTMLToDom } from "obsidian";
 import { NewEvent } from "./google";
 import { DatedEvent } from "./calendar";
-import { eventWhen } from "./render";
+import { eventWhen } from "./dates";
 
 /** Asks for a dashboard name. Resolves with the name, or null if cancelled. */
 export class NameModal extends Modal {

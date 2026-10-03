@@ -22,7 +22,7 @@ export interface ContainerNode extends NodeBase {
 
 export type LayoutNode = ContainerNode | Widget;
 
-export interface Dashboard {
+export interface DashboardConfig {
 	/** Folder holding the dated notes every widget reads. */
 	folder: string;
 	root: ContainerNode;
@@ -152,7 +152,7 @@ function parseNode(raw: unknown, where: string, depth: number): LayoutNode {
 	return parsed;
 }
 
-export function parseDashboard(source: string): Dashboard {
+export function parseDashboard(source: string): DashboardConfig {
 	let raw: unknown;
 
 	try {

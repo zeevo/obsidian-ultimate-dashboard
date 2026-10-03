@@ -1,7 +1,9 @@
-import { Agg, BlankWidget, ClockWidget, CalendarWidget, HeatmapWidget, LineWidget, NoteWidget, StatWidget, UpcomingWidget, WeatherWidget, monthName, specFor } from "./widgets";
+import { Agg, BlankWidget, ClockWidget, CalendarWidget, HeatmapWidget, LineWidget, NoteWidget, StatWidget, UpcomingWidget, WeatherWidget, specFor } from "./widgets";
+import { monthName } from "./dates";
 import { Weather, describeWeather } from "./weather";
 import { assertNever } from "./kinds";
-import { DayRecord, daysBetween, num, shiftDate, shiftMonths, toISO, today, truthy } from "./data";
+import { DayRecord, num, truthy } from "./data";
+import { DAY_MS, MONTHS_SHORT, WEEKDAYS, daysBetween, hhmm, sameDay, shiftDate, shiftMonths, toISO, today } from "./dates";
 
 const DEFAULT_COLOR = "#3b82f6";
 
@@ -124,8 +126,6 @@ export function resolveWindow(
 		end: days.length ? days[days.length - 1].date : now,
 	};
 }
-
-const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /** Whether a day counts as filled in: the same test the boxes are shaded by. */
 function logged(day: DayRecord, widget: HeatmapWidget): boolean {
@@ -256,7 +256,7 @@ export function renderHeatmap(el: HTMLElement, days: DayRecord[], widget: Heatma
 	for (const [month, { column, year }] of monthAtColumn) {
 		const label = months.createSpan({
 			cls: "udash-month",
-			text: multiYear ? `${MONTH_NAMES[month]} ${String(year).slice(2)}` : MONTH_NAMES[month],
+			text: multiYear ? `${MONTHS_SHORT[month]} ${String(year).slice(2)}` : MONTHS_SHORT[month],
 		});
 
 		label.style.gridColumn = `${column + 1}`;
@@ -292,14 +292,13 @@ export function renderLine(el: HTMLElement, days: DayRecord[], widget: LineWidge
 	}
 
 	const ms = (iso: string) => new Date(iso + "T00:00:00").getTime();
-	const DAY = 86400000;
 
 	// Rolling average over a calendar window, so gaps in logging do not distort
 	// it. Averaged over `all`, not `points`, so readings just before the window
 	// still inform the leftmost values instead of the line starting cold.
 	const smoothed = widget.rolling
 		? points.map((p) => {
-				const from = ms(p.date) - (widget.rolling! - 1) * DAY;
+				const from = ms(p.date) - (widget.rolling! - 1) * DAY_MS;
 				const win = all.filter((o) => ms(o.date) >= from && ms(o.date) <= ms(p.date));
 
 				return { date: p.date, v: win.reduce((s, o) => s + o.v, 0) / win.length };
@@ -365,21 +364,15 @@ export function renderLine(el: HTMLElement, days: DayRecord[], widget: LineWidge
 
 /* --------------------------------------------------------------- calendar */
 
-const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
 function dayLabel(d: Date, today: Date): string {
-	const same = (a: Date, b: Date) => a.toDateString() === b.toDateString();
-	const tomorrow = new Date(today.getTime() + 86400000);
+	const tomorrow = new Date(today.getTime() + DAY_MS);
 
-	if (same(d, today)) return "Today";
+	if (sameDay(d, today)) return "Today";
 
-	if (same(d, tomorrow)) return "Tomorrow";
+	if (sameDay(d, tomorrow)) return "Tomorrow";
 
-	return `${DOW[d.getDay()]} ${d.getDate()} ${MONTH_NAMES[d.getMonth()]}`;
+	return `${WEEKDAYS[d.getDay()]} ${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`;
 }
-
-const hhmm = (d: Date) =>
-	`${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
 
 /**
  * The agenda shell. Events arrive asynchronously, so this draws the heading and
@@ -493,8 +486,6 @@ export function fillSignInExpired(
 
 /* ------------------------------------------------------------ month grid */
 
-const DOW_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
 export interface MonthWindow {
 	/** The first of the displayed month. */
 	first: Date;
@@ -581,7 +572,7 @@ export function renderMonth(el: HTMLElement, widget: CalendarWidget): HTMLElemen
 	const dows = wrap.createDiv({ cls: "udash-month-dows" });
 
 	for (let i = 0; i < 7; i++) {
-		dows.createDiv({ cls: "udash-month-dow", text: DOW_SHORT[(i + weekStart) % 7] });
+		dows.createDiv({ cls: "udash-month-dow", text: WEEKDAYS[(i + weekStart) % 7] });
 	}
 
 	wrap.createDiv({ cls: "udash-month-grid" });
@@ -595,33 +586,6 @@ export interface MonthEvent {
 	end: Date;
 	allDay: boolean;
 	color?: string;
-}
-
-const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
-
-/** When an event happens, in words, for its details popup. */
-export function eventWhen(e: { start: Date; end: Date; allDay: boolean }): string {
-	const long: Intl.DateTimeFormatOptions = { weekday: "long", month: "long", day: "numeric", year: "numeric" };
-	const short: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
-	const time = (d: Date) => d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-
-	if (e.allDay) {
-		// an all day event ends at midnight after its last day
-		const last = new Date(e.end.getTime() - 1);
-
-		if (last <= e.start || sameDay(e.start, last)) return `${e.start.toLocaleDateString([], long)}, all day`;
-
-		return `${e.start.toLocaleDateString([], short)} \u2013 ${last.toLocaleDateString([], { ...short, year: "numeric" })}, all day`;
-	}
-
-	if (sameDay(e.start, e.end)) {
-		return `${e.start.toLocaleDateString([], long)}, ${time(e.start)} \u2013 ${time(e.end)}`;
-	}
-
-	return (
-		`${e.start.toLocaleDateString([], short)}, ${time(e.start)} \u2013 ` +
-		`${e.end.toLocaleDateString([], short)}, ${time(e.end)}`
-	);
 }
 
 /** Fills a shell from `renderMonth`. */
@@ -693,7 +657,7 @@ export function fillMonth<E extends MonthEvent>(
 			if (!e.allDay) {
 				chip.createSpan({
 					cls: "udash-month-chip-time",
-					text: `${e.start.getHours()}:${String(e.start.getMinutes()).padStart(2, "0")}`,
+					text: hhmm(e.start),
 				});
 			}
 
@@ -779,8 +743,6 @@ export function renderWeather(el: HTMLElement, widget: WeatherWidget): HTMLEleme
 function degrees(value: number, unit: string): string {
 	return `${Math.round(value)}${unit}`;
 }
-
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /**
  * "2pm" from a naive ISO stamp. Read off the string rather than through `Date`,

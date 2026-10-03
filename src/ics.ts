@@ -1,3 +1,5 @@
+import { DAY_MS } from "./dates";
+
 /**
  * A small iCalendar reader. Handles what a subscribed calendar feed actually
  * contains: folded lines, all-day and timed events, and the common recurrence
@@ -91,8 +93,6 @@ function parseDate(value: string, params: Record<string, string>): { date: Date;
 
 	return { date, allDay: params.VALUE === "DATE" };
 }
-
-const DAY_MS = 86400000;
 
 const WEEKDAYS = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
 
