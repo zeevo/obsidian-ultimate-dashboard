@@ -9,12 +9,26 @@ export default defineConfig({
 		"test/*.mjs",
 		"node_modules/**",
 	],
+	// the defaults plus import, which the import rules below need
+	plugins: ["typescript", "unicorn", "oxc", "import"],
 	jsPlugins: [
 		{ name: "anti-slop", specifier: "./tools/oxlint/anti-slop/index.ts" },
 		{ name: "house", specifier: "./tools/oxlint/house/index.ts" },
 	],
 	rules: {
 		"oxc/no-accumulating-spread": "error",
+		"import/no-cycle": "error",
+		"import/no-duplicates": "error",
+		"no-var": "error",
+		"prefer-const": "error",
+		"typescript/no-explicit-any": "error",
+		"no-restricted-globals": [
+			"error",
+			{
+				name: "fetch",
+				message: "Use requestUrl from obsidian: the renderer enforces CORS and calendar and weather hosts do not allow it.",
+			},
+		],
 		"house/no-enums": "error",
 		"anti-slop/no-array-filter-map": "error",
 		"anti-slop/no-reduce-accumulator-copy": "error",
