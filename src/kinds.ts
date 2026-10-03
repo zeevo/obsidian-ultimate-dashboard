@@ -23,6 +23,7 @@ export const WidgetKind = {
 	Blank: "blank",
 	Weather: "weather",
 	Clock: "clock",
+	Text: "text",
 } as const;
 
 export type WidgetKind = (typeof WidgetKind)[keyof typeof WidgetKind];

@@ -140,6 +140,16 @@ export interface ClockWidget extends NodeBase {
 	analog?: boolean;
 }
 
+export interface TextWidget extends NodeBase {
+	type: typeof WidgetKind.Text;
+	/** Shown as written, line breaks and all. */
+	text: string;
+	/** Any CSS colour. Defaults to the theme's text colour. */
+	color?: string;
+	/** Any CSS colour. Defaults to the tile background the other widgets use. */
+	background?: string;
+}
+
 export type Widget =
 	| StatWidget
 	| LineWidget
@@ -149,7 +159,8 @@ export type Widget =
 	| NoteWidget
 	| BlankWidget
 	| WeatherWidget
-	| ClockWidget;
+	| ClockWidget
+	| TextWidget;
 
 /* ------------------------------------------------------------- the spec */
 

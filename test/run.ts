@@ -13,6 +13,7 @@ import { addMonthArrows, fillMonth, labelMonth, monthWindow, renderMonth, shiftM
 import { fillSignInExpired } from "../src/widgets/calendars";
 import { currentStreak, renderHeatmap } from "../src/widgets/heatmap";
 import { renderBlank } from "../src/widgets/blank";
+import { renderText } from "../src/widgets/text";
 import { renderLine } from "../src/widgets/line";
 import { renderNote } from "../src/widgets/note";
 import { renderStat } from "../src/widgets/stat";
@@ -1156,6 +1157,39 @@ console.log("\nblank nodes from the palette");
 	}
 }
 
+console.log("\ntext widget");
+
+{
+	const plain = new El();
+
+	renderText(plain, { id: "t", type: "text", text: "Line one\nLine two" });
+
+	const box = plain.byClass("udash-text")[0];
+
+	check("the text is drawn as written", box?.text === "Line one\nLine two", box?.text);
+	check("unset colours fall back to the theme", box?.style.color === undefined && box?.style.backgroundColor === undefined);
+
+	const painted = new El();
+
+	renderText(painted, { id: "t", type: "text", text: "Hi", color: "#ffffff", background: "#1e3a8a" });
+
+	const tile = painted.byClass("udash-text")[0];
+
+	check("a text colour applies", tile?.style.color === "#ffffff", tile?.style.color);
+	check("a background colour applies", tile?.style.backgroundColor === "#1e3a8a", tile?.style.backgroundColor);
+
+	const source = 'layout:\n  type: column\n  children:\n    - { type: text, text: "Two\\nlines", color: red, background: "#000" }';
+	const parsed = parseDashboard(source).root.children[0] as Widget;
+	const again = parseDashboard(serializeDashboard(parseDashboard(source))).root.children[0];
+
+	check("text parses with its colours", strip(parsed) !== null
+		&& JSON.stringify(strip(parsed)) === JSON.stringify({ type: "text", text: "Two\nlines", color: "red", background: "#000" }),
+		JSON.stringify(strip(parsed)));
+	check("multiline text survives a round trip", JSON.stringify(strip(again)) === JSON.stringify(strip(parsed)),
+		serializeDashboard(parseDashboard(source)).split("\n").find((l) => l.includes("text")));
+	check("a text widget without text needs setup", needsSetup({ id: "t", type: "text", text: "" } as never));
+}
+
 console.log("\nblank widget");
 
 {
@@ -1488,6 +1522,7 @@ console.log("\ndefault titles");
 		blank: { id: "t", type: "blank" },
 		weather: { id: "t", type: "weather", place: "Denver" },
 		clock: { id: "t", type: "clock" },
+		text: { id: "t", type: "text", text: "Hello" },
 	};
 
 	for (const kind of WIDGET_KINDS) {

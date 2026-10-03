@@ -50,6 +50,8 @@ export interface TextField<P> extends Common<P> {
 		| typeof FieldKind.Colour
 		| typeof FieldKind.Note;
 	readonly placeholder?: string;
+	/** Edited in a text area, for prose that runs over several lines. */
+	readonly multiline?: boolean;
 }
 
 export interface NumberField<P> extends Common<P> {

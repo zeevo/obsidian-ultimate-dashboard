@@ -61,6 +61,20 @@
 	color: var(--text-muted);
 }
 
+/* ------------------------------------------------------------------ text */
+
+.udash-text {
+	height: 100%;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	padding: 10px 12px;
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	/* keep the line breaks as written, and wrap a long word rather than overflow */
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
 /* ---------------------------------------------------------------- heatmap */
 
 .udash-heatmap-head {

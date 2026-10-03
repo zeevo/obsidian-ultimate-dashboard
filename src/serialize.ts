@@ -22,7 +22,9 @@ function scalar(v: FieldValue): string {
 		/^(true|false|null|~|yes|no|on|off)$/i.test(v) ||
 		/^[-+]?[\d.]+$/.test(v) ||
 		/^\d{4}-\d{2}(-\d{2})?$/.test(v) ||
-		/[:#{}[\],&*?|<>=!%@`"']/.test(v);
+		/[:#{}[\],&*?|<>=!%@`"']/.test(v) ||
+		// a raw line break would end the value; the quoted form escapes it
+		/[\n\r\t]/.test(v);
 
 	return risky ? JSON.stringify(v) : v;
 }

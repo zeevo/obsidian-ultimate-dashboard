@@ -1,4 +1,4 @@
-import { App, ButtonComponent, Modal, Setting } from "obsidian";
+import { App, ButtonComponent, ColorComponent, Modal, Setting, TextComponent } from "obsidian";
 import { LayoutNode, isContainer } from "./layout-tree";
 import { ContainerKind, assertNever } from "./kinds";
 import { specFor } from "./widgets";
@@ -151,7 +151,17 @@ export class WidgetForm extends Modal {
 
 		switch (field.kind) {
 			case FieldKind.Text:
-			case FieldKind.Colour:
+				if (field.multiline) {
+					setting.addTextArea((t) => {
+						t.setPlaceholder(field.placeholder ?? this.fallback(field, node))
+							.setValue(String(get() ?? ""))
+							.onChange((v) => put(v.trim() || undefined));
+						t.inputEl.rows = 5;
+					});
+
+					return;
+				}
+
 				setting.addText((t) =>
 					t
 						.setPlaceholder(field.placeholder ?? this.fallback(field, node))
@@ -160,6 +170,41 @@ export class WidgetForm extends Modal {
 				);
 
 				return;
+
+			case FieldKind.Colour: {
+				// The box takes any CSS colour and empties back to the default; the
+				// picker beside it is a quicker way to fill the box, since a picker
+				// alone has no way to say "unset".
+				let box: TextComponent | null = null;
+				let picker: ColorComponent | null = null;
+				const hex = (v: unknown) => (typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v) ? v : null);
+
+				setting.addText((t) => {
+					box = t;
+					t.setPlaceholder(field.placeholder ?? "")
+						.setValue(String(get() ?? ""))
+						.onChange((v) => {
+							put(v.trim() || undefined);
+
+							const picked = hex(v.trim());
+
+							if (picked) picker?.setValue(picked);
+						});
+				});
+				setting.addColorPicker((c) => {
+					picker = c;
+
+					const current = hex(get());
+
+					if (current) c.setValue(current);
+					c.onChange((v) => {
+						put(v);
+						box?.setValue(v);
+					});
+				});
+
+				return;
+			}
 
 			case FieldKind.Property:
 				setting.addText((t) => {

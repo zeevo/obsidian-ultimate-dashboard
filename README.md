@@ -519,6 +519,28 @@ Nothing is drawn: it is an invisible spacer, so it also works for pushing a
 row's other children into place. Use `flex` to try column widths and `height` to
 try row heights.
 
+### `type: text`
+
+Free text, shown as written. Line breaks are kept; markdown is not rendered, so
+use a `note` widget for that.
+
+| Key | Meaning |
+|-----|---------|
+| `text` | **Required.** What to show |
+| `color` | Text colour, any CSS colour. Defaults to the theme's text colour |
+| `background` | Background colour, any CSS colour. Defaults to the same tile background as the other widgets |
+
+```yaml
+- type: text
+  text: "Drink water.\nStretch at lunch."
+  color: "#ffffff"
+  background: "#1e3a8a"
+```
+
+The defaults follow the theme, so an unstyled text widget reads in light and
+dark mode alike. In the configuration form each colour has a picker beside its
+box; empty the box to go back to the default.
+
 ### `type: weather`
 
 Current conditions and a forecast, from [Open-Meteo](https://open-meteo.com). No

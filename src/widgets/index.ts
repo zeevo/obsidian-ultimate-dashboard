@@ -6,6 +6,7 @@ import { line } from "./line";
 import { month } from "./month";
 import { note } from "./note";
 import { stat } from "./stat";
+import { text } from "./text";
 import { WidgetSpec } from "./types";
 import { upcoming } from "./upcoming";
 import { weather } from "./weather";
@@ -34,6 +35,7 @@ export const WIDGETS: { readonly [K in WidgetKind]: WidgetSpec } = {
 	[WidgetKind.Blank]: blank as WidgetSpec,
 	[WidgetKind.Weather]: weather as WidgetSpec,
 	[WidgetKind.Clock]: clock as WidgetSpec,
+	[WidgetKind.Text]: text as WidgetSpec,
 };
 
 export function specFor(type: WidgetKind): WidgetSpec {
