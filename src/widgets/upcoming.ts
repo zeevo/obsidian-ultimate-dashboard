@@ -24,6 +24,8 @@ export function renderUpcoming(el: HTMLElement, widget: UpcomingWidget): HTMLEle
 	const wrap = el.createDiv({ cls: "udash-calendar" });
 	const head = wrap.createDiv({ cls: "udash-heatmap-head" });
 	head.createSpan({ text: upcoming.title(widget) });
+	// where the new event button goes, as on a month grid
+	head.createDiv({ cls: "udash-calendar-actions" });
 	const body = wrap.createDiv({ cls: "udash-calendar-body" });
 	body.createDiv({ cls: "udash-empty", text: "Loading calendars\u2026" });
 

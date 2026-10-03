@@ -2004,6 +2004,14 @@ console.log("\nwidgets through a host");
 	check("an agenda lists what the host returns", agenda.byClass("udash-agenda-summary")[0]?.text === "Standup");
 	check("an agenda names the calendar when there are several", agenda.byClass("udash-agenda-meta")[0]?.text === "Work");
 
+	const newEvent = agenda.byClass("udash-bar-button").find((b) => b.text === "+");
+
+	check("an agenda offers a new event on a writable calendar", newEvent !== undefined);
+	newEvent?.click();
+	check("the agenda's new event form opens on no particular day",
+		created.length === 1 && created[0]?.targets[0]?.id === "cal" && created[0]?.on === undefined);
+	created.length = 0;
+
 	const span = asked[asked.length - 1];
 
 	check("an agenda looks 14 days ahead by default",
