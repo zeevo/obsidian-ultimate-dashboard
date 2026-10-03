@@ -1208,6 +1208,40 @@ console.log("\nheatmap streak");
 	check("no streak element unless asked", hidden.byClass("udash-heatmap-streak").length === 0);
 }
 
+console.log("\nheatmap below a goal");
+
+{
+	const ate = (...kcal: (number | string | null)[]): DayRecord[] =>
+		kcal.map((c, i) => ({ date: shiftDate(today(), -(kcal.length - 1 - i)), props: { calories: c } }));
+
+	const goal = { id: "t", type: "heatmap", property: "calories", below: 1500 } as const;
+
+	// oldest first: over, under, at the goal, under, under today
+	const days = ate(1800, 1200, 1500, 1400, 1100);
+
+	check("only days under the goal count", currentStreak(days, goal) === 2,
+		String(currentStreak(days, goal)));
+
+	const drawn = new El();
+	renderHeatmap(drawn, days, goal);
+
+	check("the count is days under the goal", drawn.byClass("udash-heatmap-count")[0]?.text === "3 days",
+		drawn.byClass("udash-heatmap-count")[0]?.text);
+
+	// an empty `calories:` is a day not logged, not a zero calorie day
+	check("an empty value is not under the goal", currentStreak(ate(1200, null, ""), goal) === 0,
+		String(currentStreak(ate(1200, null, ""), goal)));
+
+	check("a numeric string still compares", currentStreak(ate("900"), goal) === 1);
+
+	const source = "layout:\n  type: column\n  children: [{ type: heatmap, property: calories, below: 1500 }]";
+	const parsed = parseDashboard(source).root.children[0];
+
+	check("below parses", (parsed as unknown as { below?: number }).below === 1500);
+	check("below survives a round trip",
+		(parseDashboard(serializeDashboard(parseDashboard(source))).root.children[0] as unknown as { below?: number }).below === 1500);
+}
+
 console.log("\nweather");
 
 {

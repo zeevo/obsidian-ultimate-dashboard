@@ -129,6 +129,12 @@ const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Se
 
 /** Whether a day counts as filled in: the same test the boxes are shaded by. */
 function logged(day: DayRecord, widget: HeatmapWidget): boolean {
+	if (widget.below !== undefined) {
+		const v = num(day, widget.property);
+
+		return v !== null && v < widget.below;
+	}
+
 	if (truthy(day, widget.property)) return true;
 
 	return widget.intensity !== undefined && num(day, widget.intensity) !== null;
