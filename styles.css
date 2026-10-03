@@ -203,6 +203,12 @@
 	background: var(--background-secondary);
 }
 
+/* Rows align their children to the top, which leaves the tile's 100% height
+   nothing to fill; a failed widget stretches to the row's height instead. */
+.udash-node.is-failed {
+	align-self: stretch;
+}
+
 .udash-error-actions {
 	display: flex;
 	gap: 6px;
