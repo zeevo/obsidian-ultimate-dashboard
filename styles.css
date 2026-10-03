@@ -75,6 +75,20 @@
 	overflow-wrap: anywhere;
 }
 
+/* ----------------------------------------------------------------- image */
+
+.udash-image {
+	border-radius: 8px;
+	overflow: hidden;
+}
+
+.udash-image img {
+	display: block;
+	width: 100%;
+	/* with a set height the whole picture still shows, letterboxed */
+	object-fit: contain;
+}
+
 /* ---------------------------------------------------------------- heatmap */
 
 .udash-heatmap-head {

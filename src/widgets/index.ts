@@ -2,6 +2,7 @@ import { WidgetKind } from "../kinds";
 import { blank } from "./blank";
 import { clock } from "./clock";
 import { heatmap } from "./heatmap";
+import { image } from "./image";
 import { line } from "./line";
 import { month } from "./month";
 import { note } from "./note";
@@ -36,6 +37,7 @@ export const WIDGETS: { readonly [K in WidgetKind]: WidgetSpec } = {
 	[WidgetKind.Weather]: weather as WidgetSpec,
 	[WidgetKind.Clock]: clock as WidgetSpec,
 	[WidgetKind.Text]: text as WidgetSpec,
+	[WidgetKind.Image]: image as WidgetSpec,
 };
 
 export function specFor(type: WidgetKind): WidgetSpec {

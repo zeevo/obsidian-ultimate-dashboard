@@ -1192,6 +1192,10 @@ console.log("\ntext widget");
 	const parsed = parseDashboard(source).root.children[0] as Widget;
 	const again = parseDashboard(serializeDashboard(parseDashboard(source))).root.children[0];
 
+	check("an image parses and round trips",
+		JSON.stringify(strip(parseDashboard(serializeDashboard(parseDashboard("layout:\n  type: column\n  children: [{ type: image, src: \"https://example.com/a.png?x=1\", height: 120 }]"))).root.children[0]))
+			=== JSON.stringify({ type: "image", src: "https://example.com/a.png?x=1", height: 120 }));
+	check("an image without a source needs setup", needsSetup({ id: "t", type: "image", src: "" } as never));
 	check("text parses with its colours", strip(parsed) !== null
 		&& JSON.stringify(strip(parsed)) === JSON.stringify({ type: "text", text: "Two\nlines", color: "red", background: "#000" }),
 		JSON.stringify(strip(parsed)));
@@ -1533,6 +1537,7 @@ console.log("\ndefault titles");
 		weather: { id: "t", type: "weather", place: "Denver" },
 		clock: { id: "t", type: "clock" },
 		text: { id: "t", type: "text", text: "Hello" },
+		image: { id: "t", type: "image", src: "Attachments/cat.png" },
 	};
 
 	for (const kind of WIDGET_KINDS) {
@@ -2012,6 +2017,7 @@ console.log("\nwidgets through a host");
 		accountEmail: () => "me@example.com",
 		reconnectGoogle: (id) => reconnected.push(id),
 		manageCalendars: () => managed++,
+		resourcePath: (path) => (path === "cat.png" ? "app://vault/Attachments/cat.png" : null),
 		monthOffsets: new Map(),
 		nextMonthKey: () => `d:${keys++}`,
 	};
@@ -2153,6 +2159,34 @@ console.log("\nwidgets through a host");
 	check("paging remembers the offset", host.monthOffsets.get(`d:${keysBefore}`) === 1);
 	check("paging redraws the next month", grid.byClass("udash-month-title")[0]?.text === "March 2026",
 		grid.byClass("udash-month-title")[0]?.text);
+
+	const fromVault = draw({ id: "t", type: "image", src: "cat.png", height: 200 });
+	const vaultImg = fromVault.all.find((e) => e.tag === "img");
+
+	check("a vault image loads through the host", vaultImg?.attrs.src === "app://vault/Attachments/cat.png", vaultImg?.attrs.src);
+	check("an image stands at its height", vaultImg?.style.height === "200px", vaultImg?.style.height);
+	check("an image does not start a native drag", vaultImg?.attrs.draggable === "false");
+
+	const gone = draw({ id: "t", type: "image", src: "dog.png" });
+
+	check("a missing vault image says so", gone.byClass("udash-error")[0]?.text === 'No file called "dog.png"',
+		gone.byClass("udash-error")[0]?.text);
+	check("a missing vault image draws no picture", !gone.all.some((e) => e.tag === "img"));
+
+	const web = draw({ id: "t", type: "image", src: "https://example.com/a.png" }, { days, error: ctx.error });
+	const webImg = web.all.find((e) => e.tag === "img");
+
+	check("a URL loads directly, without a host", webImg?.attrs.src === "https://example.com/a.png");
+	check("without a height an image keeps its proportions", webImg?.style.height === undefined);
+	webImg?.listeners.error?.({ stopPropagation: () => {} });
+	check("an image that fails to load says so", web.byClass("udash-error")[0]?.text === "Could not load https://example.com/a.png",
+		web.byClass("udash-error")[0]?.text);
+	check("a failed image is removed", !web.all.some((e) => e.tag === "img"));
+
+	const offline = draw({ id: "t", type: "image", src: "cat.png" }, { days, error: ctx.error });
+
+	check("without a host a vault image is left blank, not an error",
+		!offline.all.some((e) => e.tag === "img") && offline.byClass("udash-error").length === 0);
 }
 
 console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED"}`);

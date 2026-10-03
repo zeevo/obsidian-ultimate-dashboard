@@ -191,6 +191,11 @@ export class DashboardView extends ItemView {
 			accountEmail: (accountId) => findAccount(settings.google, accountId)?.email,
 			reconnectGoogle: (accountId) => void this.reconnectGoogle(accountId),
 			manageCalendars: () => this.manageCalendars(),
+			resourcePath: (path) => {
+				const file = this.app.metadataCache.getFirstLinkpathDest(path, "");
+
+				return file ? this.app.vault.getResourcePath(file) : null;
+			},
 			monthOffsets: this.monthOffsets,
 			nextMonthKey: () => `${dashboardId}:${monthIndex++}`,
 		};

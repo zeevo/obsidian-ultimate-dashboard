@@ -68,4 +68,9 @@ export interface CalendarHost {
 	nextMonthKey(): string;
 }
 
-export type WidgetHost = NoteHost & WeatherHost & CalendarHost;
+export interface ImageHost {
+	/** A URL the view can load for a vault file, or null when no file matches the path. */
+	resourcePath(path: string): string | null;
+}
+
+export type WidgetHost = NoteHost & WeatherHost & CalendarHost & ImageHost;

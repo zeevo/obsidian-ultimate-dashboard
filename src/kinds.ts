@@ -24,6 +24,7 @@ export const WidgetKind = {
 	Weather: "weather",
 	Clock: "clock",
 	Text: "text",
+	Image: "image",
 } as const;
 
 export type WidgetKind = (typeof WidgetKind)[keyof typeof WidgetKind];

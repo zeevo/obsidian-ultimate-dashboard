@@ -543,6 +543,26 @@ The defaults follow the theme, so an unstyled text widget reads in light and
 dark mode alike. In the configuration form each colour has a picker beside its
 box; empty the box to go back to the default.
 
+### `type: image`
+
+A picture from the web or the vault.
+
+| Key | Meaning |
+|-----|---------|
+| `src` | **Required.** A URL, or a file in the vault |
+| `height` | Height in pixels. Without it the image fills the width at its own proportions |
+
+```yaml
+- { type: image, src: "https://example.com/banner.png", height: 160 }
+- { type: image, src: Attachments/me.jpg }
+```
+
+Anything with a scheme in front (`https:`, `data:`) is loaded as a URL. Anything
+else is a vault file, found the way a `[[link]]` is, so a bare file name works
+wherever the file lives. With a `height`, the whole picture still shows,
+letterboxed rather than cropped. A missing file or a URL that fails to load
+shows an error in the tile.
+
 ### `type: weather`
 
 Current conditions and a forecast, from [Open-Meteo](https://open-meteo.com). No

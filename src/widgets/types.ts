@@ -152,6 +152,14 @@ export interface TextWidget extends NodeBase {
 	size?: number;
 }
 
+export interface ImageWidget extends NodeBase {
+	type: typeof WidgetKind.Image;
+	/** A URL, or a vault path resolved the way a link is. */
+	src: string;
+	/** Height in pixels. Without it the image fills the width at its own proportions. */
+	height?: number;
+}
+
 export type Widget =
 	| StatWidget
 	| LineWidget
@@ -162,7 +170,8 @@ export type Widget =
 	| BlankWidget
 	| WeatherWidget
 	| ClockWidget
-	| TextWidget;
+	| TextWidget
+	| ImageWidget;
 
 /* ------------------------------------------------------------- the spec */
 
