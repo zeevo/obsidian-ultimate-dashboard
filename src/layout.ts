@@ -36,10 +36,9 @@ function applyContainer(el: HTMLElement, node: ContainerNode, inheritedGap: numb
  */
 export type NodeDecorator = (el: HTMLElement, node: LayoutNode, path: number[]) => void;
 
-/** Where a failed widget sits, so the view can offer to edit or remove it. */
+/** The widget that failed, so the view can name its type. */
 export interface FailedAt {
 	node: Widget;
-	path: number[];
 }
 
 /** What the walker needs: what widgets get, plus a way to show a failure. */
@@ -96,7 +95,7 @@ function renderAt(
 	const fail = (message: string) => {
 		el.empty();
 		el.addClass("is-failed");
-		ctx.error(el, message, { node, path });
+		ctx.error(el, message, { node });
 
 		// failing after edit mode decorated the widget took its handle with it
 		if (decorated) decorate?.(el, node, path);

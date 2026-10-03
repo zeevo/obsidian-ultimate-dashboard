@@ -78,7 +78,7 @@ function contains(haystack: ContainerNode, needle: LayoutNode): boolean {
 }
 
 /** Removes the node at `path`. The root has no parent, so it stays. */
-export function removeNode(root: ContainerNode, path: number[]): void {
+function removeNode(root: ContainerNode, path: number[]): void {
 	const parent = nodeAt(root, path.slice(0, -1));
 
 	if (!parent || !isContainer(parent) || path.length === 0) return;
@@ -500,13 +500,6 @@ export class LayoutEditor {
 
 		if (onDismiss) modal.onDismiss = onDismiss;
 		modal.open();
-	}
-
-	/** Opens the form for the node at `path`, as its pencil would. */
-	configureAt(path: number[]): void {
-		const node = nodeAt(this.config.root, path);
-
-		if (node) this.configure(node);
 	}
 
 	/**

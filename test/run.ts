@@ -2024,7 +2024,7 @@ console.log("\nwidgets through a host");
 	};
 
 	// the last failed widget the walker reported, and where it sits
-	let failedAt: { node: Widget; path: number[] } | undefined;
+	let failedAt: { node: Widget } | undefined;
 
 	const error = (el: HTMLElement, m: string, at?: { node: Widget; path: number[] }) => {
 		failedAt = at;
@@ -2124,7 +2124,7 @@ console.log("\nwidgets through a host");
 	const nameless = draw({ id: "t", type: "upcoming", calendars: ["Gym"] });
 
 	check("an unknown calendar name fails the widget", nameless.byClass("udash-error")[0]?.text === "No calendar named Gym");
-	check("a failed widget is reported with where it sits", failedAt?.node.type === "upcoming" && failedAt.path.length === 0);
+	check("a failed widget is reported with its type", failedAt?.node.type === "upcoming");
 	check("a failed widget keeps nothing of its own content", nameless.byClass("udash-calendar").length === 0);
 
 	const hostless = draw({ id: "t", type: "upcoming" }, null);

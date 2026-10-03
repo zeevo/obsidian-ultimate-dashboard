@@ -11,7 +11,7 @@ import { CalendarsModal } from "./calendars-modal";
 import { CONTAINER_KINDS, WIDGET_KINDS } from "./kinds";
 import { RANGE_KEYS, specFor } from "./widgets";
 import { IMAGE_EXTENSIONS } from "./widgets/image";
-import { LayoutEditor, removeNode } from "./editor";
+import { LayoutEditor } from "./editor";
 import { serializeDashboard } from "./serialize";
 import { Dashboard, DashboardSettings, activeDashboard, addDashboard, duplicateDashboard, findAccount, removeDashboard, uniqueName } from "./store";
 
@@ -502,9 +502,7 @@ export class DashboardView extends ItemView {
 
 	/**
 	 * Draws an error and returns its box. A failed widget's error fills the
-	 * widget's space and, outside edit mode, offers to edit or remove it. In edit
-	 * mode the widget's own handle already does both, and its content ignores
-	 * clicks, so buttons there would be dead.
+	 * widget's space; in edit mode its handle still moves, edits or deletes it.
 	 */
 	private error(el: HTMLElement, message: string, at?: FailedAt): HTMLElement {
 		const box = el.createDiv({ cls: at ? "udash-error is-widget" : "udash-error" });
@@ -512,11 +510,6 @@ export class DashboardView extends ItemView {
 
 		box.createSpan({ cls: "udash-error-tag", text: tag });
 		box.createSpan({ text: message });
-
-		if (at && this.mode === "dashboard") {
-			this.errorAction(box, "Edit", () => this.editWidget(at.path));
-			this.errorAction(box, "Remove", () => this.confirmRemove(at));
-		}
 
 		return box;
 	}
@@ -527,37 +520,5 @@ export class DashboardView extends ItemView {
 		const button = actions.createEl("button", { text });
 
 		button.addEventListener("click", onClick);
-	}
-
-	/** Switches to the visual editor with the widget's form open. */
-	private editWidget(path: number[]): void {
-		this.mode = "edit";
-		this.editorTab = "visual";
-		this.render();
-		this.editor?.configureAt(path);
-	}
-
-	private confirmRemove(at: FailedAt): void {
-		const label = specFor(at.node.type).label;
-
-		new ConfirmModal(
-			this.app,
-			{
-				title: `Remove this ${label.toLowerCase()} widget?`,
-				body: "It is taken out of the layout. Its settings cannot be brought back.",
-				cta: "Remove",
-			},
-			async () => {
-				const current = activeDashboard(this.host.settings);
-
-				if (!current) return;
-				const config = parseDashboard(current.config);
-
-				removeNode(config.root, at.path);
-				current.config = serializeDashboard(config);
-				await this.host.saveSettings();
-				this.host.refreshViews();
-			},
-		).open();
 	}
 }
