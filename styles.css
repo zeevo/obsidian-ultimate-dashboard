@@ -202,8 +202,8 @@
 	border: none;
 	border-radius: 8px;
 	padding: 10px 12px;
-	background: var(--color-red);
-	color: white;
+	background: rgba(var(--color-red-rgb), 0.15);
+	color: var(--text-error);
 	text-align: center;
 }
 
