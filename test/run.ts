@@ -2196,6 +2196,13 @@ console.log("\nwidgets through a host");
 	check("an image stands at its height", vaultImg?.style.height === "200px", vaultImg?.style.height);
 	check("an image does not start a native drag", vaultImg?.attrs.draggable === "false");
 
+	for (const type of ["mouseover", "mousedown", "wheel"]) {
+		let stopped = false;
+
+		vaultImg?.listeners[type]?.({ stopPropagation: () => (stopped = true) });
+		check(`an image keeps ${type} from document-wide image plugins`, stopped);
+	}
+
 	const gone = draw({ id: "t", type: "image", src: "dog.png" });
 
 	check("a missing vault image says so", gone.byClass("udash-error")[0]?.text === 'No file called "dog.png"',

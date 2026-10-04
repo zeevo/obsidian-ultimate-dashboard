@@ -37,6 +37,10 @@ export function renderImage(el: HTMLElement, widget: ImageWidget, ctx: RenderCon
 	// dragging the picture would start the browser's own image drag, not move the widget
 	img.setAttribute("draggable", "false");
 
+	// plugins such as Image Converter listen on the document for these on any
+	// img and resize it as if it were embedded in a note; this one is not
+	for (const type of ["mouseover", "mousedown", "wheel"]) img.addEventListener(type, (e) => e.stopPropagation());
+
 	if (widget.height !== undefined) img.style.height = `${widget.height}px`;
 	img.addEventListener("error", () => ctx.fail(`Could not load ${widget.src}`));
 }
