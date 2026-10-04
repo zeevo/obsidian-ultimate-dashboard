@@ -89,6 +89,7 @@ The time, ticking. Reads no data and needs no configuration.
 | `seconds` | `true` to tick the seconds, or draw a second hand |
 | `date` | `true` to show today's date underneath |
 | `hour24` | `true` for a 24 hour clock. Digital only |
+| `timezone` | An IANA time zone such as `America/New_York`. Local time when unset |
 | `title` | Heading. Omitted entirely when unset |
 
 ```yaml

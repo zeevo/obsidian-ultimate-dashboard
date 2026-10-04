@@ -138,6 +138,8 @@ export interface ClockWidget extends NodeBase {
 	hour24?: boolean;
 	/** Draw a face instead of digits. A face is always twelve hour. */
 	analog?: boolean;
+	/** An IANA time zone such as `Europe/London`. Local time when unset. */
+	timezone?: string;
 }
 
 export interface TextWidget extends NodeBase {

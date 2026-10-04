@@ -23,6 +23,40 @@ export function clockText(now: Date, widget: ClockWidget): string {
 	return widget.hour24 === true ? time : `${time} ${hours < 12 ? "am" : "pm"}`;
 }
 
+/**
+ * The same moment as a Date whose local fields read as the wall clock in
+ * `zone`, so the digits, the hands and the date all follow it unchanged.
+ */
+export function inZone(now: Date, zone: string): Date {
+	const parts = new Intl.DateTimeFormat("en-US", {
+		timeZone: zone,
+		hourCycle: "h23",
+		year: "numeric",
+		month: "numeric",
+		day: "numeric",
+		hour: "numeric",
+		minute: "numeric",
+		second: "numeric",
+	}).formatToParts(now);
+
+	const part = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+
+	return new Date(part("year"), part("month") - 1, part("day"), part("hour"), part("minute"), part("second"));
+}
+
+/** Why a time zone cannot be used, or null. Intl is the authority on names. */
+function validateClock(widget: ClockWidget): string | null {
+	if (!widget.timezone) return null;
+
+	try {
+		new Intl.DateTimeFormat(undefined, { timeZone: widget.timezone });
+
+		return null;
+	} catch {
+		return `Unknown time zone "${widget.timezone}". Use a name such as America/New_York.`;
+	}
+}
+
 /** The shell for a clock. `renderClock` fills it, and keeps filling it. */
 export function renderClock(el: HTMLElement, widget: ClockWidget): HTMLElement {
 	const wrap = el.createDiv({ cls: "udash-clock" });
@@ -102,7 +136,9 @@ function drawFace(body: HTMLElement, widget: ClockWidget, now: Date): void {
 }
 
 /** Fills a shell created by `renderClock`. Called again on every tick. */
-export function fillClock(body: HTMLElement, widget: ClockWidget, now: Date): void {
+export function fillClock(body: HTMLElement, widget: ClockWidget, moment: Date): void {
+	const now = widget.timezone ? inZone(moment, widget.timezone) : moment;
+
 	body.empty();
 
 	if (widget.analog) drawFace(body, widget, now);
@@ -150,9 +186,17 @@ export const clock: WidgetSpec<ClockWidget> = {
 			label: "24 hour clock",
 			hint: "Digital only. A face is always twelve hour",
 		},
+		{
+			key: "timezone",
+			kind: FieldKind.Text,
+			label: "Time zone",
+			hint: "Local time when empty",
+			placeholder: "America/New_York",
+		},
 	],
+	validate: validateClock,
 	blank: () => ({ type: WidgetKind.Clock }),
 	title: (w) => w.title || "Clock",
-	summary: (w) => (w.analog ? "analog" : w.hour24 ? "24 hour" : "12 hour"),
+	summary: (w) => [w.analog ? "analog" : w.hour24 ? "24 hour" : "12 hour", w.timezone].filter(Boolean).join(", "),
 	render: renderClockWidget,
 };

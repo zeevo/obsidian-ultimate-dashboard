@@ -18,7 +18,7 @@ import { renderLine } from "../src/widgets/line";
 import { renderNote } from "../src/widgets/note";
 import { renderStat } from "../src/widgets/stat";
 import { clockLabel, fillWeather, hourLabel, renderWeather } from "../src/widgets/weather";
-import { clockText, fillClock, handAngles, renderClock } from "../src/widgets/clock";
+import { clockText, fillClock, handAngles, inZone, renderClock } from "../src/widgets/clock";
 import { renderNode } from "../src/layout";
 import { parseICS } from "../src/ics";
 import { serializeDashboard } from "../src/serialize";
@@ -1624,6 +1624,26 @@ console.log("\nclock");
 		datedBody.byClass("udash-clock-time").map((e) => e.text).join());
 
 	check("a clock never needs setup", !needsSetup(newNode("clock")));
+
+	// one moment, read on two different wall clocks
+	const utc = new Date(Date.UTC(2026, 8, 13, 14, 30, 5));
+	const tokyo = inZone(utc, "Asia/Tokyo");
+
+	check("a zone moves the wall clock", tokyo.getHours() === 23 && tokyo.getMinutes() === 30 && tokyo.getSeconds() === 5,
+		tokyo.toString());
+	check("a zone can cross midnight", inZone(utc, "Pacific/Kiritimati").getDate() === 14);
+	check("midnight in a zone is hour zero", inZone(new Date(Date.UTC(2026, 8, 13, 0, 15)), "UTC").getHours() === 0);
+
+	const zoned = new El();
+	const zonedBody = renderClock(zoned, plain);
+
+	fillClock(zonedBody as never, { ...plain, timezone: "Asia/Tokyo" }, utc);
+	check("a zoned clock shows that zone's time", zonedBody.byClass("udash-clock-time")[0]?.text === "11:30 pm",
+		zonedBody.byClass("udash-clock-time")[0]?.text);
+	check("a known zone is accepted", specFor("clock").validate?.({ ...plain, timezone: "Europe/London" } as never) === null);
+	check("an unknown zone is refused", specFor("clock").validate?.({ ...plain, timezone: "Mars/Olympus" } as never)?.includes("Mars/Olympus") === true);
+	check("no zone is fine", specFor("clock").validate?.(plain as never) === null);
+	check("a clock summary names its zone", specFor("clock").summary({ ...plain, timezone: "Asia/Tokyo" } as never) === "12 hour, Asia/Tokyo");
 
 	/* --------------------------------------------------------- analog face */
 
