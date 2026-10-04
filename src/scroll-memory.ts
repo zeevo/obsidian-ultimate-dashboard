@@ -1,6 +1,7 @@
 import * as z from "zod/mini";
 
 const Saved = z.record(z.string(), z.unknown());
+
 const Offset = z.number();
 
 /**
@@ -14,10 +15,10 @@ export class ScrollMemory {
 	private offsets: Map<string, number>;
 
 	constructor(
-		load: () => unknown,
+		stored: unknown,
 		private save: (offsets: Record<string, number>) => void,
 	) {
-		const saved = Saved.safeParse(load());
+		const saved = Saved.safeParse(stored);
 		const entries = saved.success ? Object.entries(saved.data) : [];
 
 		// one bad entry costs only that note its place, not every note

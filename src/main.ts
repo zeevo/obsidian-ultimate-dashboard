@@ -14,7 +14,7 @@ export default class UltimateDashboardPlugin extends Plugin {
 	calendars = new CalendarService();
 	weather = new WeatherService();
 	scrolled = new ScrollMemory(
-		() => this.app.loadLocalStorage(SCROLL_KEY),
+		this.app.loadLocalStorage(SCROLL_KEY),
 		(offsets) => this.app.saveLocalStorage(SCROLL_KEY, offsets),
 	);
 

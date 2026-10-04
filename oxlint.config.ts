@@ -83,7 +83,7 @@ export default defineConfig({
 			 * entry point signature: something has to accept `unknown` from the
 			 * network or from data.json before a schema can be run over it.
 			 */
-			files: ["src/weather.ts", "src/google.ts", "src/store.ts"],
+			files: ["src/weather.ts", "src/google.ts", "src/store.ts", "src/scroll-memory.ts"],
 			rules: {
 				"anti-slop/no-unknown-parameters": "off",
 			},
