@@ -4,11 +4,19 @@ import { WeatherService } from "./weather";
 import { DashboardSettings, addDashboard, defaultSettings, migrate } from "./store";
 import { DashboardView, VIEW_TYPE_DASHBOARD } from "./view";
 import { NameModal } from "./modal";
+import { ScrollMemory } from "./scroll-memory";
+
+/** Where embedded notes' scroll offsets are kept, in the vault's local storage. */
+const SCROLL_KEY = "ultimate-dashboard-scroll";
 
 export default class UltimateDashboardPlugin extends Plugin {
 	settings: DashboardSettings = defaultSettings();
 	calendars = new CalendarService();
 	weather = new WeatherService();
+	scrolled = new ScrollMemory(
+		() => this.app.loadLocalStorage(SCROLL_KEY),
+		(offsets) => this.app.saveLocalStorage(SCROLL_KEY, offsets),
+	);
 
 	async onload(): Promise<void> {
 		await this.loadSettings();

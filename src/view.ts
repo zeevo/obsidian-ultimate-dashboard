@@ -13,6 +13,7 @@ import { RANGE_KEYS } from "./widgets";
 import { IMAGE_EXTENSIONS } from "./widgets/image";
 import { LayoutEditor } from "./editor";
 import { serializeDashboard } from "./serialize";
+import { ScrollMemory } from "./scroll-memory";
 import { Dashboard, DashboardSettings, activeDashboard, addDashboard, duplicateDashboard, findAccount, removeDashboard, uniqueName } from "./store";
 
 export const VIEW_TYPE_DASHBOARD = "ultimate-dashboard-view";
@@ -22,6 +23,8 @@ export interface ViewHost {
 	settings: DashboardSettings;
 	calendars: CalendarService;
 	weather: WeatherService;
+	/** Shared by every dashboard tab, so one tab's save does not undo another's. */
+	scrolled: ScrollMemory;
 	saveSettings(): Promise<void>;
 	refreshViews(): void;
 	invalidateCalendars(): void;
@@ -34,12 +37,6 @@ export class DashboardView extends ItemView {
 	private editorTab: "visual" | "yaml" = "visual";
 	/** Lifecycle owners widgets took for this draw (embedded notes, clocks), dropped on redraw. */
 	private embeds: Component[] = [];
-	/**
-	 * How far each embedded note is scrolled, by path. The whole view is rebuilt
-	 * whenever any note in the vault changes, so without this a tile you had
-	 * scrolled would jump back to the top as you typed elsewhere.
-	 */
-	private scrolled = new Map<string, number>();
 	/** The layout editor for the current draw, while in edit mode. */
 	private editor: LayoutEditor | null = null;
 	/**
@@ -195,7 +192,7 @@ export class DashboardView extends ItemView {
 			},
 			renderMarkdown: (markdown, el, sourcePath, owner) =>
 				MarkdownRenderer.render(this.app, markdown, el, sourcePath, owner),
-			scrolled: this.scrolled,
+			scrolled: this.host.scrolled,
 			weather: (query) => weather.weather(query),
 			sources: settings.calendars,
 			events: (sources, from, to) => calendars.events(sources, from, to),

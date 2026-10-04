@@ -506,7 +506,9 @@ Frontmatter is stripped: a tile shows the note's prose, not a property table.
 The tile scrolls internally rather than growing, and **remembers where it was
 scrolled to**. That matters more than it sounds: the dashboard redraws whenever
 any note in the vault changes, so without it a tile you had scrolled would jump
-back to the top while you typed somewhere else.
+back to the top while you typed somewhere else. The position is kept across
+restarts too, in this device's local storage rather than `data.json`, so it is
+not synced.
 
 A note tile refreshes on its own when the note it shows is edited.
 

@@ -25,7 +25,13 @@ export interface NoteHost extends ClockHost {
 	 * whenever any note in the vault changes, so without this a tile you had
 	 * scrolled would jump back to the top as you typed elsewhere.
 	 */
-	scrolled: Map<string, number>;
+	scrolled: ScrollStore;
+}
+
+/** Somewhere to keep scroll offsets by path. A Map is one. */
+export interface ScrollStore {
+	get(path: string): number | undefined;
+	set(path: string, top: number): void;
 }
 
 export interface WeatherHost {

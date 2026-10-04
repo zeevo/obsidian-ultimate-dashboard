@@ -19,6 +19,7 @@ import { renderNote } from "../src/widgets/note";
 import { renderStat } from "../src/widgets/stat";
 import { clockLabel, fillWeather, hourLabel, renderWeather } from "../src/widgets/weather";
 import { clockText, fillClock, handAngles, inZone, renderClock } from "../src/widgets/clock";
+import { ScrollMemory } from "../src/scroll-memory";
 import { renderNode } from "../src/layout";
 import { parseICS } from "../src/ics";
 import { serializeDashboard } from "../src/serialize";
@@ -2067,6 +2068,18 @@ console.log("\nwidgets through a host");
 		rendered[0]?.markdown === "hello" && rendered[0]?.sourcePath === "0 All/Health.md", JSON.stringify(rendered[0]));
 	check("a note's scroll is restored", noteEl.byClass("udash-note-body")[0]?.scrollTop === 42);
 	check("a note keeps track of its scroll", domEvents.includes("scroll"));
+
+	{
+		let stored: unknown = { Health: 120, Broken: "x" };
+		const memory = new ScrollMemory(() => stored, (offsets) => (stored = offsets));
+
+		check("saved offsets come back", memory.get("Health") === 120);
+		memory.set("Plan", 30);
+		check("a scroll is saved straight away", JSON.stringify(stored) === '{"Health":120,"Plan":30}', JSON.stringify(stored));
+		check("a reload reads what was saved", new ScrollMemory(() => stored, () => {}).get("Plan") === 30);
+		check("nothing saved starts at the top", new ScrollMemory(() => null, () => {}).get("Health") === undefined);
+		check("unreadable storage starts at the top", new ScrollMemory(() => "junk", () => {}).get("Health") === undefined);
+	}
 
 	const missing = draw({ id: "t", type: "note", path: "Nope" });
 
