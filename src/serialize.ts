@@ -41,6 +41,8 @@ function optionsOf(node: LayoutNode): [string, string][] {
 		put("gap", node.gap);
 
 		if (node.type === ContainerKind.Row) put("wrap", node.wrap);
+
+		if (node.type === ContainerKind.Mosaic) put("columns", node.columns);
 	} else {
 		// SAFETY: reading a widget by its own declared field keys is what the
 		// registry exists for; every key below comes from that widget's spec.
@@ -55,6 +57,7 @@ function optionsOf(node: LayoutNode): [string, string][] {
 	}
 
 	put("flex", node.flex);
+	put("span", node.span);
 
 	return out;
 }

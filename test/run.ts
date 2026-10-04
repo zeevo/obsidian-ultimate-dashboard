@@ -23,7 +23,7 @@ import { ScrollMemory } from "../src/scroll-memory";
 import { renderNode } from "../src/layout";
 import { parseICS } from "../src/ics";
 import { serializeDashboard } from "../src/serialize";
-import { LayoutEditor, insertionIndex, moveNode, newNode, nodeAt } from "../src/editor";
+import { LayoutEditor, insertionIndex, mosaicIndex, moveNode, newNode, nodeAt } from "../src/editor";
 import { SPANS, WEATHER_MODES, WeatherError, describeWeather, parseForecast, parsePlaces, toWeatherMode } from "../src/weather";
 import { isComplete, missingField } from "../src/schema";
 import { CONTAINER_KINDS, WIDGET_KINDS } from "../src/kinds";
@@ -461,12 +461,17 @@ check("an empty container is allowed", (() => {
 
 rejects("layout:\n  type: line\n  property: w\n  children: [{ type: heatmap, property: lift }]", "widget with children rejected");
 
-rejects("layout:\n  type: row\n  children: [{ type: heatmap, property: lift, span: 2 }]", "span is rejected outright");
+// a widget dragged out of a mosaic keeps its span, so a row has to accept it
+check("span is allowed outside a mosaic", (() => {
+		const c = parseDashboard("layout:\n  type: row\n  children: [{ type: heatmap, property: lift, span: 2 }]");
+
+		return c.root.children[0]?.span === 2;
+	})());
 
 
 
 
-rejects("layout:\n  type: row\n  columns: 2\n  children: [{ type: heatmap, property: lift }]", "columns is rejected outright");
+rejects("layout:\n  type: row\n  columns: 2\n  children: [{ type: heatmap, property: lift }]", "columns is rejected outside a mosaic");
 
 rejects("layout:\n  type: column\n  children: []\npanels: []", "the flat form is rejected");
 
@@ -475,6 +480,46 @@ let deep = "{ type: heatmap, property: lift }";
 for (let i = 0; i < 10; i++) deep = `{ type: column, children: [${deep}] }`;
 
 rejects(`layout: ${deep}`, "excessive nesting rejected");
+
+console.log("\nmosaic");
+
+{
+	const src = "layout:\n  type: mosaic\n  columns: 4\n  children:\n    - { type: calendar, span: 2 }\n    - { type: heatmap, property: lift, span: 9 }\n    - { type: heatmap, property: read }";
+	const cfg = parseDashboard(src);
+
+	check("a mosaic parses", cfg.root.type === "mosaic" && cfg.root.columns === 4 && cfg.root.children[0]?.span === 2);
+	check("a mosaic survives a round trip", JSON.stringify(parseDashboard(serializeDashboard(cfg)).root, (k, v) => (k === "id" ? undefined : v))
+		=== JSON.stringify(cfg.root, (k, v) => (k === "id" ? undefined : v)));
+
+	const host = new El();
+
+	renderNode(host as never, cfg.root, { days, error: () => {} });
+
+	const grid = host.children[0];
+
+	check("a mosaic is a grid", grid?.style.display === "grid" && grid.style.gridTemplateColumns === "repeat(4, minmax(0, 1fr))",
+		grid?.style.gridTemplateColumns);
+	check("a mosaic packs into the gaps", grid?.style.gridAutoFlow === "row dense");
+	check("a child spans its columns", grid?.children[0]?.style.gridColumn === "span 2");
+	check("a span wider than the mosaic is cut to fit", grid?.children[1]?.style.gridColumn === "span 4",
+		grid?.children[1]?.style.gridColumn);
+	check("a child spans one column by default", grid?.children[2]?.style.gridColumn === "span 1");
+
+	const plain = new El();
+
+	renderNode(plain as never, parseDashboard("layout:\n  type: mosaic\n  children: []").root, { days, error: () => {} });
+	check("a mosaic defaults to three columns", plain.children[0]?.style.gridTemplateColumns === "repeat(3, minmax(0, 1fr))");
+}
+
+rejects("layout:\n  type: mosaic\n  columns: 0\n  children: []", "a mosaic needs a column");
+
+rejects("layout:\n  type: mosaic\n  columns: 13\n  children: []", "a mosaic has at most twelve columns");
+
+rejects("layout:\n  type: mosaic\n  columns: 2.5\n  children: []", "a mosaic's columns are whole");
+
+rejects("layout:\n  type: mosaic\n  children: [{ type: heatmap, property: lift, span: 0 }]", "a span is at least one");
+
+rejects("layout:\n  type: mosaic\n  wrap: false\n  children: []", "wrap is rejected on a mosaic");
 
 console.log("\nserialisation round trip");
 
@@ -1938,6 +1983,14 @@ layout:
 	check("a column inserts above a midpoint", insertionIndex(column, 50, 10, false) === 0);
 	check("a column inserts between children", insertionIndex(column, 50, 50, false) === 1);
 	check("a column appends past the last midpoint", insertionIndex(column, 50, 95, false) === 2);
+
+	// a tall child on the left, two short ones stacked on the right
+	const mosaic = [box(0, 0, 100, 200), box(120, 0, 100, 50), box(120, 70, 100, 50)];
+
+	check("a mosaic drops before the child under the pointer", mosaicIndex(mosaic, 130, 90) === 2);
+	check("a mosaic drops after on the right half", mosaicIndex(mosaic, 210, 20) === 2);
+	check("a mosaic drops beside the nearest child from a hole", mosaicIndex(mosaic, 160, 140) === 2);
+	check("an empty mosaic drops first", mosaicIndex([], 10, 10) === 0);
 
 	// two lines: [A tall, B short] then [C]
 	const wrapped = [box(0, 0, 100, 80), box(120, 0, 100, 30), box(0, 100, 100, 30)];

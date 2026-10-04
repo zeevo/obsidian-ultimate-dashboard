@@ -10,6 +10,8 @@ export interface NodeBase {
 	id: string;
 	/** Growth factor within its container. */
 	flex?: number;
+	/** Columns taken inside a mosaic. One when unset. */
+	span?: number;
 }
 
 export const Agg = {

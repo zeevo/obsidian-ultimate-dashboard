@@ -17,11 +17,30 @@
 	width: 100%;
 }
 
+/* A mosaic child is as tall as its content and claims that many pixel rows;
+   stretching it to its rows would grow it, and the rows with it, forever. */
+.udash-mosaic > *,
+.udash-mosaic > .udash-node.is-failed {
+	align-self: start;
+}
+
+.udash-mosaic > .udash-edit-empty {
+	grid-column: 1 / -1;
+}
+
 /* Below this width every row becomes a column and every grid a single track,
    so a deeply nested dashboard stays readable in a split pane or on a phone. */
 @media (max-width: 700px) {
 	.udash-row {
 		flex-direction: column !important;
+	}
+
+	.udash-mosaic {
+		grid-template-columns: minmax(0, 1fr) !important;
+	}
+
+	.udash-mosaic > * {
+		grid-column: auto !important;
 	}
 }
 

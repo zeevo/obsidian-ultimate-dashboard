@@ -226,9 +226,30 @@ Widgets are leaves of a layout tree. Three container types hold `children`:
 |-----------|-----------|
 | `column` | stacks its children vertically |
 | `row` | lays them side by side, wrapping by default |
+| `mosaic` | packs them into columns, sliding short widgets up into the gaps beside tall ones |
 
-There is no grid type: two columns is a `row` with two children, and anything
-more elaborate is those two nesting.
+Two columns is a `row` with two children, and most arrangements are rows and
+columns nesting. Reach for a `mosaic` when a row would leave holes: a row is as
+tall as its tallest child, so one tall calendar beside three short charts
+leaves empty space under the charts. In a mosaic the widgets that follow move
+up into that space.
+
+```yaml
+layout:
+  type: mosaic
+  columns: 4
+  children:
+    - { type: calendar, span: 2 }
+    - { type: upcoming }
+    - { type: line, property: weight, span: 2 }
+    - { type: heatmap, property: lift }
+    - { type: heatmap, property: read }
+```
+
+A mosaic keeps the children in their written order as far as it can, filling
+left to right, but a short widget further down jumps ahead into a hole it fits.
+It re-packs whenever a widget's height changes, such as a calendar finishing
+loading.
 
 ```yaml
 layout:
@@ -257,8 +278,9 @@ take `children`: wrap widgets in a `row` or `column` instead.
 
 | Key | Applies to | Meaning |
 |-----|-----------|---------|
-| `gap` | both | Space between children, in px. Inherited when unset |
+| `gap` | all | Space between children, in px. Inherited when unset |
 | `wrap` | row | `false` to keep children on one line |
+| `columns` | mosaic | How many columns to pack into, 1 to 12. Defaults to 3 |
 
 **Child sizing**
 
@@ -269,12 +291,10 @@ take `children`: wrap widgets in a `row` or `column` instead.
 | Key | Valid inside | Meaning |
 |-----|-------------|---------|
 | `flex` | row, column | Growth factor, like CSS `flex-grow` |
+| `span` | mosaic | Columns to take, 1 to 12. Ignored elsewhere, so a widget dragged out of a mosaic keeps it harmlessly |
 
-`span`, `columns` and `minWidth` were removed along with the grid type; the
-parser rejects them with a message pointing at the replacement.
-
-Below 700px every row becomes a column, so a deeply nested dashboard stays
-readable in a split pane or on a phone.
+Below 700px every row becomes a column and every mosaic a single column, so a
+deeply nested dashboard stays readable in a split pane or on a phone.
 
 
 ### Ranges

@@ -4,6 +4,9 @@ import { ContainerKind } from "./kinds";
 
 const DEFAULT_GAP = 20;
 
+/** Columns in a mosaic that does not say. */
+export const DEFAULT_COLUMNS = 3;
+
 
 /** Applies a node's own sizing within whatever container encloses it. */
 function applySizing(el: HTMLElement, node: LayoutNode): void {
@@ -18,6 +21,18 @@ function applyContainer(el: HTMLElement, node: ContainerNode, inheritedGap: numb
 	const gap = node.gap ?? inheritedGap;
 	el.style.gap = `${gap}px`;
 
+	if (node.type === ContainerKind.Mosaic) {
+		// rows a pixel tall, so each child can claim exactly its own height; the
+		// gap below it is claimed with it rather than left to row-gap
+		el.style.display = "grid";
+		el.style.gridTemplateColumns = `repeat(${node.columns ?? DEFAULT_COLUMNS}, minmax(0, 1fr))`;
+		el.style.gridAutoRows = "1px";
+		el.style.gridAutoFlow = "row dense";
+		el.style.rowGap = "0";
+
+		return gap;
+	}
+
 	el.style.display = "flex";
 	el.style.flexDirection = node.type === ContainerKind.Row ? "row" : "column";
 
@@ -27,6 +42,52 @@ function applyContainer(el: HTMLElement, node: ContainerNode, inheritedGap: numb
 	}
 
 	return gap;
+}
+
+/** What a mosaic packs: its children, and the editor's stand-ins for them. */
+const PACKED = ["udash-node", "udash-edit-placeholder", "udash-edit-empty"];
+
+/**
+ * Packs a mosaic. Each child spans as many pixel rows as it is tall, plus the
+ * gap, and dense flow slides shorter children up into the holes beside taller
+ * ones. Heights change after the first draw (calendars and notes load, a
+ * window narrows), so every child is watched and re-measured, and so is
+ * anything the editor moves in during a drag.
+ */
+function packMosaic(el: HTMLElement, node: ContainerNode, childEls: HTMLElement[], gap: number, ctx: LayoutContext): void {
+	const columns = node.columns ?? DEFAULT_COLUMNS;
+
+	node.children.forEach((child, i) => {
+		childEls[i].style.gridColumn = `span ${Math.min(child.span ?? 1, columns)}`;
+	});
+
+	// measuring needs a real layout, and something to disconnect the watchers
+	// when the dashboard redraws
+	if (!ctx.host || globalThis.ResizeObserver === undefined) return;
+
+	const fit = new ResizeObserver((entries) => {
+		for (const entry of entries) {
+			// SAFETY: only HTMLElements are observed, by `watch` below.
+			const child = entry.target as HTMLElement;
+
+			child.style.gridRowEnd = `span ${Math.max(1, child.offsetHeight + gap)}`;
+		}
+	});
+
+	const watch = (child: Node) => {
+		if (child instanceof HTMLElement && PACKED.some((c) => child.hasClass(c))) fit.observe(child);
+	};
+
+	const arrivals = new MutationObserver((records) => {
+		for (const record of records) record.addedNodes.forEach(watch);
+	});
+
+	Array.from(el.children).forEach(watch);
+	arrivals.observe(el, { childList: true });
+	ctx.host.own().register(() => {
+		fit.disconnect();
+		arrivals.disconnect();
+	});
 }
 
 /**
@@ -73,7 +134,7 @@ function renderAt(
 	decorate: NodeDecorator | undefined,
 	inheritedGap: number,
 	path: number[],
-): void {
+): HTMLElement {
 	// a widget's own type is left off: its tile already carries that class, and
 	// matching both drew every tile twice, one inside the other
 	const el = parent.createDiv({ cls: isContainer(node) ? `udash-node udash-${node.type}` : "udash-node udash-widget" });
@@ -82,12 +143,12 @@ function renderAt(
 	if (isContainer(node)) {
 		const gap = applyContainer(el, node, inheritedGap);
 
-		node.children.forEach((child, i) => {
-			renderAt(el, child, ctx, decorate, gap, [...path, i]);
-		});
+		const childEls = node.children.map((child, i) => renderAt(el, child, ctx, decorate, gap, [...path, i]));
+
+		if (node.type === ContainerKind.Mosaic) packMosaic(el, node, childEls, gap, ctx);
 		decorate?.(el, node, path);
 
-		return;
+		return el;
 	}
 
 	let decorated = false;
@@ -111,4 +172,6 @@ function renderAt(
 
 	decorated = true;
 	decorate?.(el, node, path);
+
+	return el;
 }

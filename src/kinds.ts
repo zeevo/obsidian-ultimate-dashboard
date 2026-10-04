@@ -9,6 +9,7 @@
 export const ContainerKind = {
 	Row: "row",
 	Column: "column",
+	Mosaic: "mosaic",
 } as const;
 
 export type ContainerKind = (typeof ContainerKind)[keyof typeof ContainerKind];

@@ -18,6 +18,8 @@ export interface ContainerNode extends NodeBase {
 	gap?: number;
 	/** Row only: whether children wrap onto further lines. Defaults to true. */
 	wrap?: boolean;
+	/** Mosaic only: how many columns it packs its children into. */
+	columns?: number;
 }
 
 export type LayoutNode = ContainerNode | Widget;
@@ -65,8 +67,24 @@ function readFlex(raw: Record<string, unknown>, where: string): number | undefin
 	return v;
 }
 
+/** A whole number from 1 to `max`, or undefined when the key is absent. */
+function readCount(raw: Record<string, unknown>, key: string, max: number, where: string): number | undefined {
+	const v = raw[key];
+
+	if (v === undefined || v === null) return undefined;
+
+	if (typeof v !== "number" || !Number.isInteger(v) || v < 1 || v > max) {
+		throw new ConfigError(`${where}: \`${key}\` must be a whole number from 1 to ${max}`);
+	}
+
+	return v;
+}
+
+/** The most columns a mosaic can have, and so the most a child can span. */
+export const MAX_COLUMNS = 12;
+
 /** Keys handled by the tree rather than by a widget's own field list. */
-const STRUCTURAL = ["type", "flex", "children", "gap", "wrap"] as const;
+const STRUCTURAL = ["type", "flex", "span", "children", "gap", "wrap", "columns"] as const;
 
 function parseNode(raw: unknown, where: string, depth: number): LayoutNode {
 	if (depth > MAX_DEPTH) {
@@ -75,6 +93,7 @@ function parseNode(raw: unknown, where: string, depth: number): LayoutNode {
 
 	const node = asRecord(raw, where);
 	const flex = readFlex(node, where);
+	const span = readCount(node, "span", MAX_COLUMNS, where);
 	const container = toContainerKind(node.type);
 
 	if (container !== null) {
@@ -86,6 +105,10 @@ function parseNode(raw: unknown, where: string, depth: number): LayoutNode {
 			throw new ConfigError(`${where}: \`wrap\` only applies to a row`);
 		}
 
+		if (container !== ContainerKind.Mosaic && node.columns !== undefined) {
+			throw new ConfigError(`${where}: \`columns\` only applies to a mosaic`);
+		}
+
 		const gap = node.gap;
 
 		if (gap !== undefined && (typeof gap !== "number" || gap < 0)) {
@@ -94,7 +117,7 @@ function parseNode(raw: unknown, where: string, depth: number): LayoutNode {
 
 		// a container has no field declaration to check against, so its own keys
 		// are listed here; without this a typo is silently ignored
-		const allowed = new Set(["type", "flex", "children", "gap", "wrap"]);
+		const allowed = new Set(["type", "flex", "span", "children", "gap", "wrap", "columns"]);
 
 		for (const key of Object.keys(node)) {
 			if (!allowed.has(key)) {
@@ -108,8 +131,10 @@ function parseNode(raw: unknown, where: string, depth: number): LayoutNode {
 			id: nextId(),
 			type: container,
 			flex,
+			span,
 			gap: typeof gap === "number" ? gap : undefined,
 			wrap: typeof node.wrap === "boolean" ? node.wrap : undefined,
+			columns: readCount(node, "columns", MAX_COLUMNS, where),
 			children: node.children.map((c, i) => parseNode(c, `${where} > ${container}[${i}]`, depth + 1)),
 		};
 	}
@@ -119,7 +144,7 @@ function parseNode(raw: unknown, where: string, depth: number): LayoutNode {
 	if (widget === null) {
 		throw new ConfigError(
 			`${where}: unknown type "${String(node.type)}". ` +
-				`Expected a widget or a container (row, column).`,
+				`Expected a widget or a container (row, column, mosaic).`,
 		);
 	}
 
@@ -140,7 +165,7 @@ function parseNode(raw: unknown, where: string, depth: number): LayoutNode {
 	}
 
 
-	const built: Record<string, unknown> = { id: nextId(), type: widget, flex, ...fields };
+	const built: Record<string, unknown> = { id: nextId(), type: widget, flex, span, ...fields };
 
 	// SAFETY: every key came from this widget's own field declaration, and every
 	// value was validated against the kind that declaration names.
@@ -175,7 +200,7 @@ export function parseDashboard(source: string): DashboardConfig {
 	const root = parseNode(doc.layout, "layout", 0);
 
 	if (!isContainer(root)) {
-		throw new ConfigError(`layout: the root must be a row or column, not a "${root.type}" widget`);
+		throw new ConfigError(`layout: the root must be a row, column or mosaic, not a "${root.type}" widget`);
 	}
 
 	return {

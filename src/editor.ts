@@ -15,6 +15,7 @@ import { FormContext, WidgetForm } from "./widget-form";
 const DIVIDERS = [
 	{ type: ContainerKind.Row, label: "Columns", icon: "columns-3", hint: "Split into columns, side by side" },
 	{ type: ContainerKind.Column, label: "Rows", icon: "rows-3", hint: "Split into rows, stacked" },
+	{ type: ContainerKind.Mosaic, label: "Mosaic", icon: "layout-dashboard", hint: "Pack widgets into the gaps" },
 ] as const;
 
 /**
@@ -148,6 +149,32 @@ export function insertionIndex(boxes: Box[], x: number, y: number, horizontal: b
 	}
 
 	return boxes.length;
+}
+
+/**
+ * Where a drop at (x, y) lands in a mosaic. Children sit at all heights, so
+ * there are no lines to read: the drop goes beside whichever child is nearest,
+ * before it on its left half and after it on its right.
+ */
+export function mosaicIndex(boxes: Box[], x: number, y: number): number {
+	let nearest = -1;
+	let best = Infinity;
+
+	boxes.forEach((b, i) => {
+		const dx = Math.max(b.left - x, 0, x - b.right);
+		const dy = Math.max(b.top - y, 0, y - b.bottom);
+		const distance = dx * dx + dy * dy;
+
+		if (distance < best) {
+			best = distance;
+			nearest = i;
+		}
+	});
+
+	if (nearest === -1) return 0;
+	const b = boxes[nearest];
+
+	return x < (b.left + b.right) / 2 ? nearest : nearest + 1;
 }
 
 /* -------------------------------------------------------------- editor */
@@ -379,12 +406,11 @@ export class LayoutEditor {
 
 			const others = childrenOf(el).filter((c) => c !== moving);
 
-			const index = insertionIndex(
-				others.map((c) => c.getBoundingClientRect()),
-				e.clientX,
-				e.clientY,
-				node.type === ContainerKind.Row,
-			);
+			const boxes = others.map((c) => c.getBoundingClientRect());
+
+			const index = node.type === ContainerKind.Mosaic
+				? mosaicIndex(boxes, e.clientX, e.clientY)
+				: insertionIndex(boxes, e.clientX, e.clientY, node.type === ContainerKind.Row);
 
 			// past the last child means before the tab, which is drawn after them
 			const before = others[index] ?? el.querySelector(":scope > .udash-edit-tab");

@@ -1,6 +1,6 @@
 import { App, ButtonComponent, ColorComponent, Modal, Setting, TextComponent } from "obsidian";
-import { LayoutNode, isContainer } from "./layout-tree";
-import { ContainerKind, assertNever } from "./kinds";
+import { LayoutNode, MAX_COLUMNS, isContainer } from "./layout-tree";
+import { ContainerKind, assertNever, toContainerKind } from "./kinds";
 import { specFor } from "./widgets";
 import { Field, FieldKind, FieldValue, missingField } from "./schema";
 
@@ -111,18 +111,30 @@ export class WidgetForm extends Modal {
 			.addDropdown((dd) => {
 				dd.addOption(ContainerKind.Column, "Rows, stacked");
 				dd.addOption(ContainerKind.Row, "Columns, side by side");
+				dd.addOption(ContainerKind.Mosaic, "Mosaic, packed into the gaps");
 				dd.setValue(node.type);
 				dd.onChange((v) => {
-					node.type = v === ContainerKind.Row ? ContainerKind.Row : ContainerKind.Column;
+					node.type = toContainerKind(v) ?? ContainerKind.Column;
 
-					// `wrap` is a row option; leaving it on a column is rejected on save
+					// each of these belongs to one layout and is rejected on save on another
 					if (node.type !== ContainerKind.Row) delete node.wrap;
+
+					if (node.type !== ContainerKind.Mosaic) delete node.columns;
 					this.contentEl.empty();
 					this.onOpen();
 				});
 			});
 
 		this.numberControl("Gap", () => node.gap, (v) => (node.gap = v), 0, "px");
+
+		if (node.type === ContainerKind.Mosaic) {
+			this.numberControl(
+				"Columns",
+				() => node.columns,
+				(v) => (node.columns = v === undefined ? undefined : Math.min(v, MAX_COLUMNS)),
+				1,
+			);
+		}
 
 		if (node.type === ContainerKind.Row) {
 			new Setting(this.contentEl)
