@@ -9,7 +9,7 @@ import { connect } from "./google";
 import { ConfirmModal, EventDetailsModal, EventModal, NameModal } from "./modal";
 import { CalendarsModal } from "./calendars-modal";
 import { CONTAINER_KINDS, WIDGET_KINDS } from "./kinds";
-import { RANGE_KEYS, specFor } from "./widgets";
+import { RANGE_KEYS } from "./widgets";
 import { IMAGE_EXTENSIONS } from "./widgets/image";
 import { LayoutEditor } from "./editor";
 import { serializeDashboard } from "./serialize";
@@ -502,13 +502,22 @@ export class DashboardView extends ItemView {
 
 	/**
 	 * Draws an error and returns its box. A failed widget's error fills the
-	 * widget's space; in edit mode its handle still moves, edits or deletes it.
+	 * widget's space with "Error" and the reason under it; in edit mode its
+	 * handle still moves, edits or deletes it.
 	 */
 	private error(el: HTMLElement, message: string, at?: FailedAt): HTMLElement {
-		const box = el.createDiv({ cls: at ? "udash-error is-widget" : "udash-error" });
-		const tag = at ? specFor(at.node.type).label.toLowerCase() : "dashboard";
+		if (at) {
+			const tile = el.createDiv({ cls: "udash-error is-widget" });
 
-		box.createSpan({ cls: "udash-error-tag", text: tag });
+			tile.createDiv({ cls: "udash-error-title", text: "Error" });
+			tile.createDiv({ cls: "udash-error-reason", text: message });
+
+			return tile;
+		}
+
+		const box = el.createDiv({ cls: "udash-error" });
+
+		box.createSpan({ cls: "udash-error-tag", text: "dashboard" });
 		box.createSpan({ text: message });
 
 		return box;

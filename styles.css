@@ -196,11 +196,24 @@
 	min-height: 80px;
 	display: flex;
 	flex-direction: column;
+	align-items: center;
 	justify-content: center;
-	gap: 6px;
+	gap: 4px;
+	border: none;
 	border-radius: 8px;
 	padding: 10px 12px;
-	background: var(--background-secondary);
+	background: var(--color-red);
+	color: white;
+	text-align: center;
+}
+
+.udash-error-title {
+	font-size: 1.4em;
+	font-weight: 600;
+}
+
+.udash-error-reason {
+	opacity: 0.9;
 }
 
 /* Rows align their children to the top, which leaves the tile's 100% height
